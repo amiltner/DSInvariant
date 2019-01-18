@@ -133,9 +133,12 @@ let implication_counter_example ?(eval_term = "true") ?(db = []) (z3 : t)
 
 let equivalence_counter_example ?(eval_term = "true") ?(db = []) (z3 : t)
                                 (a : string) (b : string) : model option =
-  sat_model_for_asserts z3 ~eval_term
-                        ~db:(("(assert (not (=> " ^ a ^ " " ^ b ^")))") ::
-                             ("(assert (not (=> " ^ b ^ " " ^ a ^")))") :: db)
+  sat_model_for_asserts
+    z3
+    ~eval_term
+    ~db:(("(assert (not (=> " ^ a ^ " " ^ b ^")))") ::
+         ("(assert (not (=> " ^ b ^ " " ^ a ^")))") ::
+         db)
 
 let simplify (z3 : t) (q : string) : string =
   let open Sexp in
@@ -143,29 +146,44 @@ let simplify (z3 : t) (q : string) : string =
     match
       run_queries z3 ~db:["(assert " ^ q ^ ")"]
                   ["(apply (then simplify ctx-simplify ctx-solver-simplify))"]
-    with [ goal ] -> goal
-       | goals -> raise (Internal_Exn ("Unexpected z3 goals:\n"
-                                      ^ (String.concat ~sep:"\n" goals)))
-  in match Sexp.parse goal with
-     | Done (List([(Atom "goals") ; (List((Atom "goal") :: goalexpr))]), _)
-       -> let goals = List.filter_map goalexpr
-                        ~f:(function Atom("true") -> Some "true"
-                                   | Atom("false") -> Some "false"
-                                   | Atom(_) -> None
-                                   | l -> Some (to_string_hum l))
-          in if List.length goals = 0 then "true"
-             else (let goalstr = String.concat ~sep:" " goals
-                   in if List.length goals < 2 then goalstr else "(and " ^ goalstr ^ ")")
-     | _ -> raise (Internal_Exn ("Unexpected z3 goals: " ^ goal))
+    with
+    | [ goal ] -> goal
+    | goals ->
+      raise (Internal_Exn ("Unexpected z3 goals:\n"
+                           ^ (String.concat ~sep:"\n" goals)))
+  in
+  match Sexp.parse goal with
+  | Done (List([(Atom "goals") ; (List((Atom "goal") :: goalexpr))]), _) ->
+    let goals =
+      List.filter_map goalexpr
+        ~f:(function Atom("true") -> Some "true"
+                   | Atom("false") -> Some "false"
+                   | Atom(_) -> None
+                   | l -> Some (to_string_hum l))
+    in
+    if List.length goals = 0 then
+      "true"
+    else
+      let goalstr = String.concat ~sep:" " goals in
+      if List.length goals < 2 then
+        goalstr
+      else
+        "(and " ^ goalstr ^ ")"
+  | _ -> raise (Internal_Exn ("Unexpected z3 goals: " ^ goal))
 
-let constraint_sat_function (expr : string) ~(z3 : t) ~(arg_names : string list)
-                            : (Value.t list -> Value.t) =
+let constraint_sat_function
+    (expr : string)
+    ~(z3 : t)
+    ~(arg_names : string list)
+  : (Value.t list -> Value.t) =
   fun (values : Value.t list) ->
     match run_queries z3
-            ~db:(("(assert " ^ expr ^ ")") ::
-                (List.map2_exn arg_names values
-                               ~f:(fun n v -> ("(assert (= " ^ n ^ " " ^
-                                               (Value.to_string v) ^ "))"))))
+            ~db:(("(assert " ^ expr ^ ")")
+                 :: (List.map2_exn
+                       arg_names
+                       values
+                       ~f:(fun n v ->
+                           ("(assert (= " ^ n ^ " " ^ (Value.to_string v) ^ "))"))))
             [ "(check-sat)" ]
     with [ "sat" ]   -> Value.Bool true
        | [ "unsat" ] -> Value.Bool false

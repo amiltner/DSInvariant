@@ -21,7 +21,7 @@ if [ $? != 0 ] ; then usage ; fi
 
 eval set -- "$OPTS"
 
-JOBS="`cat /proc/cpuinfo | grep processor | wc -l`"
+JOBS=4
 
 WITH_LOGGING=""
 MAKE_Z3_AT=""
@@ -60,7 +60,7 @@ if [ -n "$MAKE_Z3_AT" ] ; then
   rm -rf "$Z3_BUILD_DIR"
   mkdir -p "$Z3_BUILD_DIR"
 
-  python2.7 scripts/mk_make.py --staticbin --staticlib \
+  python2.7 scripts/mk_make.py \
                                --build "$Z3_BUILD_DIR"
 
   cd "$Z3_BUILD_DIR"

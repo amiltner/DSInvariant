@@ -105,3 +105,4 @@ let learnInvariant ?(conf = default_config) ~(states : Value.t list list)
        (fun z3 -> Simulator.setup sygus z3
                 ; if not ((implication_counter_example z3 sygus.pre_func.expr sygus.post_func.expr) = None) then "false"
                   else learnInvariant_internal ~conf ~states conf.max_restarts sygus conf.base_random_seed z3)
+
