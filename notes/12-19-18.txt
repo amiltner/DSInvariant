@@ -1,0 +1,128 @@
+VPregen :: Code -> Formula -> TestCases -> Formula
+(* Calls into PIE repeatedly while building up counterexamples *)
+
+
+
+
+LoopInvGen :: Formula -> LoopCode -> Formula
+LoopInvGen P (while E do C) Q
+(* Want to generate I for while loop that suffices to prove
+   {P} While E do C {Q}
+
+To do this, LoopInvGen finds a formula I such that
+I /\ ~E => Q
+{I /\ E} C {E}
+P       => I
+
+First LoopInvGen finds a sufficient I such that I /\ ~E is strong enough to
+prove Q
+
+Next LoopInvGen makes I inductive
+
+Finally LoopInvGen checks if I is sufficiently weak to be proven by P.
+If I is not sufficiently weak, LoopInvGen adds an example that satisfies P but
+does not satisfy I into the suite, and loops again.
+
+In essence, the two calls to VPreGen make I stronger and stronger, and then if I
+has been made too strong, a counterexample is added so VPreGen can't get overly
+strong in that same way again.
+
+*)
+
+G = {} (* Good tests set to empty *)
+loop
+  I = VPreGen([Assume ~E], Q, 
+  while not {I /\ E} C {I} do
+    I' = VPreGen([Assume I /\ E; C], I, G)
+    I = I /\ I'
+  cex = Valid(P => I)
+  if cex == None then
+    return I
+  else
+    G := G U LoopHeadStates(cex)
+
+
+
+
+Ok, now go back to our Set implementation (that holds at most 2 elements).
+This set has the following interface:
+
+module Set =
+sig
+  type t
+  val empty    :: t
+  val insert   :: t -> int -> t
+  val contains :: t -> int -> bool
+  val delete   :: t -> int -> t
+end
+
+I naively moved the ideas of LoopInvGen into SetInvGen (so overly specified to
+Set, just as a first step)
+
+SetInvGen :: SetModule -> Formula -> Formula
+SetInvGen S Q =
+(*
+Let Q be a formula we wish to prove about Set
+(aka: forall x, forall s. lookup x (delete x s) = false)
+
+S is the set module implementation
+
+We wish to find a invariant I such that forall s in Set. I(s), and I(s) => Q(s).
+
+To do this, SetInvGen finds a formula I such that
+I(s) => Q(s)
+I(s) => forall x. I(insert s x)
+I(s) => forall x. I(delete s x)
+I(empty)
+
+Following the same pattern as LoopInvGen...
+First SetInvGen finds a sufficient I such that I(s) is strong enough to prove
+Q(s)
+
+Next LoopInvGen makes I inductive by first strengthening it sufficiently that
+I(s) => forall x. I(insert s x)
+I(s) => forall x. I(delete s x)
+
+Finally LoopInvGen checks if I is sufficiently weak to be true for empty.
+If I is not sufficiently weak, LoopInvGen adds an example that is empty but
+does not satisfy I into the suite, and loops again.
+
+(Start seeing the issue?)
+*)
+
+G = {} (* Good tests set to empty *)
+loop
+  I = VPreGen([], Q)
+  while not {I} [s = insert x s] {I} do
+    I' = VPreGen([Assume I; s = S.insert x s], I, G)
+    I = I /\ I'
+  while not {I} [s = delete x s] {I} do
+    I' = VPreGen([Assume I; s = S.delete x s], I, G)
+    I = I /\ I'
+  cex = Valid(I(S.empty))
+  if cex == None then
+    return I
+  else
+    G := G U LoopHeadStates(cex)
+
+
+
+So, the big issue I can see is that the way we build up counterexamples is from
+checking if the condition is too strong.  For us, however, we only build up one
+counterexample from this: we only build up the counterexample "empty".
+
+For LoopInvGen, counterexamples are added from all LoopHeadStates of the
+initial, so in theory all counterexamples could be added.  Not so here, we only
+add the initials, so our "Good" set will remain constantly at G = {S.empty}.
+
+How will this manifest? Something like:
+First loop I will just be Q or something like that, as we have no examples
+Second loop, G = {empty}
+I could be set to s = empty
+In the second while loop, it will loop forever then.  The while loops terminate
+in LoopInvGen because we add "the whole execution," but we do no such thing in
+this version.
+
+To me, this highlights two fundamental questions:
+How do we generate counterexamples that are not just the initials
+How do we safely refine I such that we don't get in an infinite loop.
