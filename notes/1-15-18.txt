@@ -1,0 +1,248 @@
+(* TODO: actual implementation *)
+
+module Set =
+struct
+  t = (int, int)
+
+  empty = (Int.max_value, Int.max_value)
+
+  lookup x (x1, x2) = x1 = x || x2 = x
+
+  insert x y
+end
+
+Jan 15, 2019
+
+VPregen :: Code -> Formula -> TestCases -> Formula
+(*  Calls into PIE repeatedly while building up counterexamples
+    VPregen C Q TC = P means {P} C {Q} is true
+    Furthermore, P is not trivial -- P(tc) for every tc in TC *)
+VPregen C Q G =
+  B = {}
+  repeat
+    P = PIE(G,B)
+    t = VERIFY(P,C,Q)
+    B = B U {t}
+  until t == None
+  return P
+
+
+
+Sets have the following interface
+
+module type Set =
+sig
+  type t
+  val empty    :: t
+  val insert   :: t -> int -> t
+  val contains :: t -> int -> bool
+  val delete   :: t -> int -> t
+end
+
+
+
+SetInvGen :: SetModule -> Formula -> Formula
+SetInvGen S Q =
+(*
+Let Q be a formula we wish to prove about Set
+(aka: forall x, s. contains x (delete x s) = false)
+
+S is the set module implementation
+
+We wish to find a invariant I such that forall s in Set. I(s), and I(s) => Q(s).
+
+To do this, SetInvGen finds a formula I such that
+I(s) => Q(s)
+I(s) => forall x. I(insert s x)
+I(s) => forall x. I(delete s x)
+I(empty)
+
+Following the same pattern as LoopInvGen...
+First SetInvGen finds a sufficient I such that I(s) is strong enough to prove
+Q(s)
+
+Next LoopInvGen makes I inductive by first strengthening it sufficiently that
+I(s) => forall x. I(insert s x)
+I(s) => forall x. I(delete s x)
+Throughout this strengthening, a suite of examples is built up that confirms
+the strengthened I is not TOO strong -- I(s) must be true for all s in S. If I(s)
+is ever not true on any of those examples, that s is added to G, and the outer
+loop restarts.
+
+Finally LoopInvGen checks if I is sufficiently weak to be true for empty.
+If I is not sufficiently weak, LoopInvGen adds an example that is empty but
+does not satisfy I into the suite, and loops again.
+*)
+
+
+(* another approach could be to generate a lot of example from QC,
+find some I st if I holds, then value could be one of the values,
+aka: P(s) = s = s1 \/ s = s2 \/ ...
+however, with PIE, this is not really /hopefully/ what would be
+found *)
+
+G = {}       (* Good tests set to empty            *)
+QCSuite = {} (* Quickcheck test suite set to empty *)
+loop
+  I = VPreGen([], Q, G) (* current version, start with Q *)
+      (* this is really the hard part at the moment *)
+  while not {I} [s = insert y s] {I} do
+    QCSuite = QCSuite U {QCGen(S,G)}
+    foreach (e in (QCSuite U G))
+      if (!I(e))
+        G = G U {e}
+        continue (outer loop)
+    I' = VPreGen([Assume I; s = S.insert x s], I, G)
+       (*can we enforce that as part of the call*)
+    I = I /\ I'
+  while not {I} [s = delete y s] {I} do
+    QCSuite = QCSuite U {QCGen(S,G)}
+    foreach (e in (QCSuite U G))
+      if (!I(e))
+        G = G U {e}
+        continue (outer loop)
+    I' = VPreGen([Assume I; s = S.delete x s], I, G)
+    I = I /\ I'
+  cex = Valid(I(S.empty))
+  if cex == None then
+    return I
+  else
+    G := G U {cex}
+
+(*
+Optimizations I've included that may be unnecessary, may be necessary:
+1:  I keep QCSuite and G separate, only moving from QCSuite to G when the example
+    is used in proving I is too strong (fairly certain this optimization is
+    important)
+2:  I generate QC examples from the basis of examples already within our benchmark
+    suite.
+*)
+
+(x,(y,z)) means x = x, s = (y,z)
+Q = contains x (delete x s) = false
+Now, with Set implementation:
+LOOP 1:
+66: I = VPreGen([], Q, {}) = false
+        8: P = PIE({},{}) = true
+        9: t = ANDERSVERIFY(true,[],Q) = Some (2,(4,2))
+        8: P = PIE({},{(2,(4,2))}) = false
+        9: t = ANDERSVERIFY(false,[],Q) = None
+67: continues
+75: continues
+103: cex = Valid(I(S.empty)) = (S.empty)
+
+LOOP 2:
+66: I = VPreGen([], Q, {(0,S.empty)}) = (s == S.empty)
+        8: P = PIE({(0,S.empty)},{}) = true
+        9: t = ANDERSVERIFY(true,[],Q) = Some (2,(4,2))
+        8: P = PIE({S.empty},{(2,(4,2))}) = (x <= 0)
+        9: t = ANDERSVERIFY(x <= 0,[],Q) = Some (-2,(4,-2))
+        8: P = PIE({S.empty},{(2,(4,2)),(-2,(4,-2))}) = (s == S.empty)
+               NB: (actually it was the correct s.1 <= s.2, but for the sake of
+                   interest)
+        9: t = ANDERSVERIFY(s == S.empty,[],Q) = None
+68: QCSuite = QCSuite U {QCGen(S,G)} = {(0,S.empty)}
+        NB: just saying this by bad luck
+        35: cex = ANDERSVERIFY(true, [s = empty; s = insert y s], s == S.empty) ---> (-1,(0,Int.max))
+73: I' = VPreGen([Assume I; s = S.insert x s], I, {(0,S.empty)}) = infinite loop
+
+(* ice framework from madhu data driven style.  they use pos exs, neg exs,
+   they have /implications/ in some way
+
+READ THIS PAPER
+ *)
+        
+
+The problem here is that it isn't true that the I isn't inductive "even once"
+
+
+Add a check that verifies each test case in G is inductive "at least once", PushBoundary
+
+
+(* think about edge cases of incorrect statements but not actually /false/ *)
+
+PushBoundary SetModule -> TestCases -> Code -> Formula -> TestCase
+PushBoundary S G C Q =
+  G' = {}
+  foreach g in G
+    cex = VERIFY(true, [s = g] ++ C, I)
+    if cex != None
+      return (resulting s)
+  return None
+
+
+
+SetInvGen :: SetModule -> Formula -> Formula
+SetInvGen S Q =
+
+G = {}       (* Good tests set to empty            *)
+QCSuite = {} (* Quickcheck test suite set to empty *)
+loop
+  I = VPreGen([], Q, G)
+  while not {I} [s = insert y s] {I} do
+    cex = PushBoundary(S,G,s = insert y s,I)
+    if (cex != None)
+      G = G U {cex}
+    QCSuite = QCSuite U {QCGen(S,G)}
+    foreach (e in (QCSuite U G))
+      if (!I(e))
+        G = G U {e}
+        continue (outer loop)
+    I' = VPreGen([Assume I; s = S.insert x s], I, G)
+    I = I /\ I'
+  cex = PushBoundary(S,G,s = delete y s,I)
+  if (cex != None)
+    G = G U {cex}
+  while not {I} [s = delete y s] {I} do
+    QCSuite = QCSuite U {QCGen(S,G)}
+    foreach (e in (QCSuite U G))
+      if (!I(e))
+        G = G U {e}
+        continue (outer loop)
+    I' = VPreGen([Assume I; s = S.delete x s], I, G)
+    I = I /\ I'
+  cex = Valid(I(S.empty))
+  if cex == None then
+    return I
+  else
+    G := G U LoopHeadStates(cex)
+
+(x,(y,z)) means x = x, s = (y,z)
+Q = contains x (delete x s) = false
+Now, with Set implementation:
+LOOP 1:
+151: I = VPreGen([], Q, {}) = false
+        8: P = PIE({},{}) = true
+        9: t = ANDERSVERIFY(true,[],Q) = Some (2,(4,2))
+        8: P = PIE({},{(2,(4,2))}) = true
+        9: t = ANDERSVERIFY(false,[],Q) = None
+152: e = PushBoundary(S,G,s = insert y s,I) = None
+155: continues
+163: e = PushBoundary(S,G,s = insert y s,I) = None
+166: continues
+174: cex = Valid(I(S.empty)) = (S.empty)
+
+LOOP 2:
+151: I = VPreGen([], Q, {(0,S.empty)}) = (s == S.empty)
+        8: P = PIE({(0,S.empty)},{}) = true
+        9: t = ANDERSVERIFY(true,[],Q) = Some (2,(4,2))
+        8: P = PIE({S.empty},{(2,(4,2))}) = (x <= 0)
+        9: t = ANDERSVERIFY(x <= 0,[],Q) = Some (-2,(4,-2))
+        8: P = PIE({S.empty},{(2,(4,2)),(-2,(4,-2))}) = (s == S.empty)
+               NB: (actually it was the correct s.1 <= s.2, but for the sake of
+                   interest)
+        9: t = ANDERSVERIFY(s == S.empty,[],Q) = None
+152: e = PushBoundary(S,G,s = insert y s,s == S.empty) = Some (-1,(0,Int.max))
+        35: cex = ANDERSVERIFY(true, [s = empty; s = insert y s], s == S.empty) ---> (-1,(0,Int.max))
+
+LOOP 3:
+151: I = VPreGen([], Q, {(0,S.empty) ; (-1,(0,Int.max))}) = (s.1 <= s.2)
+        8: P = PIE({(0,S.empty) ; (-1,(0,Int.max))},{}) = true
+        9: t = ANDERSVERIFY(true,[],Q) = Some (2,(4,2))
+        8: P = PIE({(0,S.empty) ; (-1,(0,Int.max))},{(2,(4,2))}) = (x <= 0)
+        9: t = ANDERSVERIFY(x <= 0,[],Q) = Some (-2,(4,-2))
+        8: P = PIE({(0,S.empty) ; (-1,(0,Int.max))},{(2,(4,2)),(-2,(4,-2))}) = s.1 <= s.2
+        9: t = ANDERSVERIFY(s == S.empty,[],Q) = None
+rest goes through simply
+
+

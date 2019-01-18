@@ -1,17 +1,24 @@
+
+
 VPregen :: Code -> Formula -> TestCases -> Formula
 (* Calls into PIE repeatedly while building up counterexamples *)
 
+VPregen C Q (TC) = P
+
+{P} C {Q} is true <- negative test cases help show this(?)
+Furthermore, P is not trivial - it handles all test cases TC
 
 
 
-LoopInvGen :: Formula -> LoopCode -> Formula
+
+LoopInvGen :: Formula -> LoopCode -> Formula -> Formula
 LoopInvGen P (while E do C) Q
 (* Want to generate I for while loop that suffices to prove
    {P} While E do C {Q}
 
 To do this, LoopInvGen finds a formula I such that
 I /\ ~E => Q
-{I /\ E} C {E}
+{I /\ E} C {I}
 P       => I
 
 First LoopInvGen finds a sufficient I such that I /\ ~E is strong enough to
@@ -31,7 +38,7 @@ strong in that same way again.
 
 G = {} (* Good tests set to empty *)
 loop
-  I = VPreGen([Assume ~E], Q, 
+  I = VPreGen([Assume ~E], Q, G)
   while not {I /\ E} C {I} do
     I' = VPreGen([Assume I /\ E; C], I, G)
     I = I /\ I'
@@ -63,7 +70,7 @@ SetInvGen :: SetModule -> Formula -> Formula
 SetInvGen S Q =
 (*
 Let Q be a formula we wish to prove about Set
-(aka: forall x, forall s. lookup x (delete x s) = false)
+(aka: forall x, lookup x (delete x s) = false)
 
 S is the set module implementation
 
@@ -89,7 +96,6 @@ does not satisfy I into the suite, and loops again.
 
 (Start seeing the issue?)
 *)
-
 G = {} (* Good tests set to empty *)
 loop
   I = VPreGen([], Q)
@@ -104,6 +110,8 @@ loop
     return I
   else
     G := G U LoopHeadStates(cex)
+
+(* new notes - new invariant must include at least all reachable sets *)
 
 
 
@@ -126,3 +134,23 @@ this version.
 To me, this highlights two fundamental questions:
 How do we generate counterexamples that are not just the initials
 How do we safely refine I such that we don't get in an infinite loop.
+
+new stuff:
+Possibilities:
+Provide users with QuickCheck library - allows them to generate examples from QC
+  - Actually done already using OCaml QC lib
+If you run out of good states and are already not finding an invariant, start up a
+QC call
+  - Could be useful in LoopInvGen too!
+Maybe we could do some sort of fixed unrolling
+View as LoopInvGen - while(*) switch(*) { case 1: delete * s, case 2: insert * s }
+  - QuickCheck refines this: this is the core concept, QC is "smarter" distribution
+  - This type of program, but with smart probabilities ala QC
+LoopInvGen for nondeterministic programs
+Potential Difficulties:
+  - Infinite # of parameters in executing the new aspects
+  - Kinda like a concurrent system w/ all traces
+  - Stronger guarantee, but harder to prove b/c it's ALL clients
+  - What is the Z3 aspect: proving and getting CEs <- possible engineering work
+    - Anders Oracle as a workaround, use the PIE thing and I personally execute the
+      "Verifier"

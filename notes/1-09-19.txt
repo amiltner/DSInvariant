@@ -13,10 +13,9 @@ VPregen C Q G =
 
 
 
-Ok, now go back to our Set implementation (that holds at most 2 elements).
-This set has the following interface:
+Sets have the following interface
 
-module Set =
+module type Set =
 sig
   type t
   val empty    :: t
@@ -24,19 +23,6 @@ sig
   val contains :: t -> int -> bool
   val delete   :: t -> int -> t
 end
-
-
-
-
-PushBoundary SetModule -> TestCases -> Code -> Formula -> TestCase
-PushBoundary S G C Q =
-  G' = {}
-  foreach g in G
-    cex = VERIFY(true, [s = g] ++ C, I)
-    if cex != None
-      return (resulting s)
-  return None
-
 
 
 
@@ -77,11 +63,104 @@ does not satisfy I into the suite, and loops again.
 G = {}       (* Good tests set to empty            *)
 QCSuite = {} (* Quickcheck test suite set to empty *)
 loop
-  I = VPreGen([], Q, G)
-  cex = PushBoundary(S,G,s = insert y s,I)
-  if (cex != None)
-    G = G U {cex}
+  I = VPreGen([], Q, G) (* current version, start with Q *)
   while not {I} [s = insert y s] {I} do
+    QCSuite = QCSuite U {QCGen(S,G)}
+    foreach (e in (QCSuite U G))
+      if (!I(e))
+        G = G U {e}
+        continue (outer loop)
+    I' = VPreGen([Assume I; s = S.insert x s], I, G)
+       (*can we enforce that as part of the call*)
+    I = I /\ I'
+  while not {I} [s = delete y s] {I} do
+    QCSuite = QCSuite U {QCGen(S,G)}
+    foreach (e in (QCSuite U G))
+      if (!I(e))
+        G = G U {e}
+        continue (outer loop)
+    I' = VPreGen([Assume I; s = S.delete x s], I, G)
+    I = I /\ I'
+  cex = Valid(I(S.empty))
+  if cex == None then
+    return I
+  else
+    G := G U {cex}
+
+(*
+Optimizations I've included that may be unnecessary, may be necessary:
+1:  I keep QCSuite and G separate, only moving from QCSuite to G when the example
+    is used in proving I is too strong (fairly certain this optimization is
+    important)
+2:  I generate QC examples from the basis of examples already within our benchmark
+    suite.
+*)
+
+(x,(y,z)) means x = x, s = (y,z)
+Q = lookup x (delete x s) = false
+Now, with Set implementation:
+LOOP 1:
+66: I = VPreGen([], Q, {}) = false
+        8: P = PIE({},{}) = true
+        9: t = ANDERSVERIFY(true,[],Q) = Some (2,(4,2))
+        8: P = PIE({},{(2,(4,2))}) = false
+        9: t = ANDERSVERIFY(false,[],Q) = None
+67: continues
+75: continues
+103: cex = Valid(I(S.empty)) = (S.empty)
+
+LOOP 2:
+66: I = VPreGen([], Q, {(0,S.empty)}) = (s == S.empty)
+        8: P = PIE({(0,S.empty)},{}) = true
+        9: t = ANDERSVERIFY(true,[],Q) = Some (2,(4,2))
+        8: P = PIE({S.empty},{(2,(4,2))}) = (x <= 0)
+        9: t = ANDERSVERIFY(x <= 0,[],Q) = Some (-2,(4,-2))
+        8: P = PIE({S.empty},{(2,(4,2)),(-2,(4,-2))}) = (s == S.empty)
+               NB: (actually it was the correct s.1 <= s.2, but for the sake of
+                   interest)
+        9: t = ANDERSVERIFY(s == S.empty,[],Q) = None
+68: QCSuite = QCSuite U {QCGen(S,G)} = {(0,S.empty)}
+        NB: just saying this by bad luck
+        35: cex = ANDERSVERIFY(true, [s = empty; s = insert y s], s == S.empty) ---> (-1,(0,Int.max))
+73: I' = VPreGen([Assume I; s = S.insert x s], I, {(0,S.empty)}) = infinite loop
+
+(* ice framework from madhu data driven style.  they use pos exs, neg exs,
+   they have /implications/ in some way
+
+READ THIS PAPER
+ *)
+        
+
+The problem here is that it isn't true that the I isn't inductive "even once"
+
+
+Add a check that verifies each test case in G is inductive "at least once", PushBoundary
+
+
+(* think about edge cases of incorrect statements but not actually /false/ *)
+
+PushBoundary SetModule -> TestCases -> Code -> Formula -> TestCase
+PushBoundary S G C Q =
+  G' = {}
+  foreach g in G
+    cex = VERIFY(true, [s = g] ++ C, I)
+    if cex != None
+      return (resulting s)
+  return None
+
+
+
+SetInvGen :: SetModule -> Formula -> Formula
+SetInvGen S Q =
+
+G = {}       (* Good tests set to empty            *)
+QCSuite = {} (* Quickcheck test suite set to empty *)
+loop
+  I = VPreGen([], Q, G)
+  while not {I} [s = insert y s] {I} do
+    cex = PushBoundary(S,G,s = insert y s,I)
+    if (cex != None)
+      G = G U {cex}
     QCSuite = QCSuite U {QCGen(S,G)}
     foreach (e in (QCSuite U G))
       if (!I(e))
@@ -106,34 +185,23 @@ loop
   else
     G := G U LoopHeadStates(cex)
 
-
-(*
-Optimizations I've included that may be unnecessary, may be necessary:
-1:  I keep QCSuite and G separate, only moving from QCSuite to G when the example
-    is used in proving I is too strong (fairly certain this optimization is
-    important)
-2:  I generate QC examples from the basis of examples already within our benchmark
-    suite.
-*)
-
-
 (x,(y,z)) means x = x, s = (y,z)
 Q = lookup x (delete x s) = false
 Now, with Set implementation:
 LOOP 1:
-80: I = VPreGen([], Q, {}) = false
+151: I = VPreGen([], Q, {}) = false
         8: P = PIE({},{}) = true
         9: t = ANDERSVERIFY(true,[],Q) = Some (2,(4,2))
         8: P = PIE({},{(2,(4,2))}) = true
         9: t = ANDERSVERIFY(false,[],Q) = None
-81: e = PushBoundary(S,G,s = insert y s,I) = None
-84: continues
-92: e = PushBoundary(S,G,s = insert y s,I) = None
-95: continues
-103: cex = Valid(I(S.empty)) = (S.empty)
+152: e = PushBoundary(S,G,s = insert y s,I) = None
+155: continues
+163: e = PushBoundary(S,G,s = insert y s,I) = None
+166: continues
+174: cex = Valid(I(S.empty)) = (S.empty)
 
 LOOP 2:
-80: I = VPreGen([], Q, {(0,S.empty)}) = (s == S.empty)
+151: I = VPreGen([], Q, {(0,S.empty)}) = (s == S.empty)
         8: P = PIE({(0,S.empty)},{}) = true
         9: t = ANDERSVERIFY(true,[],Q) = Some (2,(4,2))
         8: P = PIE({S.empty},{(2,(4,2))}) = (x <= 0)
@@ -142,11 +210,11 @@ LOOP 2:
                NB: (actually it was the correct s.1 <= s.2, but for the sake of
                    interest)
         9: t = ANDERSVERIFY(s == S.empty,[],Q) = None
-81: e = PushBoundary(S,G,s = insert y s,s == S.empty) = Some (-1,(0,Int.max))
+152: e = PushBoundary(S,G,s = insert y s,s == S.empty) = Some (-1,(0,Int.max))
         35: cex = ANDERSVERIFY(true, [s = empty; s = insert y s], s == S.empty) ---> (-1,(0,Int.max))
 
 LOOP 3:
-80: I = VPreGen([], Q, {(0,S.empty) ; (-1,(0,Int.max))}) = (s == S.empty)
+151: I = VPreGen([], Q, {(0,S.empty) ; (-1,(0,Int.max))}) = (s.1 <= s.2)
         8: P = PIE({(0,S.empty) ; (-1,(0,Int.max))},{}) = true
         9: t = ANDERSVERIFY(true,[],Q) = Some (2,(4,2))
         8: P = PIE({(0,S.empty) ; (-1,(0,Int.max))},{(2,(4,2))}) = (x <= 0)
@@ -156,10 +224,3 @@ LOOP 3:
 rest goes through simply
 
 
-
-
-
-Pretend no PushBoundary on loop 2...
-    90: I' = VPreGen([Assume I; s = S.insert x s], I, {0,S.empty))
-        (infinite loop, as will never be able to verify, as it's false)
-        
