@@ -7,7 +7,7 @@ GENERATE_DATA := python generate-data.py
 all: build link
 
 build:
-	dune build
+	dune build app/App.exe
 
 link: $(TARGETS)
 
