@@ -1,13 +1,13 @@
 open Core_kernel
-
-open SyGuS
+open Verifiers
+open SyGuS_Set
 open Utils
 
-let setup (s : SyGuS.t) (z3 : ZProc.t) : unit =
-  ignore (ZProc.run_queries ~scoped:false z3 ~db:((
+let setup (_ : SyGuS_Set.t) : unit =
+  ()(*ignore (ZProc.run_queries ~scoped:false z3 ~db:((
     ("(set-logic " ^ s.logic ^ ")")
-    :: (List.map ~f:var_declaration s.variables))
-     @ (List.map ~f:func_definition s.functions)) [])
+    :: (List.map ~f:fst(*var_declaration*) s.variables))
+      @ (List.map ~f:(fun _ -> "")(*func_definition*) s.functions)) [])*)
 
 let filter_state ?(trans = true) (model : ZProc.model) : ZProc.model =
   if trans
@@ -26,7 +26,7 @@ let value_assignment_constraint ?(negate = false) ?(prime = false) (vars : var l
                                ^ " " ^ (Value.to_string value) ^ ")")))
  ^ (if negate then "))" else ")")
 
-let gen_state_from_model (s : SyGuS.t) (m : ZProc.model option)
+let gen_state_from_model (s : SyGuS_Set.t) (m : ZProc.model option)
                          : Value.t list option Quickcheck.Generator.t =
   let open Quickcheck.Generator in
   match m with None -> singleton None
@@ -37,7 +37,7 @@ let gen_state_from_model (s : SyGuS.t) (m : ZProc.model option)
                                with Some d -> d
                                   | None -> generate (TestGen.for_type t) ~size rnd)))
 
-let transition (s : SyGuS.t) ((* vals *)_ : Value.t list)
+let transition (s : SyGuS_Set.t) ((* vals *)_ : Value.t list)
                : Value.t list option Quickcheck.Generator.t =
   gen_state_from_model s (
     try begin
@@ -51,16 +51,24 @@ let transition (s : SyGuS.t) ((* vals *)_ : Value.t list)
       with None -> None | Some model -> Some (filter_state ~trans:true model)
     end with _ -> None)
 
-let gen_pre_state ?(avoid = []) ?(use_trans = false) (s : SyGuS.t)
-                  (z3 : ZProc.t) : Value.t list option Quickcheck.Generator.t =
+let gen_pre_state
+    ~verifier:(module V : Verifier)
+    ?(avoid = [])
+    ?(use_trans = false)
+    (s : SyGuS_Set.t)
+  : Value.t list option Quickcheck.Generator.t =
+  (*TODO*)
+  assert (avoid = []);
+  assert (use_trans = false);
   Log.info (lazy "Generating an initial state:");
   gen_state_from_model s
-    (ZProc.sat_model_for_asserts z3
-          ~db:[ "(assert (and " ^ s.pre_func.expr ^ " "
+    (V.sat_model_for_asserts
+          ~db:[ (*"(assert (and " ^ s.pre_func.expr ^ " "
               ^ (if use_trans then s.trans_func.expr else "true") ^ " "
-              ^ (String.concat avoid ~sep:" ") ^ "))" ])
+                  ^ (String.concat avoid ~sep:" ") ^ "))"*) ]
+          ~eval_term:V.true_exp)
 
-let simulate_from (s : SyGuS.t) (head : Value.t list option)
+let simulate_from (s : SyGuS_Set.t) (head : Value.t list option)
                   : Value.t list list Quickcheck.Generator.t =
   let open Quickcheck.Generator in
   match head with None -> singleton []
@@ -82,7 +90,15 @@ let simulate_from (s : SyGuS.t) (head : Value.t list option)
 let build_avoid_constraints sygus head =
   Option.map head ~f:(value_assignment_constraint sygus.synth_variables ~negate:true ~prime:true)
 
-let record_states ?(avoid = []) ~size ~seed ~state_chan ~(zpath : string) (s : SyGuS.t) : unit =
+let record_states
+    ~verifier:(module V : Verifier)
+    ?(avoid = [])
+    ~size
+    ~seed
+    ~state_chan
+    ~(zpath : string)
+    (s : SyGuS_Set.t)
+  : unit =
   let record_and_update avoid head size : (string list * int) =
     match head with
     | None -> (avoid, 0)
@@ -99,13 +115,13 @@ let record_states ?(avoid = []) ~size ~seed ~state_chan ~(zpath : string) (s : S
   in ZProc.process ~zpath
        ~random_seed:(Some (string_of_int (Quickcheck.(
                        random_value ~seed (Generator.small_non_negative_int)))))
-       (fun z3 -> setup s z3 ;
+       (fun _ -> setup s ;
           let rec helper avoid size =
             let open Quickcheck in
             let sz = size / 2 in
-            let head_1 = random_value (gen_pre_state ~avoid s z3) ~seed in
+            let head_1 = random_value (gen_pre_state ~verifier:(module V) ~avoid s) ~seed in
             let (avoid, added_1) = record_and_update avoid head_1 sz in
-            let head_2 = random_value (gen_pre_state ~avoid ~use_trans:true s z3)
+            let head_2 = random_value (gen_pre_state ~verifier:(module V) ~avoid ~use_trans:true s)
                                       ~seed in
             let (avoid, added_2) = record_and_update avoid head_2 sz
             in (if added_1 = 0 && added_2 = 0 then ()

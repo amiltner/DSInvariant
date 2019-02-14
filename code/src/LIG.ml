@@ -1,5 +1,4 @@
 open Core_kernel
-
 open SyGuS
 open Utils
 open VPIE
@@ -24,9 +23,13 @@ let default_config = {
   model_completion_mode = `RandomGeneration ;
 }
 
-let satisfyTrans ?(conf = default_config) ~(sygus : SyGuS.t) ~(z3 : ZProc.t)
-                 ~(states : Value.t list list) (inv : Job.desc)
-                 : (Job.desc * ZProc.model option) =
+let satisfyTrans
+    ?(conf = default_config)
+    ~(sygus : SyGuS.t)
+    ~(z3 : ZProc.t)
+    ~(states : Value.t list list)
+    (inv : Job.desc)
+  : (Job.desc * ZProc.model option) =
   let invf_call =
        "(invf " ^ (List.to_string_map sygus.inv_func.args ~sep:" " ~f:fst) ^ ")" in
   let invf'_call =

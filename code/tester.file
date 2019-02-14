@@ -1,0 +1,27 @@
+(declare-datatypes () ((Pair (mk-pair (first Int) (second Int)))))
+
+(define-fun lookup ((t Pair) (z Int)) Bool
+(or (= z (first t)) (= z (second t))))
+
+(define-fun delete ((t Pair) (z Int)) Pair
+(ite (< z (first t))
+          t
+          (ite (= z (first t))
+               (mk-pair (second t) 2147483647)
+               (ite (= z (second t))
+                    (mk-pair (first t) 2147483647)
+                    t))))
+
+(define-fun insert ((t Pair) (z Int)) Pair
+(ite (<= z (first t))
+          (mk-pair z (second t))
+          (mk-pair (first t) z)))
+
+(define-fun post ((t Pair) (z Int)) Bool
+(not (lookup (delete t z) z)))
+
+(declare-const z! Int)
+(declare-const t! Pair)
+(assert (not (post t! z!)))
+(check-sat)
+(get-model)

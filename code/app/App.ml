@@ -1,7 +1,8 @@
 open Base
 open LoopInvGen
+open Verifiers
 
-
+let _ = z3_verifier
 let empty = (Int.max_value, Int.max_value)
 
 let insert z (x,y) =
@@ -84,3 +85,68 @@ let () =
       "The precondition is: "
     ^ PIE.cnf_opt_to_desc (PIE.learnPreCond equiv_job)
   )
+
+open SyGuS_Set
+
+let insert_func =
+  {
+    args = [("x",Type.INT);("y",Type.INT);("z",Type.INT);("x!",Type.INT);("y!",Type.INT);];
+    name = "insert";
+    expr = "(and (= x! (ite (<= z x) z x)) (= y! (ite (<= z x) y z)))";
+    return = Type.BOOL;
+  }
+
+let delete_func =
+  {
+    args = [("x",Type.INT);("y",Type.INT);("z",Type.INT);("x!",Type.INT);("y!",Type.INT);];
+    name = "delete";
+    expr = "(and (= x! (ite (< z x) x (ite (= z x) y x))) (= y! (ite (< z x) y (ite (= z x) 2147483647 (ite (= z y) 2147483647 y)))))";
+    return = Type.BOOL;
+  }
+
+let lookup_func =
+  {
+    args = [("x",Type.INT);("y",Type.INT);("z",Type.INT)];
+    name = "lookup";
+    expr = "(or (= z x) (= z y))";
+    return = Type.BOOL;
+  }
+
+let post_func =
+  {
+    args = [("x",Type.INT);("y",Type.INT)];
+    name = "post";
+    expr = "(forall ((z Int) (x! Int) (y! Int)) (and (delete x y z x! y!) (not (lookup x! y! z))))";
+    return = Type.BOOL;
+  }
+
+(*let v = empty
+let v = register_func v insert_func
+let v = register_func v delete_func
+let v = register_func v lookup_func
+  let v = register_func v post_func*)
+
+let sygus_call =
+  {
+    insert_func = insert_func;
+    delete_func = delete_func;
+    lookup_func = lookup_func;
+    post_func = post_func;
+    constants = [];
+    synth_variables = [];
+  }
+
+open SIG
+
+let _ =
+  learnSetInvariant
+    ~states:[]
+    sygus_call
+
+let _ = Z3Verifier.register_func Z3Verifier.empty
+    {
+      args = [("x",Type.INT);("y",Type.INT);("z",Type.INT);("x!",Type.INT);("y!",Type.INT);];
+      name = "delete";
+      expr = "(and (= x! (ite (< z x) x (ite (= z x) y x))) (= y! (ite (< z x) y (ite (= z x) 2147483647 (ite (= z y) 2147483647 y)))))";
+      return = Type.BOOL;
+    }

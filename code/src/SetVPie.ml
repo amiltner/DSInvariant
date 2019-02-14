@@ -22,18 +22,20 @@ let default_config = {
 }
 
 let learnVPreCond
+    (type expr)
     (type t)
-    ~verifier:(module V : Verifier with type t = t)
+    ~verifier:(module V : Verifier with type expr = expr and type t = t)
     ~(conf : Value.t list config)
-    ~(eval : V.t)
-    ~(post : V.t)
+    ~(eval : V.expr)
+    ~(post : V.expr)
+    ~(v : V.t)
     ~(consts:Value.t list)
     ~(testbed : TestBed.t)
-  : V.t =
+  : V.expr =
   let rec helper
       (tries_left:int)
       (testBed:TestBed.t)
-    : V.t option =
+    : V.expr option =
     if conf.max_tries > 0 && tries_left < 1 then
       (Log.error (lazy ("VPIE Reached MAX attempts ("
                         ^ (Int.to_string conf.max_tries)
@@ -48,8 +50,11 @@ let learnVPreCond
        | Some [[]] -> None
        | precond ->
          let pre = V.from_synth precond in
-         Log.info (lazy ("Candidate Precondition: " ^ (V.to_string pre)));
-         begin match V.implication_counter_example ~pre ~eval ~post with
+         Stdio.print_endline "hiya";
+         Stdio.print_endline pre;
+         Log.info (lazy ("Candidate Precondition: " ^ (pre)));
+         let pre = V.true_exp in
+         begin match V.implication_counter_example ~v ~pre ~eval ~post with
            | None ->
              let pre = if conf.simplify then
                  V.simplify pre
