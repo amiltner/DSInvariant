@@ -1,0 +1,98 @@
+In general our current algorithm is:
+Find I sufficient to prove Q
+Strengthen I to make it inductive
+Confirm it is weak enough to be proven by initial conditions
+
+During step 2: strengthening, we use quickcheck to check whether I has become
+overly strong
+
+Uses GenPrecond :: formula -> code -> examples -> formula
+GenPrecond(Q,C,exs) = P iff {P} C {Q} and P(ex) for each ex in exs
+
+SetInvGen(Q)
+G = {}
+loop:
+  I = GenPrecond(Q,[],G)
+  while not {I} (insert x s) {I}
+    ce = QuickCheck(I)
+    if ce = Some s
+      G = G U {s}
+      continue (outer loop)
+    else
+      I' = GenPrecond(I,[insert x s],G)
+      I = I /\ I'
+  ce = Verify(I(empty))
+  if ce = Some s
+    G = G U {s}
+    continue
+  else
+    return I
+
+There's some fears with this approach:
+All the work may be forced to happen at the start (no incremental strengthening)
+I personally am a little frightened by how reliant we are on quickcheck, and
+think it would be cool if we could remove it's need
+
+
+Could we instead do it in a different direction, where we first generate I
+that's true on empty, then strengthen until it's inductive and strong enough to
+prove Q.
+
+
+To generate a postcondition, we can't use GenPrecond, so we instead use GenPostcond
+
+
+GenPrecond :: formula -> code -> examples -> formula
+GenPrecond(Q,C,exs) = P iff {P} C {Q} and P(ex) for each ex in exs
+
+
+
+GenPostcond :: formula -> code -> examples -> formula
+GenPostcond(P,C,exs) = Q iff {P} C {Q} and not Q(ex) for each ex in exs
+
+
+SetInvGen(Q)
+G = {}
+B = {}
+loop:
+  I = GenPostcond(I,[],B)
+      (* reformulate as a check on splitting the G/B examples *)
+  while not {I} (insert x s) {I}
+    ce = QuickCheck(I)
+    if ce = Some s
+      G = G U {s}
+      continue
+    else
+      I' = GenPrecond(I,[insert x s],G)
+      I = I /\ I'
+  ce = Verify(I => Q)
+  if ce = Some s
+    B = B U {s}
+  else
+    return I
+
+
+Just for my own interest, I also want to look at what would happen if we
+completely swithed to be weakening
+
+
+SetInvGen(Q)
+B = {}
+loop:
+  I = GenPostcond(I,[],B)
+  while not {I} (insert x s) {I}
+    ce = QuickCheck(I)
+    if ce = Some s
+      G = G U {s}
+      continue
+    else
+      I' = GenPostcond(I,[insert x s],B)
+      I = I \/ I'
+  ce = Verify(I => Q)
+  if ce = Some s
+    B = B U {s}
+  else
+    return I
+
+
+

@@ -45,7 +45,7 @@ SetInvGen :: SetModule -> Formula -> Formula
 SetInvGen S Q =
 (*
 Let Q be a formula we wish to prove about Set
-(aka: forall x, s. contains x (delete x s) = false)
+(aka: Q(s) := forall x\in Nat. contains x (delete x s) = false)
 
 S is the set module implementation
 
@@ -81,26 +81,17 @@ aka: P(s) = s = s1 \/ s = s2 \/ ...
 however, with PIE, this is not really /hopefully/ what would be
 found *)
 
-G = {}       (* Good tests set to empty            *)
-QCSuite = {} (* Quickcheck test suite set to empty *)
+G = {}       (* elements of type t that can be constructed from interface *)
+QCSuite = {} (* elements of type t that can be constructed from interface *)
 loop
-  I = VPreGen([], Q, G) (* current version, start with Q *)
+
+  (* Generate an invariant that implies Q, and is true on the good statments *)
+  I = VPreGen(skip, Q, G) (* current version, start with Q *)
       (* this is really the hard part at the moment *)
   while not {I} [s = insert y s] {I} do
-    QCSuite = QCSuite U {QCGen(S,G)}
-    foreach (e in (QCSuite U G))
-      if (!I(e))
-        G = G U {e}
-        continue (outer loop)
     I' = VPreGen([Assume I; s = S.insert x s], I, G)
-       (*can we enforce that as part of the call*)
     I = I /\ I'
   while not {I} [s = delete y s] {I} do
-    QCSuite = QCSuite U {QCGen(S,G)}
-    foreach (e in (QCSuite U G))
-      if (!I(e))
-        G = G U {e}
-        continue (outer loop)
     I' = VPreGen([Assume I; s = S.delete x s], I, G)
     I = I /\ I'
   cex = Valid(I(S.empty))

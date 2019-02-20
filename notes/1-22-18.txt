@@ -1,0 +1,95 @@
+Encoding things as Z3 formulas is hard...
+
+When I want to run:  {Pre} C {Post}
+When:
+{Pre} := assert Inv(s)
+C := s = insert x s
+{Post} := assert Inv(s) /\ Inv2(s)
+
+I realize I mixed up Z3 and Daphne, and I thought I could merely send
+assert Inv(s)
+s = insert x s
+assert Inv(s) /\ Inv2(s)
+to Z3.
+
+I can't.
+
+Copying from LIG:
+
+assert Inv(s)
+s = insert x s'
+assert Inv(s') /\ Inv2(s')
+
+is what I should do instead, instead of some sort of logical semantics
+
+
+
+
+
+
+Formalization of problem:
+Given an ADT:
+type t
+signature
+{
+  f1: t1
+  ...
+  fn: tn
+}
+
+the functions fall into 3 classes:
+C1: strictly consumer
+C2: inductive
+C3: strictly producer
+
+In general our current algorithm is as such:
+
+VPregen(C,Q,G) :: generates precondition that proves Q after C has been executed
+                  generated precondition must be true on all of G
+Q :: Desired property
+
+G = {}       (* Good tests set to empty            *)
+QCSuite = {} (* Quickcheck test suite set to empty *)
+loop
+  I = VPreGen([], Q, G)
+  foreach (var f in C2)
+    while not {I} [f] {I} do
+      QCSuite = QCSuite U {QCGen(S,G)}
+      foreach (e in (QCSuite U G))
+        if (!I(e))
+          G = G U {e}
+          continue (outer loop)
+      I' = VPreGen([Assume I; f], I, G)
+      I = I /\ I'
+  foreach (var f in C3)
+    cex = Valid({} f {I})
+    if cex != None then
+      G := G U {cex}
+      continue
+  return I
+
+
+One thing I've been thinking, is there a way to change VPreGen to do each class
+"all at once".  Would it be worth doing?
+
+VPregens(Cs,Q,G) :: generates precondition that proves Q after Cs have been executed
+                    generated precondition must be true on all of G
+
+G = {}       (* Good tests set to empty            *)
+QCSuite = {} (* Quickcheck test suite set to empty *)
+loop
+  I = VPreGens([], Q, G)
+  I = I /\ I'
+  while not {I} [f] {I} forall f in C2 do
+    QCSuite = QCSuite U {QCGen(S,G)}
+    foreach (e in (QCSuite U G))
+      if (!I(e))
+        G = G U {e}
+        continue (outer loop)
+    I' = VPreGen([Assume I; f] for f in C2, I, G)
+    I = I /\ I'
+  cex = {} [f] {I} forall f in C3
+  if cex != None then
+    G := G U {cex}
+    continue
+  return I

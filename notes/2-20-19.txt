@@ -1,0 +1,147 @@
+So I looked up things for ADTs in Coq, as it's quite formal. I started proving
+in there but then got frustrated by not remembering tactics, so I just
+semi-formally wrote it up here.
+
+https://softwarefoundations.cis.upenn.edu/vfa-current/ADT.html
+
+I want to prove that my list implementation of set satisfies
+forall s in Set, x in Nat. not (lookup (delete s x) x) /\ (lookup (insert s x) x)
+
+The super-formal way to prove invariants on ADTs is to embed the invariant in
+the type as a sigma type:
+
+Let our invariant be I : x -> Prop
+
+           __
+type t =   \              I(x)
+           /_{x : list int}
+
+So, in other words, each element of our ADT is a pair, the first element of the
+pair is the list itself (x), the other is a proof that I is true on x.
+
+In coq, this is given the suggestive notation of t = { x : list int | I(x) }.
+They also have slightly verbose intro and elim rules, so I'm just going to
+pretend they are pairs for the sake of sanity.
+
+Now, I'm going to give a specific implementation of using lists as sets.
+
+
+Inductive SearchList : list nat -> Prop :=
+| SL_Nil : SearchList []
+| SL_Single : forall x, SearchList [x].
+| SL_TwoPlus : forall x y l, SearchList (y::l) -> x < y -> SearchList (x::y::l)
+
+
+Essentially, a list can be a SearchList if it is in order.
+
+module type Set = sig
+  type t
+  val insert :: t -> int -> t
+  val delete :: t -> int -> t
+  val lookup :: t -> int -> bool
+
+  val delete_lookup :: forall x l, lookup (delete l x) x = false
+  val insert_lookup :: forall x l, lookup (insert l x) x = true
+end
+
+def insert_list :: list int -> int -> list int :=
+    (* code for insert into place maintaining order *)
+def delete_list :: list int -> int -> list int
+    (* code for delete utilizing order *)
+def lookup_list :: list int -> int -> list int
+    (* code for lookup utilizing order *)
+
+Theorem insert_searchlist ::
+forall l x, SearchList l -> SearchList (insert_list l x) :=
+    (* theorem proving SearchList is held after insert *)
+Theorem delete_searchlist ::
+forall l x, SearchList l -> SearchList (delete_list l x) :=
+    (* theorem proving SearchList is held after delete *)
+
+module Set = struct
+  type t = { x : list int | SearchList x }
+  def empty = ([], SL_Empty)
+  def insert lp x =
+    let (l,pf) = lp in
+    let ans = insert_list lp x in
+    (ans,insert_searchlist l x pf)
+  def delete lp x =
+    let (l,pf) = lp in
+    let ans = delete_list lp x in
+    (ans,delete_searchlist l x pf)
+  def lookup lp x =
+    let (l,_) = lp in
+    lookup_list l x
+
+  def delete_lookup (l,p) =
+    begin proof
+      let l be a list, satisfying invariant SearchList
+        (p is a proof of that fact)
+      p := SearchList p
+      cases:
+      | SL_Nil l -> l = []. So delete l x = []. So lookup is false
+      | SL_Single : l = [y]. Cases on whether x = y or not.
+      | SL_TwoPlus : l = x::y::l', and x < y, and SearchList (y::l').
+                     Then we go through and do case analysis, x not removed,
+                     use induction for (y::l')
+      end
+    end proof
+
+  def insert_lookup (l,p) =
+    begin proof
+      This can be easily done without any complex SearchList induction
+    end proof
+end
+
+
+
+OK! So the primary takeaways I got from this exercise are:
+
+Case analyzing about why SearchList was true was important for the proof of
+delete_lookup. In this specific instance, I had to reason about *why* the
+SearchList was, in fact, a SearchList. I did this, because its Coq, using an
+inductive proposition. This could be done, in a more informal setting, as case
+analysis on the list itself, then reasoning about possible ways the proposition
+was true (essentially doing the same as with an inductive proposition).
+
+I'm not sure if there's any single induction principle for lists. Consider the
+situation where lists of even size are valid, and lists of odd size are invalid.
+This sort of Inductive Proposition would need to be something like:
+
+Inductive DoubleList : list nat -> Prop :=
+| DL_Nil : SearchList []
+| DL_TwoPlus : forall x y l, SearchList (y::l) -> SearchList (x::y::l)
+
+Neither is there a single way to write these propositions, another way to write
+SearchList is:
+
+Inductive SearchList' :: list nat -> nat -> Prop :=
+| SLP_Nil : forall lo, SearchList' [] lo
+| SLP_Cons : forall x h t, x < h -> SearchList' h t -> SearchList' x (h::t).
+
+Inductive SearchList :: list nat -> Prop :=
+| SL_Nil : SearchList []
+| SL_Cons : forall h t, SearchList' h t -> SearchList (h::t)
+
+
+So yeah, I believe we at one point were talking about whether there is a single
+form for how these propositions work, like what the specific form of them were,
+and thought it could be something like:
+
+P(Nil)
+P(l) /\ F(i,l) => P(Cons(i,l))
+
+In this specific Set case, such a induction principle does seem possible,
+set F to be a match on whether l is nil or cons, if it is nil, apply SL_Single,
+if it is cons, apply SL_TwoPlus.
+
+Now, I am not certain such a common format is the case. To me, it seems like
+there are a number of possible "induction skeletons" that could be possible, or
+in fact necessary.
+
+For example, if we restrict F to be non-recursive (which I think we should),
+this approach doesn't work for the even-length lists.  We need a different
+induction skeleton:
+
+P(Nil)
+P(l) /\ F(i,j,l) => P(Cons(i,Cons(j,l)))
