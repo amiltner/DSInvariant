@@ -36,3 +36,22 @@ let sorting_and_sort
   (Permutation.create
      (List.map ~f:snd sorted_l_with_is)
   ,List.map ~f:fst sorted_l_with_is)
+
+let rec zip3
+    (l1:'a list)
+    (l2:'b list)
+    (l3:'c list)
+  : ('a * 'b * 'c) list option =
+  begin match (l1,l2,l3) with
+    | (h1::t1,h2::t2,h3::t3) ->
+      Option.map ~f:(fun t -> (h1,h2,h3)::t) (zip3 t1 t2 t3)
+    | ([],[],[]) -> Some []
+    | _ -> None
+  end
+
+let zip3_exn
+    (l1:'a list)
+    (l2:'b list)
+    (l3:'c list)
+  : ('a * 'b * 'c) list =
+  Option.value_exn (zip3 l1 l2 l3)

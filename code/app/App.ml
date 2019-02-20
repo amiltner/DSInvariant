@@ -72,23 +72,14 @@ x", Type.INT); ("y", Type.INT); ("z", Type.INT) ])
     ~post:(fun inp _ ->
         match inp with
         | [ Value.Int x; Value.Int y; Value.Int z ] ->
-          Stdio.print_endline (Int.to_string x);
-          Stdio.print_endline (Int.to_string y);
-          Stdio.print_endline (Int.to_string z);
           not (contains z (delete z (x,y)))
         | _ -> false)
     ~features:[]
     (List.map [(0,empty); (-1,(0,Int.max_value))] ~f:(fun (x,(y,z)) -> [Value.Int y ; Value.Int z; Value.Int x]))
 
-let () =
-  Stdio.print_endline (
-      "The precondition is: "
-    ^ PIE.cnf_opt_to_desc (PIE.learnPreCond equiv_job)
-  )
 
-open SyGuS_Set
 
-let insert_func =
+(*let insert_func =
   {
     args = [("x",Type.INT);("y",Type.INT);("z",Type.INT);("x!",Type.INT);("y!",Type.INT);];
     name = "insert";
@@ -118,7 +109,7 @@ let post_func =
     name = "post";
     expr = "(forall ((z Int) (x! Int) (y! Int)) (and (delete x y z x! y!) (not (lookup x! y! z))))";
     return = Type.BOOL;
-  }
+  }*)
 
 (*let v = empty
 let v = register_func v insert_func
@@ -126,7 +117,7 @@ let v = register_func v delete_func
 let v = register_func v lookup_func
   let v = register_func v post_func*)
 
-let sygus_call =
+(*let sygus_call =
   {
     insert_func = insert_func;
     delete_func = delete_func;
@@ -134,19 +125,126 @@ let sygus_call =
     post_func = post_func;
     constants = [];
     synth_variables = [];
-  }
+  }*)
 
+let make_lookup
+    (type expr)
+    ~verifier:(module V : Verifier with type expr = expr)
+    (t:expr)
+    (z:expr)
+  : expr =
+  V.mk_or
+    [V.mk_equals z (V.get_fst t)
+    ;V.mk_equals z (V.get_snd t)]
+
+let make_empty
+    (type expr)
+    ~verifier:(module V : Verifier with type expr = expr)
+    (t:expr)
+    (_:expr)
+  : expr =
+  V.bin_and_exps
+    (V.mk_equals (V.get_fst t) (V.integer_exp 2147483647))
+    (V.mk_equals (V.get_snd t) (V.integer_exp 2147483647))
+
+let make_precond
+    (type expr)
+    ~verifier:(module V : Verifier with type expr = expr)
+    (t:expr)
+    (z:expr)
+  : expr =
+  V.and_exps
+    [V.mk_le (V.get_fst t) (V.integer_exp 2147483647)
+    ;V.mk_le (V.get_snd t) (V.integer_exp 2147483647)
+    ;V.mk_lt z (V.integer_exp 2147483647)]
+
+let make_delete
+    (type expr)
+    ~verifier:(module V : Verifier with type expr = expr)
+    (t:expr)
+    (z:expr)
+  : expr =
+  V.if_then_else_exp
+    (V.mk_lt z (V.get_fst t))
+    t
+    (V.if_then_else_exp
+       (V.mk_equals z (V.get_fst t))
+       (V.make_pair (V.get_snd t) (V.integer_exp 2147483647))
+       (V.if_then_else_exp
+          (V.mk_equals z (V.get_snd t))
+          (V.make_pair (V.get_fst t) (V.integer_exp 2147483647))
+          t))
+
+let make_insert
+    (type expr)
+    ~verifier:(module V : Verifier with type expr = expr)
+    (t:expr)
+    (z:expr)
+  : expr =
+  V.if_then_else_exp
+    (V.mk_le z (V.get_fst t))
+    (V.make_pair z (V.get_snd t))
+    (V.make_pair (V.get_fst t) z)
+
+let make_post
+    (type expr)
+    ~verifier:(module V : Verifier with type expr = expr)
+    (t:expr)
+    (z:expr)
+  : expr =
+  V.bin_and_exps
+    (make_lookup
+       ~verifier:(module V)
+       (make_insert ~verifier:(module V) t z)
+       z)
+    (V.mk_not
+       (make_lookup
+          ~verifier:(module V)
+          (make_delete ~verifier:(module V) t z)
+          z))
+
+(*let x = Z3Verifier.make_pair (Z3Verifier.integer_exp 3) (Z3Verifier.integer_exp 4)
+
+let _ = Stdio.print_endline (Z3Verifier.to_string x)
+
+let y = Z3Verifier.get_fst x
+let _ = Stdio.print_endline (Z3Verifier.to_string y)
+
+let z = Z3Verifier.get_snd x
+let _ = Stdio.print_endline (Z3Verifier.to_string z)
+
+  let q = make_lookup x z z3_verifier*)
+
+open SyGuS_Set
 open SIG
 
-let _ =
-  learnSetInvariant
+let sygus_call =
+  {
+    precond_func = make_precond;
+    empty_func = make_empty;
+    delete_func = make_delete;
+    insert_func = make_insert;
+    lookup_func = make_lookup;
+    post_func = make_post;
+    constants = [Value.Int 2147483647];
+    synth_variables = [("x",Type.INT);("y",Type.INT)];
+  }
+
+let _ = Log.enable (Some "log")
+
+module MySig = SIGLearner(Z3Verifier)
+
+let ans =
+  MySig.learnSetInvariant
     ~states:[]
     sygus_call
 
-let _ = Z3Verifier.register_func Z3Verifier.empty
+let _ = Stdio.print_endline ans
+
+(*let _ = Z3Verifier.register_func Z3Verifier.empty
     {
       args = [("x",Type.INT);("y",Type.INT);("z",Type.INT);("x!",Type.INT);("y!",Type.INT);];
       name = "delete";
       expr = "(and (= x! (ite (< z x) x (ite (= z x) y x))) (= y! (ite (< z x) y (ite (= z x) 2147483647 (ite (= z y) 2147483647 y)))))";
       return = Type.BOOL;
-    }
+    }*)

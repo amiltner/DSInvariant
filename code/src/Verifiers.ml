@@ -5,23 +5,33 @@ type model = (string * Value.t) list
 module type Verifier =
 sig
   type expr
-  type t
-  type func
-  val empty : t
   val true_exp : expr
   val false_exp : expr
   val to_string : expr -> string
   val compare : expr -> expr -> int
   val equal : expr -> expr -> bool
   val bin_and_exps : expr -> expr -> expr
-  val make_app : func -> expr list -> expr
-  val implication_counter_example : pre:expr -> eval:expr -> post:expr -> v:t -> model option
-  val from_synth : Value.t list TestBed.feature TestBed.with_desc CNF.t option -> string
+  val and_exps : expr list -> expr
+  val make_pair : expr -> expr -> expr
+  val get_fst : expr -> expr
+  val get_snd : expr -> expr
+  val mk_equals : expr -> expr -> expr
+  val mk_lt : expr -> expr -> expr
+  val mk_le : expr -> expr -> expr
+  val mk_not : expr -> expr
+  val mk_or : expr list -> expr
+  val implication_counter_example : pre:expr -> eval:expr -> post:expr -> model option
+  val from_synth : Value.t list TestBed.feature TestBed.with_desc CNF.t option -> expr
   val simplify : expr -> expr
+  val substitute : expr -> expr list -> expr list -> expr
   val sat_model_for_asserts : eval_term:expr -> db:expr list -> model option
   val integer_var_exp : string -> expr
+  val integer_exp : int -> expr
+  val bool_exp : bool -> expr
   val if_then_else_exp : expr -> expr -> expr -> expr
-  val register_func : t -> SyGuS_Set.func -> t * func
+  val to_value : expr -> Value.t option
+  val from_value : Value.t -> expr
+  val to_value_exn : expr -> Value.t
 end
 
 module Z3Verifier =
@@ -93,9 +103,6 @@ struct
       [int_sort;int_sort]
       bool_sort
 
-  let _ = Stdio.print_endline (Z3.Expr.to_string delete_func_def);
-
-
   type expr = Expr.expr
 
   type t = (FuncDecl.func_decl list * expr list * Symbol.symbol list)
@@ -103,6 +110,23 @@ struct
   type func = FuncDecl.func_decl
 
   let empty : t = ([],[],[])
+
+  let to_value
+      (e:expr)
+    : Value.t option =
+    if Arithmetic.is_int e then
+      Some (Int (Arithmetic.Integer.get_int e))
+    else
+      begin match Boolean.get_bool_value e with
+        | L_FALSE -> Some (Bool false)
+        | L_TRUE -> Some (Bool true)
+        | L_UNDEF -> None
+      end
+
+  let to_value_exn
+    (e:expr)
+    : Value.t =
+    Option.value_exn (to_value e)
 
   let insert_call
       (insert_arg_1_1:expr)
@@ -146,31 +170,135 @@ struct
 
   let bin_and_exps e1 e2 = Boolean.mk_and context [e1;e2]
 
+  let pair_constructor =
+    let pair_constructor =
+      Datatype.mk_constructor
+        context
+        (Symbol.mk_string context "mk-pair")
+        (Symbol.mk_string context "mk-pair")
+        [Symbol.mk_string context "first";Symbol.mk_string context "second"]
+        [Some (Arithmetic.Integer.mk_sort context);Some (Arithmetic.Integer.mk_sort context)]
+        [1;2]
+    in
+    let _ =
+      Datatype.mk_sort_s
+        context
+        "Pair"
+        [pair_constructor]
+    in
+    pair_constructor
+
+  let get_snd
+      (p:expr)
+    : expr =
+    let accessor_decls =
+      Datatype.Constructor.get_accessor_decls
+        pair_constructor
+    in
+    let fst = List.nth_exn accessor_decls 1 in
+    Expr.mk_app
+      context
+      fst
+      [p]
+
+  let get_fst
+      (p:expr)
+    : expr =
+    let _ =
+      Datatype.mk_sort_s
+        context
+        "Pair"
+        [pair_constructor]
+    in
+    let accessor_decls =
+      Datatype.Constructor.get_accessor_decls
+        pair_constructor
+    in
+    let fst = List.nth_exn accessor_decls 0 in
+    Expr.mk_app
+      context
+      fst
+      [p]
+
+  let mk_equals
+      (e1:expr)
+      (e2:expr)
+    : expr =
+    Boolean.mk_eq context e1 e2
+
+  let mk_lt
+    : expr -> expr -> expr =
+    Arithmetic.mk_lt context
+
+  let mk_le
+    : expr -> expr -> expr =
+    Arithmetic.mk_le context
+
+  let mk_not : expr -> expr = Boolean.mk_not context
+
+  let mk_or
+      (es:expr list)
+    : expr =
+    Boolean.mk_or context es
+
+  let make_pair
+    (x:expr)
+    (y:expr)
+    : expr =
+    let pair_constructor =
+      Datatype.mk_constructor
+        context
+        (Symbol.mk_string context "mk-pair")
+        (Symbol.mk_string context "mk-pair")
+        [Symbol.mk_string context "first";Symbol.mk_string context "second"]
+        [Some (Arithmetic.Integer.mk_sort context);Some (Arithmetic.Integer.mk_sort context)]
+        [1;2]
+    in
+    let _ =
+      Datatype.mk_sort_s
+        context
+        "Pair"
+        [pair_constructor]
+    in
+    let pair_constructor_function =
+      Datatype.Constructor.get_constructor_decl
+        pair_constructor
+    in
+    Expr.mk_app
+      context
+      pair_constructor_function
+      [x;y]
+
+  let integer_var_exp
+      (var:string)
+    : expr =
+    Arithmetic.Integer.mk_const
+      context
+      (Symbol.mk_string context var)
+
   let implication_counter_example
       ~pre:(pre:expr)
       ~eval:(eval:expr)
       ~post:(post:expr)
-      ~v:(v:t)
     : model option =
     let solver = Solver.mk_simple_solver context in
-    let defs = (snd3 v) in
     let g = Goal.mk_goal context false false false in
     let impl = Boolean.mk_not context (Boolean.mk_implies context pre post) in
-    Goal.add g (impl::eval::defs);
+    Goal.add g (impl::eval::[]);
     (List.iter
        ~f:(fun f -> (Solver.add solver [f]))
        (Goal.get_formulas g));
-    Stdio.print_endline "";
-    Stdio.print_endline "";
-    Stdio.print_endline "";
-    Stdio.print_endline "";
-    Stdio.print_endline (Solver.to_string solver);
     let ans = Solver.check solver [] in
     begin match ans with
       | SATISFIABLE ->
         let model_option = Solver.get_model solver in
         Option.map
-          ~f:(fun model -> Stdio.print_endline (Model.to_string model); [])
+          ~f:(fun model ->
+               List.map
+                 ~f:(fun fd ->
+                     (Symbol.get_string @$ FuncDecl.get_name fd
+                     ,to_value_exn @$ Option.value_exn (Model.get_const_interp model fd)))
+                 (Model.get_const_decls model))
           model_option
       | _ -> None
     end
@@ -180,12 +308,32 @@ struct
     : expr =
     Expr.simplify e None
 
+  let substitute
+      (e:expr)
+      (old_es:expr list)
+      (new_es:expr list)
+    : expr =
+    Expr.substitute
+      e
+      old_es
+      new_es
+
   let from_synth
       (pred:Value.t list TestBed.feature TestBed.with_desc CNF.t option)
-    : string =
-      match pred with
-      | None -> "false"
-      | Some pred -> CNF.to_string pred ~stringify:snd
+    : expr =
+    let from_synth_string =
+      begin match pred with
+        | None -> "false"
+        | Some pred -> CNF.to_string pred ~stringify:snd
+      end
+    in
+    Z3.SMT.parse_smtlib2_string
+      context
+      ("(declare-const x Int) (declare-const y Int) (assert " ^ from_synth_string ^ ")")
+      []
+      []
+      []
+      []
 
   let sat_model_for_asserts
       ~eval_term:(_ : expr)
@@ -193,12 +341,17 @@ struct
       : model option =
     failwith "TODO: ah"
 
-  let integer_var_exp
-      (var:string)
+  let integer_exp
+      (i:int)
     : expr =
-    Arithmetic.Integer.mk_const
-      context
-      (Symbol.mk_string context var)
+    Z3.Arithmetic.Integer.mk_numeral_i context i
+
+  let bool_exp
+      (b:bool)
+    : expr =
+    Z3.Boolean.mk_val context b
+
+  let exp_to_string = Z3.Expr.to_string
 
   let if_then_else_exp
       (cond:expr)
@@ -219,47 +372,19 @@ struct
       | BOOL -> Z3.Boolean.mk_sort context
     end
 
-  let var_to_z3_var_intro
-      (v:SyGuS_Set.var)
-    : string =
-    "(" ^ (fst v) ^ " " ^ (Type.to_string @$ snd v) ^ ") "
-
-  let register_func
-      ((fs,es,ss):t)
-      (f:SyGuS_Set.func)
-    : t * func =
-    let func_symbol =
-      (Symbol.mk_string context f.name)
-    in
-    let func_decl =
-      FuncDecl.mk_func_decl
-        context
-        func_symbol
-        (List.map ~f:(type_to_z3_type % snd) f.args)
-        (type_to_z3_type f.return)
-    in
-    let ss = func_symbol::ss in
-    let fs = func_decl::fs in
-    let func_def =
-      Z3.SMT.parse_smtlib2_string context
-        ("(assert (forall "
-         ^ (paren (String.concat (List.map ~f:var_to_z3_var_intro f.args)))
-         ^ "(= " ^ (paren (f.name ^ " " ^ String.concat ~sep:" " ((List.map ~f:fst f.args)))) ^ f.expr ^ ")"
-         ^ "))")
-        []
-        []
-        ss
-        fs
-    in
-    Stdio.print_endline (Expr.to_string func_def);
-    let new_t = (fs,func_def::es,ss) in
-    (new_t,func_decl)
-
   let make_app
       (f:func)
       (exs:expr list)
     : expr =
     Expr.mk_app context f exs
+
+  let from_value
+      (v:Value.t)
+    : expr =
+    begin match v with
+      | Int i -> integer_exp i
+      | Bool b -> bool_exp b
+    end
 end
 
 let z3_verifier = (module Z3Verifier : Verifier)
