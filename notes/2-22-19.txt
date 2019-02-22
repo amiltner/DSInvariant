@@ -1,0 +1,70 @@
+I spent some time trying to get this to work with specifically lists, but even
+doing this began hitting some problems.
+
+The core issue with trying to prove these inductive definitions is that we need
+to essentially find *lemmas*. If we only needed to find invariants, I think that
+the problem would be significantly more tractable -- we find a single invariant,
+if that invariant isn't strong enough (without lemmas) to prove the theorem,
+then tough, find a better one.
+
+
+Example:
+Same as before:
+lookup (l:list) (x:int) : bool =
+  match l with
+  | [] -> false
+  | h::t ->
+    if h == x then
+      true
+    else if h < x then
+      lookup t x
+    else
+      false
+
+delete (l:list) (x:int) : bool =
+  match l with
+  | [] -> []
+  | h::t ->
+    if h == x then
+      t
+    else if h < x then
+      h::(delete t x)
+    else
+      l
+
+Inductive SearchList =
+  | SearchList []
+  | SearchList [x]
+  | SearchList (y::l) /\ x < y => SearchList x::y::l
+
+
+Now, let's go about proving that SearchList l => lookup (delete l x) x = false
+
+Base case: SearchList [], just done via eval and reflexivity
+Base case2: SearchList [y], just done via case analysis on x = y and reflexivity
+Inductive case: SearchList h1::h2::t
+  If h1 < h2, and lookup (delete (h2::t) x) x = false, show eval to false on
+  h1::h2::t
+
+  Case analysis: h1 == x
+    lookup (delete x::h2::t x) x
+      = lookup h2::t x
+      = ???
+
+  At this point we (by which I mean Z3) have no knowledge of h2::t, beyond the
+    knowledge that if we delete x from it, then the lookup will be false. We
+    fundamentally need the lemma: x < h2 /\ SearchList (h2::t) => lookup h2::t x
+    = false
+
+  When I try alternative invariants, no matter how strong I get, short of
+  literally including that lemma in my invariant, the invariants require proving
+  that lemma.
+
+I see two ways forward: I think we could either:
+
+1) Figure out a way to find such lemmas, perhaps by inspecting the necessary
+   goals, finding what remains, and attempting that.
+
+2) Use QuickChick or QuickCheck. I think QuickChick would be better because we
+   are synthesizing our calls anyway, so we may as well make them into inductive
+   relations, to leverage QuickChick's power.
