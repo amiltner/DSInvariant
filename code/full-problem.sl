@@ -6,10 +6,8 @@
 (declare-var l IList)
 (declare-var l! IList)
 (declare-var t IList)
-(declare-var t! IList)
 (declare-var h Int)
 (declare-var x Int)
-(declare-var x! Int)
 
 (rule (lookup (insert h t) h))
 (rule (=> (and (> x h) (lookup t x)) (lookup (insert h t) x)))
@@ -24,5 +22,8 @@
 
 (rule (searchlist nil))
 (rule (=> (searchlist! h t) (searchlist (insert h t))))
+
+(declare-rel fail ())
+(rule (=> (and (searchlist l) (delete l x l!) (lookup l! x)) fail))
 
 (query fail)

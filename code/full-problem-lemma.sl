@@ -9,7 +9,7 @@
 (declare-var t! IList)
 (declare-var h Int)
 (declare-var x Int)
-(declare-var x! Int)
+(declare-var y Int)
 
 (rule (lookup (insert h t) h))
 (rule (=> (and (> x h) (lookup t x)) (lookup (insert h t) x)))
@@ -25,4 +25,7 @@
 (rule (searchlist nil))
 (rule (=> (searchlist! h t) (searchlist (insert h t))))
 
-(query fail)
+(declare-rel lemma ())
+(rule (=> (and (searchlist! x t) (<= y x) (delete t y t!) (not (= t t!))) lemma))
+
+(query lemma)
