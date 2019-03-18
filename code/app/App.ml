@@ -1,5 +1,5 @@
 open Base
-open LoopInvGen
+open DSInvGen
 open Verifiers
 
 let _ = z3_verifier
@@ -130,41 +130,45 @@ let v = register_func v lookup_func
 let make_lookup
     (type expr)
     ~verifier:(module V : Verifier with type expr = expr)
-    (t:expr)
-    (z:expr)
+    (_:expr)
+    (_:expr)
   : expr =
-  V.mk_or
+  V.integer_var_exp "lookup"
+  (*V.mk_or
     [V.mk_equals z (V.get_fst t)
-    ;V.mk_equals z (V.get_snd t)]
+    ;V.mk_equals z (V.get_snd t)]*)
 
 let make_empty
     (type expr)
     ~verifier:(module V : Verifier with type expr = expr)
-    (t:expr)
+    (_:expr)
     (_:expr)
   : expr =
-  V.bin_and_exps
+  V.integer_var_exp "empty"
+  (*V.bin_and_exps
     (V.mk_equals (V.get_fst t) (V.integer_exp 2147483647))
-    (V.mk_equals (V.get_snd t) (V.integer_exp 2147483647))
+    (V.mk_equals (V.get_snd t) (V.integer_exp 2147483647))*)
 
 let make_precond
     (type expr)
     ~verifier:(module V : Verifier with type expr = expr)
-    (t:expr)
-    (z:expr)
+    (_:expr)
+    (_:expr)
   : expr =
-  V.and_exps
+  V.integer_var_exp "precond"
+  (*V.and_exps
     [V.mk_le (V.get_fst t) (V.integer_exp 2147483647)
     ;V.mk_le (V.get_snd t) (V.integer_exp 2147483647)
-    ;V.mk_lt z (V.integer_exp 2147483647)]
+    ;V.mk_lt z (V.integer_exp 2147483647)]*)
 
 let make_delete
     (type expr)
     ~verifier:(module V : Verifier with type expr = expr)
-    (t:expr)
-    (z:expr)
+    (_:expr)
+    (_:expr)
   : expr =
-  V.if_then_else_exp
+  V.integer_var_exp "delete"
+  (*V.if_then_else_exp
     (V.mk_lt z (V.get_fst t))
     t
     (V.if_then_else_exp
@@ -173,26 +177,28 @@ let make_delete
        (V.if_then_else_exp
           (V.mk_equals z (V.get_snd t))
           (V.make_pair (V.get_fst t) (V.integer_exp 2147483647))
-          t))
+          t))*)
 
 let make_insert
     (type expr)
     ~verifier:(module V : Verifier with type expr = expr)
-    (t:expr)
-    (z:expr)
+    (_:expr)
+    (_:expr)
   : expr =
-  V.if_then_else_exp
+  V.integer_var_exp "insert"
+  (*V.if_then_else_exp
     (V.mk_le z (V.get_fst t))
     (V.make_pair z (V.get_snd t))
-    (V.make_pair (V.get_fst t) z)
+    (V.make_pair (V.get_fst t) z)*)
 
 let make_post
     (type expr)
     ~verifier:(module V : Verifier with type expr = expr)
-    (t:expr)
-    (z:expr)
+    (_:expr)
+    (_:expr)
   : expr =
-  V.bin_and_exps
+  V.integer_var_exp "post"
+  (*V.bin_and_exps
     (make_lookup
        ~verifier:(module V)
        (make_insert ~verifier:(module V) t z)
@@ -201,7 +207,7 @@ let make_post
        (make_lookup
           ~verifier:(module V)
           (make_delete ~verifier:(module V) t z)
-          z))
+          z))*)
 
 (*let x = Z3Verifier.make_pair (Z3Verifier.integer_exp 3) (Z3Verifier.integer_exp 4)
 
@@ -227,19 +233,20 @@ let sygus_call =
     lookup_func = make_lookup;
     post_func = make_post;
     constants = [Value.Int 2147483647];
-    synth_variables = [("x",Type.INT);("y",Type.INT)];
+    synth_variables = [("x",Type.INTLIST)];
   }
 
 let _ = Log.enable (Some "log")
 
-module MySig = SIGLearner(Z3Verifier)
+module MySig = SIGLearner(QuickCheckVerifier)
 
 let ans =
   MySig.learnSetInvariant
     ~states:[]
     sygus_call
 
-let _ = Stdio.print_endline ans
+  let _ = Stdio.print_endline ans
+
 
 (*let _ = Z3Verifier.register_func Z3Verifier.empty
     {
@@ -248,3 +255,139 @@ let _ = Stdio.print_endline ans
       expr = "(and (= x! (ite (< z x) x (ite (= z x) y x))) (= y! (ite (< z x) y (ite (= z x) 2147483647 (ite (= z y) 2147483647 y)))))";
       return = Type.BOOL;
     }*)
+
+
+  let synth_context =
+    "
+type nat =
+  mu nat.
+  | O
+  | S of nat
+
+type bool =
+  | True
+  | False
+
+type list =
+  mu list .
+  | Nil
+  | Cons of (nat * list)
+
+type cmp =
+  | LT
+  | EQ
+  | GT
+
+let compare =
+  fix (compare : nat -> nat -> cmp) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 binding x1 with
+          | O -> (match x2 binding x2 with
+                 | O -> EQ
+                 | S -> LT)
+          | S -> (match x2 binding x2 with
+                 | O -> GT
+                 | S -> (compare x1) x2);;
+
+let not =
+  fun (v : bool) ->
+    match v binding i with
+      | True -> False
+      | False -> True ;;
+
+let and =
+  fun (b1 : bool) ->
+    fun (b2 : bool) ->
+      match b1 binding b1 with
+      | True -> b2
+      | False -> False
+;;
+
+let or =
+  fun (b1 : bool) ->
+    fun (b2 : bool) ->
+      match b1 binding b1 with
+      | True -> True
+      | False -> b2
+;;
+
+struct
+type t = list
+
+let lookup =
+  fix (lookup : t -> nat -> bool) =
+    fun (l : t) ->
+      fun (x : nat) ->
+        match l binding l with
+        | Nil -> False
+        | Cons -> match compare (l.1) x binding c with
+                  | EQ -> True
+                  | LT -> lookup (l.2) x
+                  | GT -> False
+;;
+
+let empty = Nil;;
+
+let insert =
+  fix (insert : t -> nat -> t) =
+    fun (l : t) ->
+      fun (x : nat) ->
+        match l binding lp with
+        | Nil -> Cons (x, Nil)
+        | Cons ->
+          (match compare x (lp.1) binding c with
+           | LT -> Cons (x, l)
+           | EQ -> l
+           | GT -> Cons (lp.1, (insert lp.2 x)))
+;;
+
+let delete =
+  fix (delete : t -> nat -> t) =
+    fun (l : t) ->
+      fun (x : nat) ->
+        match l binding lp with
+        | Nil -> Nil
+        | Cons ->
+          (match compare x (lp.1) binding c with
+           | LT -> l
+           | EQ -> lp.2
+           | GT -> Cons (lp.1, (delete lp.2 x)))
+;;
+
+end
+:
+sig
+  type t
+
+  val lookup : t -> nat -> bool
+  val empty : t
+  val insert : t -> nat -> t
+  val delete : t -> nat -> t
+end
+maintains
+forall (s : t). forall (i : nat). (lookup (delete s i)) i
+"
+
+let problem =
+  Parser.problem
+    Lexer.token (Lexing.from_string synth_context)
+
+let full_spec =
+  ProcessFile.process_full_problem
+    problem
+
+let _ = begin match full_spec with
+  | Left _ -> Stdio.print_endline "passed"
+  | Right s -> Stdio.print_endline s
+end
+(*
+
+let concat : list -> list |>
+                     { LNil => []
+                     | LCons ([], LNil) => []
+                     | LCons ([0], LNil) => [0]
+                     | LCons ([0], LCons([0], LNil)) => [0;0]
+                     | LCons ([1], LNil) => [1]
+                     | LCons ([1], LCons([1], LNil)) => [1;1]
+                     } = ?*)

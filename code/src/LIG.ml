@@ -1,10 +1,10 @@
 open Core_kernel
 open SyGuS
 open Utils
-open VPIE
+open VPIE_Loop
 
 type 'a config = {
-  for_VPIE : 'a VPIE.config ;
+  for_VPIE : 'a VPIE_Loop.config ;
 
   base_random_seed : string ;
   max_restarts : int ;
@@ -14,7 +14,7 @@ type 'a config = {
 
 let default_config = {
   for_VPIE = {
-    VPIE.default_config with simplify = false ;
+    VPIE_Loop.default_config with simplify = false ;
   } ;
 
   base_random_seed = "LoopInvGen" ;
@@ -49,7 +49,7 @@ let satisfyTrans
     in ZProc.create_scope z3 ~db:[ inv_def ; "(assert " ^ sygus.trans_func.expr ^ ")"
                                            ; "(assert " ^ invf_call ^ ")" ]
      ; let pre_inv =
-         VPIE.learnVPreCond
+         VPIE_Loop.learnVPreCond
            ~conf:conf.for_VPIE ~consts:sygus.constants ~eval_term ~post_desc:invf'_call ~z3
            (Job.create_positive states
               ~f:(ZProc.constraint_sat_function ("(not " ^ invf'_call ^ ")")
@@ -73,8 +73,8 @@ let satisfyTrans
 let rec learnInvariant_internal ?(conf = default_config) (restarts_left : int)
                                 ~(states : Value.t list list) (sygus : SyGuS.t)
                                 (seed_string : string) (z3 : ZProc.t) : Job.desc =
-  let open Quickcheck in
   let open Simulator in
+  let open Quickcheck in
   let restart_with_new_states head =
     if restarts_left < 1
     then (Log.error (lazy ("Reached MAX (" ^ (string_of_int conf.max_restarts)

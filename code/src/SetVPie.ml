@@ -1,11 +1,11 @@
 open Core_kernel
 open Verifiers
 
-open SPIE
 open Utils
 
 module SetVPieImpl(V : Verifier) =
 struct
+  module SetSimulator = SetSimulator.SetSimulatorImpl(V)
   type 'a config = {
     for_SPIE : SPIE.config ;
 
@@ -24,12 +24,14 @@ struct
   }
 
   let learnVPreCond
+      ~(pre:V.expr)
       ~(conf : Value.t list config)
       ~(eval : V.expr)
       ~(post : V.expr)
       ~(consts:Value.t list)
       ~(testbed : TestBed.t)
     : V.expr =
+    let oldpre = pre in
     let rec helper
         (tries_left:int)
         (testbed:TestBed.t)
@@ -43,13 +45,45 @@ struct
         (Log.info (lazy ("VPIE Attempt "
                          ^ (Int.to_string (1 + conf.max_tries - tries_left))
                          ^ "/" ^ (Int.to_string conf.max_tries) ^ "."));
-         match learnPreCond ~conf:conf.for_SPIE ~consts testbed with
-         | None
-         | Some [[]] -> None
-         | precond ->
-           let pre = V.from_synth precond in
+         let pos_examples = List.map ~f:(fun (v,_) -> List.hd_exn v) testbed.pos_tests in
+         let neg_examples = List.map ~f:(fun (v,_) -> List.hd_exn v) testbed.neg_tests in
+         let basic_examples =
+           List.map
+             ~f:(fun x -> match x with
+                 | IntList l -> l
+                 | _ -> failwith "nope")
+             (pos_examples@neg_examples)
+         in
+         let rec sublists = function
+           | []    -> [[]]
+           | x::xs -> let ls = sublists xs in
+             (x::xs)::ls
+         in
+         let all_inside_examples =
+           List.concat_map
+             ~f:sublists
+             basic_examples
+         in
+         let testbed =
+           List.fold_left
+             ~f:(fun tb l ->
+                 if Option.is_some (SetSimulator.check_condition_held_after_eval
+                                        ~test:[("x",Type.INTLIST, IntList l)]
+                                        ~code:eval
+                                        ~condition:post) then
+                   TestBed.add_neg_test ~testbed:tb [IntList l]
+                 else
+                   TestBed.add_pos_test ~testbed:tb [IntList l]
+              )
+             ~init:(TestBed.create_positive ~args:(List.zip_exn testbed.farg_names testbed.farg_types) ~post:testbed.post [])
+             all_inside_examples
+         in
+         match V.synth ~consts testbed with
+         | None -> None
+         | Some pre ->
+           let testpre = V.bin_and_exps pre oldpre in
            Log.info (lazy ("Candidate Precondition: " ^ (V.to_string pre)));
-           begin match V.implication_counter_example ~pre ~eval ~post with
+           begin match V.implication_counter_example ~resultant:false ~pre:testpre ~eval ~post None with
              | None ->
                let pre = if conf.simplify then
                    V.simplify pre

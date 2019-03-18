@@ -1,0 +1,8 @@
+(menhir (modules parser))
+
+(ocamllex lexer)
+
+(library
+    (name Myth)
+    (public_name Myth)
+    (libraries core str ounit))

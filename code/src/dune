@@ -1,3 +1,7 @@
+(menhir (modules parser))
+
+(ocamllex lexer)
+
 (env
     (debug (ocamlopt_flags (:standard -g -Oclassic)))
     (_ (ocamlopt_flags (:standard -O3 -rounds 6))))
@@ -22,8 +26,8 @@
         (bash "cp %{project_root}/../../src/config.h .")))
 
 (library
-    (name LoopInvGen)
-    (public_name LoopInvGen)
-    (libraries core z3 core_extended MyStdlib)
+    (name DSInvGen)
+    (public_name DSInvGen)
+    (libraries core z3 core_extended MyStdlib Myth)
     (preprocessor_deps (file config.h))
-    (preprocess (pps ppx_optcomp ppx_compare ppx_sexp_conv)))
+    (preprocess (pps ppx_hash ppx_deriving.std ppx_optcomp ppx_compare ppx_sexp_conv)))

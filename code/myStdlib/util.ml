@@ -421,6 +421,49 @@ let either_right_exn
   : 'b =
   Option.value_exn (either_right e)
 
+type 'a except = ('a,string) either
+
+let option_to_either
+    (type a)
+    (type b)
+    ~(f:unit -> b)
+    (xo:a option)
+  : (a,b) either =
+  begin match xo with
+    | Some x -> Left x
+    | None -> Right (f ())
+  end
+
+let option_to_except
+    (type a)
+    ~(f:unit -> string)
+    (xo:a option)
+  : a except =
+  option_to_either ~f xo
+
+let except_map
+    (type a)
+    (type b)
+    ~(f:a -> b)
+    (xe:a except)
+  : b except =
+  begin match xe with
+    | Left x -> Left (f x)
+    | Right s -> Right s
+  end
+
+let except_bind
+    (type a)
+    (type b)
+    ~(f:a -> b except)
+    (xe:a except)
+  : b except =
+  begin match xe with
+    | Left x -> f x
+    | Right s -> Right s
+  end
+
+
 let split_by_either (l:('a,'b) either list) : ('a list) * ('b list) =
   let rec split_by_either_internal
       (l:('a,'b) either list)

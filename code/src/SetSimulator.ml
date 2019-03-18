@@ -98,12 +98,13 @@ module SetSimulatorImpl(V : Verifier) = struct
       ~(code : V.expr)
       ~(condition : V.expr)
     : model option =
-    let make_prime
+    let test = trd3 @$ List.hd_exn test in
+    (*let make_prime
         (v:string)
       : string =
       v ^ "!"
-    in
-    let vars = List.map ~f:(fun (var,_,_) -> V.integer_var_exp var) test in
+      in*)
+    (*let vars = List.map ~f:(fun (var,_,_) -> V.integer_var_exp var) test in
     let vars_prime = List.map ~f:(fun (var,_,_) -> V.integer_var_exp (make_prime var)) test in
     let var_setting_exps =
       List.map
@@ -112,13 +113,15 @@ module SetSimulatorImpl(V : Verifier) = struct
             let val_exp = V.from_value value in
             V.mk_equals var_exp val_exp)
         test
-    in
-    let code = V.substitute code (vars@vars_prime) (vars_prime@vars) in
-    let eval = V.and_exps (code::var_setting_exps) in
+      in*)
+    (*let code = V.substitute code (vars@vars_prime) (vars_prime@vars) in*)
+    let eval = code in
     V.implication_counter_example
+      ~resultant:true
       ~pre:V.true_exp
       ~eval
       ~post:condition
+      (Some test)
 
 
   let check_condition_held_after_evals

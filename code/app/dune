@@ -4,4 +4,4 @@
 
 (executable
     (name App)
-    (libraries LoopInvGen base))
+    (libraries DSInvGen base))

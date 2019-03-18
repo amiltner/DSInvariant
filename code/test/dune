@@ -4,7 +4,7 @@
 
 (executable
     (name Runner)
-    (libraries LoopInvGen base alcotest))
+    (libraries DSInvGen base alcotest))
 
 (alias
     (name runtest)

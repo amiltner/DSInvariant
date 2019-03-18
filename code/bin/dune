@@ -5,5 +5,5 @@
 (executables
     (names Process Record Infer Verify)
     (public_names lig-process lig-record lig-infer lig-verify)
-    (libraries LoopInvGen core)
-    (package LoopInvGen))
+    (libraries DSInvGen core)
+    (package DSInvGen))

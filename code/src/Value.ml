@@ -5,6 +5,7 @@ open Exceptions
 module T = struct
   type t = Int of int
          | Bool of bool
+         | IntList of int list
          [@@deriving compare,sexp]
 end
 
@@ -15,12 +16,14 @@ let typeof (v : t) : Type.t =
   match v with
   | Int _  -> Type.INT
   | Bool _ -> Type.BOOL
+  | IntList _ -> Type.INTLIST
 [@@inline always]
 
 let to_string (v : t) : string =
   match v with
   | Int i  -> Int.to_string i
   | Bool b -> Bool.to_string b
+  | IntList il -> MyStdlib.string_of_list (Int.to_string) il
 [@@inline always]
 
 let of_string (s : string) : t =

@@ -64,6 +64,7 @@ let solve_impl consts task =
     } in match Value.typeof value with
          | Type.BOOL -> bool_candidates.(1) <- Set.add bool_candidates.(1) candidate
          | Type.INT -> int_candidates.(1) <- Set.add int_candidates.(1) candidate
+         | Type.INTLIST -> failwith "cannot do"
   in
 
   (* Log.debug (lazy ("  + Loaded Constants: [" ^ (List.to_string_map constants ~sep:"; " ~f:Value.to_string) ^ "]")); *)
@@ -73,6 +74,7 @@ let solve_impl consts task =
     let candidates = match Value.typeof input.(1) with
       | Type.INT -> int_candidates
       | Type.BOOL -> bool_candidates
+      | Type.INTLIST -> failwith "cannot do"
     in candidates.(1) <- Set.add candidates.(1) { expr = Expr.Var i ; outputs = input })
   ;
 
@@ -91,6 +93,7 @@ let solve_impl consts task =
   begin match task_codomain with
   | Type.INT -> Set.iter ~f:check int_candidates.(1);
   | Type.BOOL -> Set.iter ~f:check bool_candidates.(1);
+  | Type.INTLIST -> failwith "cannot do"
   end ;
 
   let apply_component size arg_types applier =
@@ -101,6 +104,7 @@ let solve_impl consts task =
                     begin match typ with
                       | Type.INT -> int_candidates.(i)
                       | Type.BOOL -> bool_candidates.(i)
+                      | Type.INTLIST -> failwith "cannot do"
                     end
       | ([], []) -> applier (List.rev acc)
       | _ -> raise (Internal_Exn "Impossible case!")

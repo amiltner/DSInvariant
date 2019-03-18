@@ -9,3 +9,4 @@ let for_type (t : Type.t) : Value.t Generator.t =
   (* Full range of Int:
   | Type.INT -> Int.gen >>= fun i -> singleton (Value.Int i) *)
   | Type.BOOL -> Bool.gen >>= fun b -> singleton (Value.Bool b)
+  | Type.INTLIST -> failwith "TODO"

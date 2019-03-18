@@ -1,5 +1,4 @@
 open MyStdlib
-
 open Utils
 open SetVPie
 open Verifiers
@@ -53,7 +52,7 @@ module SIGLearner(V : Verifier) = struct
 
 
   let satisfyTrans
-      ~(pre_expr : V.expr)
+      ~pre_expr:(_ : V.expr)
       ~(invariant : V.expr)
       ~(code : V.expr)
       ~(conf : Value.t list config)
@@ -85,10 +84,7 @@ module SIGLearner(V : Verifier) = struct
               [V.integer_var_exp "x!";V.integer_var_exp "y!"]
           in
           let eval =
-            V.and_exps
-              [invf_call
-              ;pre_expr
-              ;code]
+              code
           in
           Log.info
             (lazy ("IND >> Strengthening for inductiveness:"
@@ -96,6 +92,7 @@ module SIGLearner(V : Verifier) = struct
                    ^ (V.to_string invariant))) ;
           let pre_inv =
             SetVPie.learnVPreCond
+              ~pre:invf_call
               ~conf:conf.for_VPIE
               ~eval
               ~consts:sygus.constants
@@ -109,7 +106,7 @@ module SIGLearner(V : Verifier) = struct
                               | _ -> false))
           in
           Log.debug (lazy ("IND Delta: " ^ (V.to_string pre_inv))) ;
-          if V.equal pre_inv V.true_exp then
+          if V.equal pre_inv V.true_exp || V.equal pre_inv V.alternative_true_exp then
             (invariant, None)
           else
             let new_inv = V.bin_and_exps pre_inv invariant in
@@ -174,6 +171,7 @@ module SIGLearner(V : Verifier) = struct
       in
       let invariant =
         SetVPie.learnVPreCond
+          ~pre:V.true_exp
           ~conf:conf.for_VPIE
           ~eval:pre_expr
           ~post:post_expr
@@ -194,18 +192,18 @@ module SIGLearner(V : Verifier) = struct
              (V.integer_var_exp "y"))
           (V.integer_var_exp "z")
       in
-      let set_xyprime_to_inserted =
+      (*let set_xyprime_to_inserted =
         V.bin_and_exps
           (V.mk_equals (V.integer_var_exp "x!") (V.get_fst inserted_xy))
           (V.mk_equals (V.integer_var_exp "y!") (V.get_snd inserted_xy))
-      in
+        in*)
       let invariant =
         match satisfyTrans
                 ~pre_expr
                 ~conf
                 ~sygus
                 ~states
-                ~code:set_xyprime_to_inserted
+                ~code:inserted_xy
                 ~invariant with
         | inv, None ->
           V.simplify inv
@@ -224,18 +222,18 @@ module SIGLearner(V : Verifier) = struct
              (V.integer_var_exp "y"))
           (V.integer_var_exp "z")
       in
-      let set_xyprime_to_deleted =
+      (*let set_xyprime_to_deleted =
         V.bin_and_exps
           (V.mk_equals (V.integer_var_exp "x!") (V.get_fst deleted_xy))
           (V.mk_equals (V.integer_var_exp "y!") (V.get_snd deleted_xy))
-      in
+        in*)
       let invariant =
         match satisfyTrans
                 ~pre_expr
                 ~conf
                 ~sygus
                 ~states
-                ~code:set_xyprime_to_deleted
+                ~code:deleted_xy
                 ~invariant with
         | inv, None ->
           V.simplify inv
@@ -261,9 +259,11 @@ module SIGLearner(V : Verifier) = struct
           (V.integer_var_exp "z")
       in
       begin match V.implication_counter_example
-                    ~pre:(V.bin_and_exps pre_expr empty)
-                    ~eval:(V.true_exp) (*TODO: confirm this works *)
-                    ~post:invariant with
+                    ~resultant:false
+                    ~pre:(V.bin_and_exps V.true_exp empty)
+                    ~eval:(pre_expr) (*TODO: confirm this works *)
+                    ~post:invariant
+        None with
       | None -> invariant
       | Some ce_model ->
         restart_with_new_states
@@ -290,18 +290,74 @@ module SIGLearner(V : Verifier) = struct
     verifier_state*)
 
 
+
   let learnSetInvariant
-      ?(conf = default_config)
-      ~(states : Value.t list list)
-      (sygus : V.expr SyGuS_Set.t)
+      (*?(conf = default_config)*)
+        ~states:(states : Value.t list list)
+        (sygus : V.expr SyGuS_Set.t)
     : Job.desc =
     let ans = V.to_string
       (learnSetInvariant_internal
-         ~conf
-         ~restarts_left:conf.max_restarts
+         ~conf:default_config
+         ~restarts_left:default_config.max_restarts
          ~states
          ~sygus
-         ~seed_string:conf.base_random_seed)
+         ~seed_string:default_config.base_random_seed)
     in
-    ans
+      ans
+
+
+  (*let intlist_generator =
+    Quickcheck.Generator.list Quickcheck.Generator.small_non_negative_int
+  in
+  let intlist_seq =
+    Sequence.filter
+      ~f:(fun l -> List.length l < 5)
+      (Quickcheck.random_sequence intlist_generator)
+  in
+  let intlist_list = Sequence.to_list (Sequence.take intlist_seq 80)
+  in
+  let rec sublists = function
+    | []    -> [[]]
+    | x::xs -> let ls = sublists xs in
+      (x::xs)::ls
+  in
+  let all_inside_examples =
+    List.concat_map
+      ~f:sublists
+      intlist_list
+  in
+  let testbed =
+    List.fold_left
+      ~f:(fun tb l ->
+          if Option.is_some (SetSimulator.check_condition_held_after_eval
+                               ~test:[("x",Type.INTLIST, IntList l)]
+                               ~code:(sygus.precond_func
+                                        ~verifier:(module V)
+                                        (V.make_pair
+                                           (V.integer_var_exp "x")
+                                           (V.integer_var_exp "y"))
+                                        (V.integer_var_exp "z"))
+                               ~condition:(sygus.post_func
+                                             ~verifier:(module V)
+                                             (V.make_pair
+                                                (V.integer_var_exp "x")
+                                                (V.integer_var_exp "y"))
+                                             (V.integer_var_exp "z"))) then
+            TestBed.add_neg_test ~testbed:tb [IntList l]
+          else
+            TestBed.add_pos_test ~testbed:tb [IntList l]
+        )
+      ~init:(
+        TestBed.create_positive
+          []
+          ~args:sygus.synth_variables
+          ~post:(fun _ res ->
+              match res with
+              | Ok v when v = Value.Bool false -> true
+              | _ -> false))
+      all_inside_examples
+  in
+  let myend = Option.value_exn (V.synth ~consts:sygus.constants testbed) in
+    (V.to_string myend)*)
 end
