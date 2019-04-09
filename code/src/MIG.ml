@@ -1,54 +1,53 @@
 open MyStdlib
-open Utils
 open Verifiers
-open SetSimulator
+open Lang
 
 module MIGLearner(V : Verifier) = struct
   module VPIE = VPIE.Make(V)
-  module SetSimulator = SetSimulatorImpl(V)
 
   let push_boundary
-      ~(sygus : V.expr SyGuS_Set.t)
-      ~(code : V.expr)
-      ~(postcondition : V.expr)
-      ~(states : Value.t list list)
-    : model option =
-    let testbed =
+      ~sygus:(_ : Expr.t Problem.t)
+      ~code:(_ : Expr.t)
+      ~postcondition:(_ : Expr.t)
+      ~positives:(_ : Value.t list)
+    : Expr.t option =
+    (*let _ =
       TestBed.create_positive
-        states
+        (List.map ~f:(fun x -> [x]) positives)
         ~args:sygus.synth_variables
         ~post:(fun _ res ->
             match res with
             | Ok v when v = Value.Bool false -> true
             | _ -> false)
-    in
-    SetSimulator.check_condition_held_after_evals
+      in*)
+    failwith "TODO"
+    (*SetSimulator.check_condition_held_after_evals
       ~testbed
       ~code
-      ~condition:postcondition
+      ~condition:postcondition*)
 
 
   let satisfyTrans
-      ~pre_expr:(_ : V.expr)
-      ~(invariant : V.expr)
-      ~(code : V.expr)
-      ~(sygus : V.expr SyGuS_Set.t)
-      ~(states : Value.t list list)
-    : (V.expr * model option) =
-    let rec helper (invariant : V.expr) : (V.expr * model option) =
+      ~pre_expr:(_ : Expr.t)
+      ~invariant:(_ : Expr.t)
+      ~code:(_ : Expr.t)
+      ~sygus:(_ : Expr.t Problem.t)
+      ~positives:(_ : Value.t list)
+    : (Expr.t * Expr.t option) =
+    (*let rec helper (invariant : Expr.t) : (V.expr * V.expr option) =
       let boundary_validity =
         push_boundary
           ~sygus
           ~code
           ~postcondition:invariant
-          ~states
+          ~positives
       in
       begin match boundary_validity with
         | Some m ->
-          Log.info
+          (*Log.info
             (lazy ("Boundary Not Satisfied, counterexample:"
                    ^ (Log.indented_sep 4)
-                   ^ (string_of_list (string_of_pair ident Value.to_string) m))) ;
+                   ^ (string_of_list (string_of_pair ident Value.to_string) m))) ;*)
 
           (V.true_exp,Some m)
         | None ->
@@ -73,7 +72,7 @@ module MIGLearner(V : Verifier) = struct
               ~consts:sygus.constants
               ~post:invf'_call
               ~testbed:(TestBed.create_positive
-                          states
+                          (List.map ~f:(fun x -> [x]) positives)
                           ~args:sygus.synth_variables
                           ~post:(fun _ res ->
                               match res with
@@ -88,28 +87,27 @@ module MIGLearner(V : Verifier) = struct
             helper new_inv
       end
     in
-    helper invariant
+      helper invariant*)
+    failwith "ah"
 
   let learnSetInvariant_internal
-      ~(states : Value.t list list)
-      ~(sygus : V.expr SyGuS_Set.t)
-    : V.expr =
-    let rec learnSetInvariant_internal
-        ~(states : Value.t list list)
+      ~positives:(_ : Value.t list)
+      ~sygus:(_ : Expr.t Problem.t)
+    : Expr.t =
+    (*let rec learnSetInvariant_internal
+        ~(positives : Value.t list)
         ~(attempt:int)
-      : V.expr =
-      let open Quickcheck in
-      let open SetSimulator in
-      let restart_with_new_states
-          (head : Value.t list)
-        : V.expr =
+      : Expr.t =
+      let restart_with_new_positives
+          (positive : Value.t)
+        : Expr.t =
           begin
             Log.warn (lazy ("Restarting inference engine. Attempt "
                             ^ (string_of_int attempt)
                             ^ ".")) ;
             learnSetInvariant_internal
               ~attempt:attempt
-              ~states:(List.dedup_and_sort ~compare:(compare Value.compare) (head::states))
+              ~positives:(List.dedup_and_sort ~compare:Value.compare (positive::positives))
           end
       in
       (* I => Q *)
@@ -135,7 +133,8 @@ module MIGLearner(V : Verifier) = struct
           ~eval:pre_expr
           ~post:post_expr
           ~consts:sygus.constants
-          ~testbed:(TestBed.create_positive states
+          ~testbed:(TestBed.create_positive
+                      (List.map ~f:(fun x -> [x]) positives)
                       ~args:sygus.synth_variables
                       ~post:(fun _ res ->
                           match res with
@@ -160,15 +159,14 @@ module MIGLearner(V : Verifier) = struct
         match satisfyTrans
                 ~pre_expr
                 ~sygus
-                ~states
+                ~positives
                 ~code:inserted_xy
                 ~invariant with
         | inv, None ->
           V.simplify inv
         | _, (Some ce_model) ->
-          restart_with_new_states
-            (Option.value_exn (random_value
-                                 (gen_state_from_model sygus (Some ce_model))))
+          restart_with_new_positives
+            (V.to_value_exn ce_model)
       in
       (* {I'} s = delete y s {I} *)
       let deleted_xy =
@@ -188,12 +186,12 @@ module MIGLearner(V : Verifier) = struct
         match satisfyTrans
                 ~pre_expr
                 ~sygus
-                ~states
+                ~positives
                 ~code:deleted_xy
                 ~invariant with
         | inv, None ->
           V.simplify inv
-          (*restart_with_new_states
+        (*restart_with_new_positives
             (random_value
                ~seed:(`Deterministic seed_string)
                (gen_pre_state
@@ -201,9 +199,7 @@ module MIGLearner(V : Verifier) = struct
                   ~use_trans:true
                   sygus))*)
         | _, (Some ce_model) ->
-          restart_with_new_states
-            (Option.value_exn (random_value
-                                 (gen_state_from_model sygus (Some ce_model))))
+          ce_model
       in
       let empty =
         sygus.empty_func
@@ -221,19 +217,18 @@ module MIGLearner(V : Verifier) = struct
         None with
       | None -> invariant
       | Some ce_model ->
-        restart_with_new_states
-          (Option.value_exn (random_value
-                               (gen_state_from_model sygus (Some ce_model))))
+        V.from_value @$ List.hd_exn ce_model
       end
     in
     learnSetInvariant_internal
-      ~states
-      ~attempt:1
+      ~positives
+      ~attempt:1*)
+    failwith "ah"
 
   (*let make_sygus_verifier_state
       (type t)
       ~verifier:(module V : Verifier with type t = t)
-      ~(sygus : SyGuS_Set.t)
+      ~(sygus : Problem.t)
     : V.t =
     let verifier_state = V.empty in
     let verifier_state = V.register_func verifier_state sygus.insert_func in
@@ -246,12 +241,12 @@ module MIGLearner(V : Verifier) = struct
 
   let learnSetInvariant
       (*?(conf = default_config)*)
-        ~states:(states : Value.t list list)
-        (sygus : V.expr SyGuS_Set.t)
+      ~positives:(positives : Value.t list)
+        (sygus : Expr.t Problem.t)
     : Job.desc =
-    let ans = V.to_string
+    let ans = Expr.show
       (learnSetInvariant_internal
-         ~states
+         ~positives
          ~sygus)
     in
     ans

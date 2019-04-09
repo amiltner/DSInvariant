@@ -1,6 +1,6 @@
 open Base
 open DSInvGen
-open Verifiers
+open SetVerifiers
 
 let _ = z3_verifier
 let empty = (Int.max_value, Int.max_value)
@@ -24,10 +24,9 @@ let delete z (x,y) =
   else
     (x,y)
 
-
 (* a job for inferring an equivalence relation between two representations of a\
  counter data structure (adapted from Dave Walker's course notes) *)
-let equiv_job = Job.create
+(*let equiv_job = Job.create
     ~f:(fun [@warning "-8"] [ Value.Int x; Value.Int y; Value.Int z] ->
         Value.Bool (contains z (delete z (x,y))))
     ~args:([ ("Q = contains x (delete x s) = false
@@ -76,6 +75,7 @@ x", Type.INT); ("y", Type.INT); ("z", Type.INT) ])
         | _ -> false)
     ~features:[]
     (List.map [(0,empty); (-1,(0,Int.max_value))] ~f:(fun (x,(y,z)) -> [Value.Int y ; Value.Int z; Value.Int x]))
+                *)
 
 
 
@@ -240,12 +240,12 @@ let _ = Log.enable (Some "log")
 
 module MySig = SIGLearner(QuickCheckVerifier)
 
-let ans =
+(*let ans =
   MySig.learnSetInvariant
     ~states:[]
     sygus_call
 
-  let _ = Stdio.print_endline ans
+  let _ = Stdio.print_endline ans*)
 
 
 (*let _ = Z3Verifier.register_func Z3Verifier.empty
@@ -321,9 +321,9 @@ let lookup =
       fun (x : nat) ->
         match l binding l with
         | Nil -> False
-        | Cons -> match compare (l.1) x binding c with
+        | Cons -> match compare (l.0) x binding c with
                   | EQ -> True
-                  | LT -> lookup (l.2) x
+                  | LT -> lookup (l.1) x
                   | GT -> False
 ;;
 
@@ -336,10 +336,10 @@ let insert =
         match l binding lp with
         | Nil -> Cons (x, Nil)
         | Cons ->
-          (match compare x (lp.1) binding c with
+          (match compare x (lp.0) binding c with
            | LT -> Cons (x, l)
            | EQ -> l
-           | GT -> Cons (lp.1, (insert lp.2 x)))
+           | GT -> Cons (lp.0, (insert lp.1 x)))
 ;;
 
 let delete =
@@ -349,10 +349,10 @@ let delete =
         match l binding lp with
         | Nil -> Nil
         | Cons ->
-          (match compare x (lp.1) binding c with
+          (match compare x (lp.0) binding c with
            | LT -> l
-           | EQ -> lp.2
-           | GT -> Cons (lp.1, (delete lp.2 x)))
+           | EQ -> lp.1
+           | GT -> Cons (lp.0, (delete lp.1 x)))
 ;;
 
 end
@@ -366,7 +366,7 @@ sig
   val delete : t -> nat -> t
 end
 maintains
-forall (s : t). forall (i : nat). (lookup (delete s i)) i
+forall (s : t). forall (i : nat). (lookup (delete s i) i)
 "
 
 let problem =
@@ -377,8 +377,25 @@ let full_spec =
   ProcessFile.process_full_problem
     problem
 
+open Lang
+open MyStdlib
+
 let _ = begin match full_spec with
-  | Left _ -> Stdio.print_endline "passed"
+  | Left (_,ec,tc,vc,_,forall,i_e) ->
+    let ans =
+      Verifiers.QuickCheckVerifier.implication_counter_example
+      ~ec
+      ~tc
+      ~vc
+      ~i_e
+      ~pre:(Expr.func ("i",Type.Var "t") (Value.to_exp (Verifiers.QuickCheckVerifier.true_val)))
+      ~eval:(Expr.func ("i",Type.Var "t") (Expr.var "i"))
+      ~post:forall
+    in
+    begin match ans with
+      | None -> failwith "None"
+      | Some anses -> print_endline (string_of_list Expr.show anses)
+    end
   | Right s -> Stdio.print_endline s
 end
 (*

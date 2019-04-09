@@ -693,6 +693,27 @@ let split_by_first_last_exn (l:'a list) : 'a * 'a list * 'a =
   let (m,e) = split_by_last_exn t in
   (h,m,e)
 
+let rec remove_at
+    (l:'a list)
+    (i:int)
+  : 'a list option =
+  begin match l with
+    | [] -> None
+    | h::t ->
+      if i = 0 then
+        Some t
+      else
+        Option.map
+          ~f:(fun t -> h::t)
+          (remove_at t (i-1))
+  end
+
+let remove_at_exn
+    (l:'a list)
+    (i:int)
+  : 'a list =
+  Option.value_exn (remove_at l i)
+
 let split_at_index_exn (l:'a list) (i:int) : 'a list * 'a list =
   let rec split_at_index_exn_internal (l:'a list) (i:int)
             (continuation:('a list * 'a list) -> ('a list * 'a list))

@@ -64,7 +64,7 @@ let add_pos_test ~(testbed : t) (test : Value.t list) : t =
         :: testbed.pos_tests
     }
 
-let add_neg_test ~(testbed : t) (test : Value.t list) : t =
+let add_neg_tests ~(testbed : t) (test : Value.t list) : t =
   if List.exists testbed.neg_tests ~f:(fun (nt, _) -> nt = test)
   then (*raise (Duplicate_Test ("New NEG test (" ^ (String.concat ~sep:"," testbed.farg_names)
                              ^ ") = (" ^ (List.to_string_map ~sep:"," ~f:Value.to_string test)

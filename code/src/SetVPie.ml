@@ -1,5 +1,5 @@
 open Core_kernel
-open Verifiers
+open SetVerifiers
 
 open Utils
 
@@ -71,7 +71,7 @@ struct
                                         ~test:[("x",Type.INTLIST, IntList l)]
                                         ~code:eval
                                         ~condition:post) then
-                   TestBed.add_neg_test ~testbed:tb [IntList l]
+                   TestBed.add_neg_tests ~testbed:tb [IntList l]
                  else
                    TestBed.add_pos_test ~testbed:tb [IntList l]
               )
@@ -113,7 +113,7 @@ struct
                              ~sep:", "
                              ~f:(fun v n -> n ^ " = " ^ (Value.to_string v)))
                         ^ "}"));
-               helper (tries_left - 1) (TestBed.add_neg_test ~testbed test)
+               helper (tries_left - 1) (TestBed.add_neg_tests ~testbed test)
            end)
     in
     begin match helper conf.max_tries testbed with

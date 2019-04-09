@@ -438,6 +438,7 @@ end
 module UniversalFormula =
 struct
   type t = Arg.t list * Expr.t
+  [@@deriving ord, show, hash]
 end
 
 module Value =
@@ -446,6 +447,7 @@ struct
     | Func of Arg.t * Expr.t
     | Ctor of Id.t * t
     | Tuple of t list
+  [@@deriving ord, show, hash]
 
   let func
       (a:Arg.t)

@@ -1,6 +1,6 @@
 open MyStdlib
 open Core_kernel
-open Verifiers
+open SetVerifiers
 open SyGuS_Set
 open Utils
 open TestBed

@@ -310,8 +310,8 @@ let rec typecheck_exp
       except_bind
         ~f:(fun ts ->
             option_to_except
-              ~f:(fun () -> "projection of invalid component")
-              (List.nth ts (i-1)))
+              ~f:(fun () -> "projection of invalid component " ^ (Int.to_string i))
+              (List.nth ts i))
         ts_e
   end
 

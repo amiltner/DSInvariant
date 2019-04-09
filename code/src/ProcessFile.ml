@@ -26,13 +26,13 @@ let process_decl_list
     (tc:TypeContext.t)
     (vc:VariantContext.t)
     (ds:Declaration.t list)
-  : (ExprContext.t * TypeContext.t * VariantContext.t) except =
+  : (ExprContext.t * TypeContext.t * VariantContext.t * (Id.t * Expr.t) list) except =
   except_map
     ~f:fst
     (List.fold_left
        ~f:(fun ec_tc_vc_e decl ->
            except_bind
-             ~f:(fun ((new_ec,new_tc,new_vc),(ec,tc,vc)) ->
+             ~f:(fun ((new_ec,new_tc,new_vc,i_e),(ec,tc,vc)) ->
                  Declaration.fold
                    ~type_f:(fun i t ->
                        let all_variants = extract_variants t in
@@ -42,7 +42,8 @@ let process_decl_list
                           ,List.fold_left
                               ~f:(fun vc (k,v) -> VariantContext.insert vc k v)
                               ~init:new_vc
-                              all_variants)
+                              all_variants
+                          ,i_e)
                          ,(ec
                           ,TypeContext.insert tc i t
                           ,List.fold_left
@@ -55,7 +56,8 @@ let process_decl_list
                          ~f:(fun t ->
                              ((ExprContext.insert new_ec i t
                               ,new_tc
-                              ,new_vc)
+                              ,new_vc
+                              ,(i,e)::i_e)
                              ,(ExprContext.insert ec i t
                               ,tc
                               ,vc)))
@@ -63,7 +65,7 @@ let process_decl_list
                    decl)
              ec_tc_vc_e)
        ~init:(Left
-                ((ExprContext.empty,TypeContext.empty,VariantContext.empty)
+                ((ExprContext.empty,TypeContext.empty,VariantContext.empty,[])
                 ,(ec,tc,vc)))
        ds)
 
@@ -110,7 +112,8 @@ let process_full_problem
      * TypeContext.t
      * VariantContext.t
      * Type.t list
-     * UniversalFormula.t) except =
+     * UniversalFormula.t
+     * (Id.t * Expr.t) list) except =
   let ec_tc_vc_e =
     process_decl_list
       ExprContext.empty
@@ -120,15 +123,17 @@ let process_full_problem
   in
   let context_modonly_context_e =
     except_bind
-      ~f:(fun (ec,tc,vc) ->
+      ~f:(fun (ec,tc,vc,i_e) ->
           except_map
-            ~f:(fun ectcvc' -> ((ec,tc,vc),ectcvc'))
+            ~f:(fun ectcvc' ->
+                let (ec',tc',vc',i_e') = ectcvc' in
+                ((ec,tc,vc),(ec',tc',vc'),i_e'@i_e))
             (process_decl_list ec tc vc modi))
       ec_tc_vc_e
   in
   let validated_context_modonly_context_e =
     except_bind
-      ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc)) ->
+      ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),i_e) ->
           let full_tc =
             TypeContext.from_kvp_list
               (TypeContext.merge
@@ -150,22 +155,22 @@ let process_full_problem
                 if (not b) then
                   Right "module doesn't satisfy spec"
                 else
-                  Left (((ec,tc,vc),(m_ec,m_tc,m_vc))))
+                  Left (((ec,tc,vc),(m_ec,m_tc,m_vc),i_e)))
             satisfies_e)
       context_modonly_context_e
   in
   let validated_context_modonly_context_uf_e =
     except_bind
-      ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc)) ->
+      ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),i_e) ->
           let ec_sig = process_module_sig ec mods in
           let ftl_e = typecheck_formula ec_sig tc vc uf in
           except_map
-            ~f:(fun tl -> ((ec,tc,vc),(m_ec,m_tc,m_vc),tl,uf))
+            ~f:(fun tl -> ((ec,tc,vc),(m_ec,m_tc,m_vc),tl,uf,i_e))
             ftl_e)
       validated_context_modonly_context_e
   in
   except_map
-    ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),tl,uf) ->
+    ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),tl,uf,i_e) ->
         let full_ec =
           TypeContext.from_kvp_list
             (ExprContext.merge
@@ -198,5 +203,5 @@ let process_full_problem
             full_tc
             (fst mods)
         in
-        (type_instantiation,full_ec,full_tc,full_vc,tl,uf))
+        (type_instantiation,full_ec,full_tc,full_vc,tl,uf,i_e))
     validated_context_modonly_context_uf_e

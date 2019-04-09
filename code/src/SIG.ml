@@ -1,7 +1,7 @@
 open MyStdlib
 open Utils
 open SetVPie
-open Verifiers
+open SetVerifiers
 open SetSimulator
 
 module SIGLearner(V : Verifier) = struct

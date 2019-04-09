@@ -894,3 +894,22 @@
 2019-03-18 14:56:09.161644-07:00 [info ]: Candidate Precondition: fun (i1:nat) -> fix f1 (l1:list) : bool = not False
 2019-03-18 14:56:09.162060-07:00 [info ]: Verified Precondition: fun (i1:nat) -> fix f1 (l1:list) : bool = not False
 2019-03-18 14:56:09.162066-07:00 [debug]: IND Delta: fun (i1:nat) -> fix f1 (l1:list) : bool = not False
+2019-03-28 16:26:18.821118-04:00 [info ]: 
+2019-03-28 16:26:18.824087-04:00 [info ]: ===============================================================================
+2019-03-28 16:26:18.824108-04:00 [info ]: VPIE Attempt 1/512.
+2019-03-28 16:26:18.824646-04:00 [info ]: Candidate Precondition: fun (i1:nat) -> fix f1 (l1:list) : bool = not False
+2019-03-28 16:26:18.825549-04:00 [info ]: Counter example: {x = [0;0;0;0;0;0;1;0;0;0;0;0]}
+2019-03-28 16:26:18.825553-04:00 [info ]: VPIE Attempt 2/512.
+2019-03-28 16:26:18.890788-04:00 [info ]: Candidate Precondition: fun (i1:nat) ->
+  fix f1 (l1:list) : bool =
+    match l1 with
+      | Nil -> True
+      | Cons (n1, l2) -> (match f1 l2 with
+                            | True -> (match l2 with
+                                         | Nil -> True
+                                         | Cons (n2, l3) -> not (f1 l3))
+                            | False -> (match n1 with
+                                          | O -> False
+                                          | S n2 -> True))
+2019-03-28 16:26:18.891192-04:00 [info ]: Counter example: {x = [1;0;2;2;1;0;0;1;2;1]}
+2019-03-28 16:26:18.891198-04:00 [info ]: VPIE Attempt 3/512.
