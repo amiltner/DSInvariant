@@ -63,6 +63,8 @@ Currently, Myth is slow, can we improve by using a more data-driven algorithm?
 Currently, Myth doesn't support the type of IO examples we need, can we extend it,
 or make some other algorithm handle it.
 
+Currently, we have no theorems or proofs, we should do that.
+
 
 
 CHC solvers papers have some work
@@ -82,6 +84,9 @@ We need some form of example like: (e1 = false \/ e2 = false)
 Currently Escher does not support such examples
 
 
+
+
+Another list example: functional double ended QUEUE 
 
 
 
@@ -149,6 +154,3 @@ verify_boundary(I : formula, f : function, G : set)
 Conjectures:
 If the Verifier and Synthesizer are Sound + Complete + Always terminate, then
 so does the algorithm if there is such an invariant
-
-
-Another list example: functional double ended QUEUE 
