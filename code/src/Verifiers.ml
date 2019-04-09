@@ -267,17 +267,10 @@ struct
     : Value.t option =
     failwith "TODO"
 
-  let substitute
-      (e:Expr.t)
-      (_:Expr.t list)
-      (_:Expr.t list)
-    : Expr.t =
-    e
-
   let synth
       ~testbed:(_:TestBed.t)
     : Expr.t option =
-    failwith "not yet"
+    failwith "TODO"
 end
 
 let quickcheck_verifier = (module QuickCheckVerifier : Verifier)

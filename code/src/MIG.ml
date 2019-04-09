@@ -68,67 +68,51 @@ module MIGLearner(V : Verifier) = struct
     in
     helper invariant
 
-  let learnInvariant_internal
-      ~positives:(positives : Value.t list)
+  let rec learnInvariant_internal
       ~problem:(problem : problem)
+      ~positives:(positives : Value.t list)
+      ~attempt:(attempt:int)
     : Expr.t =
-    let rec learnInvariant_internal
-        ~(positives : Value.t list)
-        ~(attempt:int)
+    let restart_with_new_positives
+        (positive : Value.t)
       : Expr.t =
-      let restart_with_new_positives
-          (positive : Value.t)
-        : Expr.t =
-          begin
-            Log.warn (lazy ("Restarting inference engine. Attempt "
-                            ^ (string_of_int attempt)
-                            ^ ".")) ;
-            learnInvariant_internal
-              ~attempt:attempt
-              ~positives:(positive::positives)
-          end
-      in
-      (* I => Q *)
-      let initial_invariant =
-        VPIE.learnVPreCond
+      begin
+        Log.warn (lazy ("Restarting inference engine. Attempt "
+                        ^ (string_of_int attempt)
+                        ^ ".")) ;
+        learnInvariant_internal
           ~problem
-          ~pre:(Expr.mk_constant_true_func problem.module_type)
-          ~eval:(Expr.mk_identity_func problem.module_type)
-          ~post:problem.post
-          ~positives:positives
-      in
-      (* inductiveness checks and updates *)
-      let inv_or_pos =
-        fold_until_right_or_list_end
-          ~f:(fun acc e ->
-              satisfyTrans
-                ~problem
-                ~invariant:acc
-                ~eval:e
-                ~positives)
-          ~init:initial_invariant
-          problem.mod_vals
-      in
-      begin match inv_or_pos with
-        | Left inv -> inv
-        | Right ce -> restart_with_new_positives ce
+          ~positives:(positive::positives)
+          ~attempt:(attempt+1)
       end
     in
-    learnInvariant_internal
-      ~positives
-      ~attempt:1
-
-  (*let make_sygus_verifier_state
-      (type t)
-      ~verifier:(module V : Verifier with type t = t)
-      ~(sygus : Problem.t)
-    : V.t =
-    let verifier_state = V.empty in
-    let verifier_state = V.register_func verifier_state sygus.insert_func in
-    let verifier_state = V.register_func verifier_state sygus.delete_func in
-    let verifier_state = V.register_func verifier_state sygus.lookup_func in
-    let verifier_state = V.register_func verifier_state sygus.post_func in
-    verifier_state*)
+    (* find I => Q *)
+    let initial_invariant =
+      VPIE.learnVPreCond
+        ~problem
+        ~pre:(Expr.mk_constant_true_func problem.module_type)
+        ~eval:(Expr.mk_identity_func problem.module_type)
+        ~post:problem.post
+        ~positives:positives
+    in
+    (* inductiveness checks and updates to invariants *)
+    (* terminates when either all have been processed and found invariant *)
+    (* or until it becomes too strong, and a positive counterexample is added *)
+    let inv_or_pos =
+      fold_until_right_or_list_end
+        ~f:(fun acc e ->
+            satisfyTrans
+              ~problem
+              ~invariant:acc
+              ~eval:e
+              ~positives)
+        ~init:initial_invariant
+        problem.mod_vals
+    in
+    begin match inv_or_pos with
+      | Left inv -> inv
+      | Right ce -> restart_with_new_positives ce
+    end
 
   let learnInvariant
       ~unprocessed_problem:(unprocessed_problem : unprocessed_problem)
@@ -139,7 +123,8 @@ module MIGLearner(V : Verifier) = struct
       | Left problem ->
         Expr.show
           (learnInvariant_internal
+             ~problem
              ~positives:[]
-             ~problem)
+             ~attempt:0)
     end
 end
