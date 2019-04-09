@@ -1,0 +1,154 @@
+problem :=
+{declarations}
+{module} : {signature} maintaining {theorem}
+
+declarations :=
+  | type {id} = {type} {declarations}
+  | let {id} = {exp};; {declarations}
+  | .
+
+module := struct {declarations} end
+
+signature := sig type x {val_reqs} end
+val_reqs :=
+  | val {id} = {exp} {val_reqs}
+  | .
+
+{theorem} :=
+  | forall ({id} : {type}) {theorem}
+  | {expr}     (* must have type bool, when FVs filled in with appropriate types *)
+
+Require: e_1 : t_1 ... e_n : t_n |- theorem : bool
+
+Our goal: find inv such that
+forall i. (t_i == x => inv(e_i)) => theorem(e_1...e_n)
+2) inv is inductive on module : sig
+
+A function is predicate on a module if its indutve for all functions of the module.
+
+A function    f : t1 -> t2 -> ... -> (tn * ... * tm)   is inductive if
+let e1 : t1 , ... , en : t_{n-1}
+let (en,...,em) = f e1 ... en-1
+((i < n /\ t_i == x) => inv(e_i))    =>   ((i >= n /\ t_i == x) => inv(e_i))
+
+
+
+
+
+High Level Approach:
+Essentially the same as in LIG, but modified to work in this context
+Get IO examples from verifier, use those IO examples for synthesis, loop until sufficiently strong invariant found
+
+Medium Level Approach:
+Find function sufficiently strong to prove postcondition.
+Check it's inductive on module
+If it isn't because too weak, strengthen
+If it isn't because too strong, add counterexample and restart
+
+Low Level Approach:
+See pseudocode below
+
+
+Open questions / Difficulties / TODOs:
+
+Benchmark suite -- must be created
+
+Is current (medium level) approach good enough to work in practice
+
+Currently quickcheck just generates elements of data type, can we use
+"Generating Good Generators for Inductive Relations" to improve?
+
+Currently, Myth is slow, can we improve by using a more data-driven algorithm?
+
+Currently, Myth doesn't support the type of IO examples we need, can we extend it,
+or make some other algorithm handle it.
+
+
+
+CHC solvers papers have some work
+ICE by Madhu does ICE for CHC
+Suresh Jaghanathan uses PIE style but generalizing for PLDI 2018
+
+
+Currently, Myth doesn't support the type of IO examples we need, can we extend it,
+or make some other algorithm handle it -- detailed
+
+Say I have union :: x -> x -> x
+I have a postcondition Q
+Say I synthesize a precondition P
+Say P is too weak -- P(e1) /\ P(e2) /\ -Q(union(e1,e2))
+What should be added into the system as a negative example -- e1, e2, or both?
+We need some form of example like: (e1 = false \/ e2 = false)
+Currently Escher does not support such examples
+
+
+
+
+
+
+
+
+
+Low Level Algorithm:
+
+Fix V a verifier
+Fix S a synthesizer
+
+
+Algorithm:
+G = {}
+synthesize_invariant(thm : theorem, M : Module) :=
+  G = {}
+  loop
+    I = generate_precondition(thm,G)
+    foreach (f in Module):
+      strengthened_or_ex = inductive_strengthen(I,f,G)
+      match strengthened_or_ex with
+      | Left strengthened -> I = strengthened
+      | Right ex -> G = G U {ex}
+  return I
+
+
+
+inductive_strengthen(I : formula, f : function, G : set)
+  while I is not inductive on f:
+    counterexample_option = verify_boundary(I,f,G)
+    match example_option with
+    | Some ex -> return Right ex
+    | None ->
+        phi = x = f(v_1,...,v_n)
+              /\ I(x)
+              /\ (/\_{v_i \in T} I(v_i))
+        I' = generate_precondition(phi, G)
+        if I' = true then
+          return Left I
+        else
+          I = I /\ I'
+
+
+
+generate_precondition(thm : theorem, G : set t)
+  B = {}
+  loop
+    P = Synthesize(G,B)
+    examples_option = Verify(thm[forall (x:t | inv(x)) / forall (x:t)])
+    match examples_option with
+    | None -> return P
+    | Some ex_vect -> B = B U {ex_vect}
+
+
+
+verify_boundary(I : formula, f : function, G : set)
+  in_G v = (\/_{g \in G} v = g)
+  phi = x = f(v_1,...,v_n)
+          /\ I(x)
+          /\ (/\_{v_i \in T} in_G(v_i))
+  return Verify(phi)
+
+
+Conjectures:
+If the Verifier and Synthesizer are Sound + Complete + Always terminate, then
+so does the algorithm if there is such an invariant
+
+
+Another list example: functional double ended QUEUE 
