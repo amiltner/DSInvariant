@@ -1,0 +1,5 @@
+(* Generated Tue Mar  3 15:55:06 2015 *)
+let record_sum2 : { a : nat; b : nat; c : nat } -> nat -> nat =
+  fun (r1:{ a : nat; b : nat; c : nat }) ->
+    fun (n1:nat) -> sum n1 (record_sum {a = r1.c; b = r1.b; c = r1.a})
+;;

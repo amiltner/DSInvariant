@@ -1,0 +1,11 @@
+(* Generated Wed Dec 31 11:17:18 2014 *)
+let fvs : exp -> list =
+  let rec f1 (e1:exp) : list =
+    match e1 with
+      | Unit -> Nil
+      | Var n1 -> Cons (n1, Nil)
+      | Lam (n1, e2) -> f1 e2
+      | App (e2, e3) -> append (f1 e2) (f1 e3)
+  in
+    f1
+;;

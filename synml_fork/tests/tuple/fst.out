@@ -1,0 +1,4 @@
+(* Generated Sun Mar  1 19:57:29 2015 *)
+let fst : nat * nat -> nat =
+  fun (t1:nat * nat) -> #1 t1
+;;

@@ -1,0 +1,66 @@
+* Post-PLDI TODO list...
+
+** Larger examples to identify bottlenecks
+
+   [ ] Get all those larger examples we wanted to work
+
+   [ ] Examining E-guessed sets to see what equivalence classes arise 
+
+   [ ] Profile larger examples to find the bottlenecks
+
+** Enhance current implementation
+
+   [ ] Filter matches by equivalence classes of scrutinees (2nd attempt)
+
+   [ ] Factor out evaluation of terms in like-contexts
+
+   [ ] Hashcons implementation (2nd attempt)
+
+   [ ] Recursive backtracking
+
+   [ ] Helper function generation
+
+** Significantly upgrade the OCaml implementation
+
+   [ ] Utilize the OCaml front-end to parse code
+
+   [ ] Hijack bytecode interpreter for evaluation
+
+   [ ] Investigate abstract contexts and other alternative representations
+
+** Patch up our story about compatibility and completeness
+
+   [ ] How does polarity play into interpreting examples as goals vs. values (in 
+   the context)?
+
+   [ ] How do we fix-up how function examples are used, i.e., when
+   function examples are transferred from goal to context?
+
+   [ ] What is our statetement and proof of completeness?
+
+** Information-theoretic understanding of examples
+
+   [ ] Searching in generalization order --- general to specific types
+
+   [ ] Try to derive a way to utilize information theory to refine examples more
+   efficiently.
+
+** Explore additional ways of leveraging normal forms
+
+   [ ] βη-equality for co-products [Ghani 1995]
+
+** Extend the system with fancier types
+
+   [ ] Polymorphism (generics)
+
+   [ ] Linear types (protocols)
+
+   [ ] Dependent types (properties)
+   
+** Enhance the system to deal with non-npush down constraints
+
+   [ ] Can we formalize this idea of pushing arbitrary constraints up and down
+   the synthesis derivation?
+
+   [ ] Can we use this formalism to capture what other synthesis algorithms do
+   with their constraints?

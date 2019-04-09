@@ -1,0 +1,9 @@
+(* Generated Wed Dec 31 11:16:14 2014 *)
+let revappend : list -> list =
+  let rec f1 (l1:list) : list =
+    match l1 with
+      | Nil -> Nil
+      | Cons (n1, l2) -> append (f1 l2) Cons (n1, Nil)
+  in
+    f1
+;;

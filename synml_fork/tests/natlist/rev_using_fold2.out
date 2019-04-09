@@ -1,0 +1,5 @@
+(* Generated Wed Dec 31 11:16:29 2014 *)
+let rev : list -> list =
+  fun (l1:list) ->
+    fold l1 (fun (l2:list) -> fun (n1:nat) -> Cons (n1, l2)) Nil
+;;

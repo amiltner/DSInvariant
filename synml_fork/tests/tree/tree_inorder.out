@@ -1,0 +1,9 @@
+(* Generated Wed Dec 31 11:19:06 2014 *)
+let tree_map : tree -> list =
+  let rec f1 (t1:tree) : list =
+    match t1 with
+      | Leaf -> Nil
+      | Node (t2, n1, t3) -> append (f1 t2) Cons (n1, f1 t3)
+  in
+    f1
+;;

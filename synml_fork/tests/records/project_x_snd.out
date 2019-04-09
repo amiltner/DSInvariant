@@ -1,0 +1,4 @@
+(* Generated Tue Mar  3 15:20:26 2015 *)
+let getXsnd : { x : (nat * nat) } -> nat =
+  fun (r1:{ x : (nat * nat) }) -> #2 (r1.x)
+;;

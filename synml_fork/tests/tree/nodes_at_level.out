@@ -1,0 +1,12 @@
+(* Generated Wed Dec 31 11:19:52 2014 *)
+let nodes_at_level : tree -> nat -> nat =
+  let rec f1 (t1:tree) : nat -> nat =
+    fun (n1:nat) ->
+      match t1 with
+        | Leaf -> O
+        | Node (t2, b1, t3) -> (match n1 with
+                                  | O -> S O
+                                  | S n2 -> sum (f1 t2 n2) (f1 t3 n2))
+  in
+    f1
+;;

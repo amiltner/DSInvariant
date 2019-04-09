@@ -1,0 +1,4 @@
+(* Generated Tue Mar  3 15:20:26 2015 *)
+let getfstY : { x : nat; y : nat } * nat -> nat =
+  fun (t1:{ x : nat; y : nat } * nat) -> (#1 t1).y
+;;

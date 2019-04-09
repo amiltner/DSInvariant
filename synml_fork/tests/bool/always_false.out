@@ -1,0 +1,4 @@
+(* Generated Mon Dec 29 00:38:04 2014 *)
+let always_false : bool -> bool =
+  fun (b1:bool) -> False
+;;

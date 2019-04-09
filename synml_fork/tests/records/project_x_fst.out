@@ -1,0 +1,4 @@
+(* Generated Tue Mar  3 15:20:27 2015 *)
+let getXfst : { x : (nat * nat) } -> nat =
+  fun (r1:{ x : (nat * nat) }) -> #1 (r1.x)
+;;

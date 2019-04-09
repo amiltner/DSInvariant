@@ -1,0 +1,6 @@
+(* Generated Mon Dec 29 00:38:04 2014 *)
+let bor : bool -> bool -> bool =
+  fun (b1:bool) -> fun (b2:bool) -> match b1 with
+                                      | True -> True
+                                      | False -> b2
+;;

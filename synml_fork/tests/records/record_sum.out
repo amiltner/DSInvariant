@@ -1,0 +1,4 @@
+(* Generated Tue Mar  3 15:20:26 2015 *)
+let record_sum : { a : nat; b : nat; c : nat } -> nat =
+  fun (r1:{ a : nat; b : nat; c : nat }) -> sum (sum (r1.a) (r1.c)) (r1.b)
+;;

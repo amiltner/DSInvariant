@@ -1,0 +1,12 @@
+(* Generated Wed Dec 31 11:16:14 2014 *)
+let drop : list -> nat -> list =
+  fun (l1:list) ->
+    let rec f2 (n1:nat) : list =
+      match n1 with
+        | O -> l1
+        | S n2 -> (match f2 n2 with
+                     | Nil -> Nil
+                     | Cons (n3, l2) -> l2)
+    in
+      f2
+;;

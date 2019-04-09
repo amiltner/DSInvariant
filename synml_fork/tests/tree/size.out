@@ -1,0 +1,9 @@
+(* Generated Wed Dec 31 11:19:08 2014 *)
+let count_leaves : tree -> nat =
+  let rec f1 (t1:tree) : nat =
+    match t1 with
+      | Leaf -> O
+      | Node (t2, b1, t3) -> S (sum (f1 t3) (f1 t2))
+  in
+    f1
+;;

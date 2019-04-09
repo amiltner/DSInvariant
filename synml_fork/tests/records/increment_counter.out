@@ -1,0 +1,6 @@
+(* Generated Tue Mar  3 15:20:26 2015 *)
+let increment_counter : { counter : nat; other : nat } ->
+                          { counter : nat; other : nat } =
+  fun (r1:{ counter : nat; other : nat }) ->
+    {counter = S (r1.counter); other = r1.other}
+;;
