@@ -197,7 +197,7 @@ let rec typecheck_exp
                   except_bind
                     ~f:(fun b ->
                         if b then
-                          Left (Type.variant its)
+                          Left (Type.mk_variant its)
                         else
                           Right ("variant " ^ i ^ "expects different type"))
                     (type_equiv tc t_defined t))
@@ -294,7 +294,7 @@ let rec typecheck_exp
           es
       in
       except_map
-        ~f:Type.tuple
+        ~f:Type.mk_tuple
         ts_e
     | Proj (i,e) ->
       let t_e = typecheck_simple e in

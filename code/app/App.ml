@@ -370,7 +370,7 @@ forall (s : t). forall (i : nat). (lookup (delete s i) i)
 "
 
 let problem =
-  Parser.problem
+  Parser.unprocessed_problem
     Lexer.token (Lexing.from_string synth_context)
 
 let full_spec =
@@ -381,20 +381,17 @@ open Lang
 open MyStdlib
 
 let _ = begin match full_spec with
-  | Left (_,ec,tc,vc,_,forall,i_e) ->
+  | Left fs ->
     let ans =
       Verifiers.QuickCheckVerifier.implication_counter_example
-      ~ec
-      ~tc
-      ~vc
-      ~i_e
-      ~pre:(Expr.func ("i",Type.Var "t") (Value.to_exp (Verifiers.QuickCheckVerifier.true_val)))
-      ~eval:(Expr.func ("i",Type.Var "t") (Expr.var "i"))
-      ~post:forall
+        ~problem:fs
+      ~pre:(Expr.mk_func ("i",Type.Var "t") (Value.to_exp (Verifiers.QuickCheckVerifier.true_val)))
+      ~eval:(Expr.mk_func ("i",Type.Var "t") (Expr.mk_var "i"))
+      ~post:fs.post
     in
     begin match ans with
       | None -> failwith "None"
-      | Some anses -> print_endline (string_of_list Expr.show anses)
+      | Some anses -> print_endline (string_of_list Value.show anses)
     end
   | Right s -> Stdio.print_endline s
 end

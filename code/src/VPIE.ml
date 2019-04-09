@@ -6,21 +6,21 @@ open Utils
 module Make(V : Verifier) =
 struct
   let learnVPreCond
+      ~(problem:problem)
       ~(pre:Expr.t)
       ~(eval : Expr.t)
-      ~(post : Expr.t)
-      ~consts:(_:Value.t list)
-      ~(testbed : TestBed.t)
+      ~(post : UniversalFormula.t)
+      ~(positives : Value.t list)
     : Expr.t =
-    let _(*oldpre*) = pre in
-    let helper
+    let testbed = TestBed.create_positive positives in
+    let rec helper
         (attempt:int)
         (testbed:TestBed.t)
       : Expr.t =
         (Log.info (lazy ("VPIE Attempt "
                          ^ (Int.to_string attempt)
                          ^ "."));
-         let pos_examples = List.map ~f:(fun (v,_) -> List.hd_exn v) testbed.pos_tests in
+         (*let pos_examples = List.map ~f:(fun (v,_) -> List.hd_exn v) testbed.pos_tests in
          let neg_examples = List.map ~f:(fun (v,_) -> List.hd_exn v) testbed.neg_tests in
          let basic_examples =
            List.map
@@ -44,6 +44,7 @@ struct
              ~f:(fun tb l ->
                  if Option.is_some
                      (V.true_on_examples
+                        ~problem
                         ~examples:(*[V.from_value (IntList l)]*) (failwith "ah")
                         ~eval:eval
                         ~post:post) then
@@ -53,25 +54,24 @@ struct
               )
              ~init:(TestBed.create_positive ~args:(List.zip_exn testbed.farg_names testbed.farg_types) ~post:testbed.post [])
              all_inside_examples
-         in
-         let _ =
-           Option.value_exn
-             (V.synth
-                ~examples:(failwith "ah")
-                ~eval:(failwith "ah")
-                ~post:(failwith "ah"))
-         in
-         (*let testpre = V.bin_and_exps pre oldpre in
-           Log.info (lazy ("Candidate Precondition: " ^ (V.to_string pre)));*)
-         (*begin match V.implication_counter_example ~resultant:false ~pre:testpre ~eval ~post None with
+           in*)
+         let synthed_pre = Option.value_exn (V.synth ~testbed) in
+         Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
+         let full_pre = Expr.and_predicates pre synthed_pre in
+         begin match V.implication_counter_example ~problem ~pre:full_pre ~eval:eval ~post:post with
            | None ->
-             let pre = V.simplify pre in
-             Log.info (lazy ("Verified Precondition: " ^ (V.to_string pre)));
+             Log.info (lazy ("Verified Precondition: " ^ (Expr.show synthed_pre)));
              pre
            | Some model ->
-             helper (attempt+1) (TestBed.add_neg_tests ~testbed model)
-           end)*)
-         failwith "ah")
+             if (List.length model <> 1) then
+               failwith "cannot do such functions yet"
+             else
+               helper
+                 (attempt+1)
+                 (TestBed.add_neg_test_disallow_dups
+                    ~testbed
+                    (List.hd_exn model))
+           end)
     in
     helper 0 testbed
 end

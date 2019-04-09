@@ -27,11 +27,6 @@ struct
     : t =
     Arr (t1,t2)
 
-  let mk_tuple
-      (ts:t list)
-    : t =
-    Tuple ts
-
   let mk_mu
       (i:Id.t)
       (t:t)
@@ -39,11 +34,6 @@ struct
     if (is_equal @$ compare t (mk_var i)) then
       failwith "cannot do infinite loop";
     Mu (i,t)
-
-  let mk_variant
-      (branches:(Id.t * t) list)
-    : t =
-    Variant branches
 
   let fold
       (type a)
@@ -96,7 +86,7 @@ struct
     : t -> Id.t option =
     id_apply ~f:ident
 
-  let variant
+  let mk_variant
       (vs:(Id.t * t) list)
     : t =
     Variant vs
@@ -120,7 +110,7 @@ struct
     : (Id.t * t) list =
     Option.value_exn (destruct_variant t)
 
-  let tuple
+  let mk_tuple
     (ts:t list)
     : t =
     Tuple ts
@@ -159,7 +149,7 @@ struct
     | Proj of int * t
   [@@deriving ord, show, hash]
 
-  let var
+  let mk_var
       (i:Id.t)
     : t =
     Var i
@@ -205,7 +195,7 @@ struct
     in
     fold_internal e
 
-  let app
+  let mk_app
       (e1:t)
       (e2:t)
     : t =
@@ -230,7 +220,7 @@ struct
     : t * t =
     Option.value_exn (destruct_app e)
 
-  let func
+  let mk_func
       (a:Arg.t)
       (e:t)
     : t =
@@ -255,7 +245,7 @@ struct
     : Arg.t * t =
     Option.value_exn (destruct_func e)
 
-  let ctor
+  let mk_ctor
       (i:Id.t)
       (e:t)
     : t =
@@ -280,7 +270,7 @@ struct
     : Id.t * t =
     Option.value_exn (destruct_ctor e)
 
-  let tuple
+  let mk_tuple
       (es:t list)
     : t =
     Tuple es
@@ -304,7 +294,7 @@ struct
     : t list =
     Option.value_exn (destruct_tuple e)
 
-  let proj
+  let mk_proj
       (i:int)
       (e:t)
     : t =
@@ -381,7 +371,112 @@ struct
     : Id.t * Type.t * t =
     Option.value_exn (destruct_fix e)
 
-  let unit : t = tuple []
+  let rec replace
+      (i:Id.t)
+      (e_with:t)
+      (e:t)
+    : t =
+    let replace_simple = replace i e_with in
+    begin match e with
+      | Var i' ->
+        if is_equal (String.compare i i') then
+          e_with
+        else
+          e
+      | App (e1,e2) ->
+        App (replace_simple e1, replace_simple e2)
+      | Func ((i',t),e') ->
+        if is_equal (String.compare i i') then
+          e
+        else
+          Func ((i',t),replace_simple e')
+      | Ctor (i,e) ->
+        Ctor (i, replace_simple e)
+      | Match (e,i',branches) ->
+        let branches =
+          if is_equal @$ Id.compare i i' then
+            branches
+          else
+            List.map
+              ~f:(fun (i,e) -> (i,replace_simple e))
+              branches
+        in
+        Match (replace_simple e, i', branches)
+      | Fix (i',t,e') ->
+        if is_equal @$ Id.compare i i' then
+          e
+        else
+          Fix (i,t,replace_simple e')
+      | Tuple es ->
+        Tuple
+          (List.map ~f:replace_simple es)
+      | Proj (i,e) ->
+        Proj (i,replace_simple e)
+    end
+
+  let replace_holes
+      ~(i_e:(Id.t * t) list)
+      (e:t)
+    : t =
+    List.fold_left
+      ~f:(fun acc (i,e) -> replace i e acc)
+      ~init:e
+      i_e
+
+  let mk_unit : t = mk_tuple []
+
+  let mk_true_exp
+    : t =
+    mk_ctor "True" (mk_tuple [])
+
+  let mk_false_exp
+    : t =
+    mk_ctor "False" (mk_tuple [])
+
+  let mk_constant_func
+      (t:Type.t)
+      (e:t)
+    : t =
+    mk_func ("x",t) e
+
+  let mk_constant_true_func
+      (t:Type.t)
+    : t =
+    mk_constant_func t mk_true_exp
+
+  let mk_identity_func
+      (t:Type.t)
+    : t =
+    mk_func ("x",t) (mk_var "x")
+
+  let mk_and_func : t = mk_var "and"
+
+  let and_exps
+      (e1:t)
+      (e2:t)
+    : t =
+    mk_app (mk_app mk_and_func e1) e2
+
+  let and_predicates
+      (e1:t)
+      (e2:t)
+    : t = 
+  let ((arg1,t1),internal1) = destruct_func_exn e1 in
+  let ((arg2,t2),internal2) = destruct_func_exn e2 in
+  if not @$ is_equal @$ Type.compare t1 t2 then
+    failwith "bad predicate merging"
+  else
+  let replaced_internal1 =
+    replace
+      arg1
+      (mk_var arg2)
+      internal1
+  in
+  mk_func
+    (arg2,t2)
+    (and_exps
+       replaced_internal1
+       internal2)
 end
 
 module Context(D : Data) =
@@ -449,7 +544,7 @@ struct
     | Tuple of t list
   [@@deriving ord, show, hash]
 
-  let func
+  let mk_func
       (a:Arg.t)
       (e:Expr.t)
     : t =
@@ -474,7 +569,7 @@ struct
     : Arg.t * Expr.t =
     Option.value_exn (destruct_func v)
 
-  let ctor
+  let mk_ctor
       (i:Id.t)
       (v:t)
     : t =
@@ -499,7 +594,7 @@ struct
     : Id.t * t =
     Option.value_exn (destruct_ctor v)
 
-  let tuple
+  let mk_tuple
       (vs:t list)
     : t =
     Tuple vs
@@ -539,9 +634,48 @@ struct
   let to_exp
     : t -> Expr.t =
     fold
-      ~func_f:Expr.func
-      ~ctor_f:Expr.ctor
-      ~tuple_f:Expr.tuple
+      ~func_f:Expr.mk_func
+      ~ctor_f:Expr.mk_ctor
+      ~tuple_f:Expr.mk_tuple
+
+  let rec from_exp
+    (e:Expr.t)
+    : t option =
+    begin match e with
+      | Func (a,e) ->
+        Some (mk_func a e)
+      | Ctor (i,e) ->
+        Option.map
+          ~f:(mk_ctor i)
+          (from_exp e)
+      | Tuple es ->
+        Option.map
+          ~f:mk_tuple
+          (distribute_option
+             (List.map ~f:from_exp es))
+      | Var _
+      | App _
+      | Proj _
+      | Match _
+      | Fix _ -> None
+    end
+
+  let from_exp_exn
+      (e:Expr.t)
+    : t =
+    Option.value_exn (from_exp e)
 end
 
-type problem = Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t
+type unprocessed_problem = Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t
+
+type problem =
+  {
+    module_type  : Type.t               ;
+    ec           : ExprContext.t        ;
+    tc           : TypeContext.t        ;
+    vc           : VariantContext.t     ;
+    mod_vals     : Expr.t list          ;
+    post         : UniversalFormula.t   ;
+    eval_context : (Id.t * Expr.t) list ;
+  }
+[@@deriving ord, show, hash, make]

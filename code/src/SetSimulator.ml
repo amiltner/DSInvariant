@@ -3,7 +3,7 @@ open Core_kernel
 open SetVerifiers
 open SyGuS_Set
 open Utils
-open TestBed
+open NonModuleTestBed
 
 module SetSimulatorImpl(V : Verifier) = struct
   let setup (_ : 'a SyGuS_Set.t) : unit =
@@ -125,7 +125,7 @@ module SetSimulatorImpl(V : Verifier) = struct
 
 
   let check_condition_held_after_evals
-      ~(testbed:TestBed.t)
+      ~(testbed:NonModuleTestBed.t)
       ~(code : V.expr)
       ~(condition : V.expr)
     : model option =

@@ -25,7 +25,7 @@ sig
   val mk_or : expr list -> expr
   val implication_counter_example : resultant:bool -> pre:expr -> eval:expr -> post:expr -> Value.t option -> model option
   val true_on_examples : examples:expr list -> post:expr -> model option
-  val synth : consts:Value.t list -> TestBed.t -> expr option
+  val synth : consts:Value.t list -> NonModuleTestBed.t -> expr option
   val simplify : expr -> expr
   val substitute : expr -> expr list -> expr list -> expr
   val sat_model_for_asserts : eval_term:expr -> db:expr list -> model option
@@ -333,7 +333,7 @@ struct
       new_es
 
   let from_synth
-      (pred:Value.t list TestBed.feature TestBed.with_desc CNF.t option)
+      (pred:Value.t list NonModuleTestBed.feature NonModuleTestBed.with_desc CNF.t option)
     : expr =
     let from_synth_string =
       begin match pred with
@@ -404,7 +404,7 @@ struct
 
   let synth
       ~(consts:Value.t list)
-      (testbed : TestBed.t)
+      (testbed : NonModuleTestBed.t)
   : expr option =
     match SPIE.learnPreCond testbed ~consts with
     | None
@@ -942,7 +942,7 @@ let concat : list -> list |>
 
   let synth
       ~consts:(_:Value.t list)
-      (tb:TestBed.t)
+      (tb:NonModuleTestBed.t)
     : expr option =
     let pos_examples = List.map ~f:(fun (v,_) -> (from_value (List.hd_exn v),real_true_exp)) tb.pos_tests in
     let neg_examples = List.map ~f:(fun (v,_) -> (from_value (List.hd_exn v),false_exp)) tb.neg_tests in

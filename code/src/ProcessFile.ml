@@ -11,14 +11,14 @@ let extract_variants
     ~arr_f:(fun (vs1,t1) (vs2,t2) -> (vs1@vs2,Type.mk_arr t1 t2))
     ~tuple_f:(fun vss_ts ->
         let (vss,ts) = List.unzip vss_ts in
-        (List.concat vss, Type.tuple ts))
+        (List.concat vss, Type.mk_tuple ts))
     ~mu_f:(fun _ vs -> vs)
     ~variant_f:(fun ids_vss_ts ->
         let (ids,vss_ts) = List.unzip ids_vss_ts in
         let (vss,ts) = List.unzip vss_ts in
         let ids_ts = List.zip_exn ids ts in
         let ids_map = List.map ~f:(fun id -> (id,ids_ts)) ids in
-        (ids_map@(List.concat vss), Type.variant ids_ts))
+        (ids_map@(List.concat vss), Type.mk_variant ids_ts))
     t
 
 let process_decl_list
@@ -106,14 +106,8 @@ let validate_module_satisfies_spec
     es
 
 let process_full_problem
-    ((decs,modi,mods,uf):problem)
-  : (Type.t
-     * ExprContext.t
-     * TypeContext.t
-     * VariantContext.t
-     * Type.t list
-     * UniversalFormula.t
-     * (Id.t * Expr.t) list) except =
+    ((decs,modi,mods,uf):unprocessed_problem)
+  : problem except =
   let ec_tc_vc_e =
     process_decl_list
       ExprContext.empty
@@ -155,22 +149,31 @@ let process_full_problem
                 if (not b) then
                   Right "module doesn't satisfy spec"
                 else
-                  Left (((ec,tc,vc),(m_ec,m_tc,m_vc),i_e)))
+                  let module_vals =
+                    List.map
+                      ~f:(fun it ->
+                          List.Assoc.find_exn
+                            ~equal:(is_equal %% Id.compare)
+                            i_e
+                            (fst it))
+                      (snd mods)
+                  in
+                  Left (((ec,tc,vc),(m_ec,m_tc,m_vc),i_e,module_vals)))
             satisfies_e)
       context_modonly_context_e
   in
   let validated_context_modonly_context_uf_e =
     except_bind
-      ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),i_e) ->
+      ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),i_e,mvs) ->
           let ec_sig = process_module_sig ec mods in
           let ftl_e = typecheck_formula ec_sig tc vc uf in
           except_map
-            ~f:(fun tl -> ((ec,tc,vc),(m_ec,m_tc,m_vc),tl,uf,i_e))
+            ~f:(fun _ -> ((ec,tc,vc),(m_ec,m_tc,m_vc),uf,i_e,mvs))
             ftl_e)
       validated_context_modonly_context_e
   in
   except_map
-    ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),tl,uf,i_e) ->
+    ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),uf,i_e,mvs) ->
         let full_ec =
           TypeContext.from_kvp_list
             (ExprContext.merge
@@ -203,5 +206,13 @@ let process_full_problem
             full_tc
             (fst mods)
         in
-        (type_instantiation,full_ec,full_tc,full_vc,tl,uf,i_e))
+        make_problem
+          ~module_type:type_instantiation
+          ~ec:full_ec
+          ~tc:full_tc
+          ~vc:full_vc
+          ~mod_vals:mvs
+          ~post:uf
+          ~eval_context:i_e
+          ())
     validated_context_modonly_context_uf_e

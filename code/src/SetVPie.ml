@@ -10,7 +10,7 @@ struct
     for_SPIE : SPIE.config ;
 
     base_random_seed : string ;
-    describe : (('a TestBed.feature TestBed.with_desc) CNF.t option) -> TestBed.desc ;
+    describe : (('a NonModuleTestBed.feature NonModuleTestBed.with_desc) CNF.t option) -> NonModuleTestBed.desc ;
     max_tries : int ;
     simplify : bool ;
   }
@@ -29,12 +29,12 @@ struct
       ~(eval : V.expr)
       ~(post : V.expr)
       ~(consts:Value.t list)
-      ~(testbed : TestBed.t)
+      ~(testbed : NonModuleTestBed.t)
     : V.expr =
     let oldpre = pre in
     let rec helper
         (tries_left:int)
-        (testbed:TestBed.t)
+        (testbed:NonModuleTestBed.t)
       : V.expr option =
       if conf.max_tries > 0 && tries_left < 1 then
         (Log.error (lazy ("VPIE Reached MAX attempts ("
@@ -71,11 +71,11 @@ struct
                                         ~test:[("x",Type.INTLIST, IntList l)]
                                         ~code:eval
                                         ~condition:post) then
-                   TestBed.add_neg_tests ~testbed:tb [IntList l]
+                   NonModuleTestBed.add_neg_tests ~testbed:tb [IntList l]
                  else
-                   TestBed.add_pos_test ~testbed:tb [IntList l]
+                   NonModuleTestBed.add_pos_test ~testbed:tb [IntList l]
               )
-             ~init:(TestBed.create_positive ~args:(List.zip_exn testbed.farg_names testbed.farg_types) ~post:testbed.post [])
+             ~init:(NonModuleTestBed.create_positive ~args:(List.zip_exn testbed.farg_names testbed.farg_types) ~post:testbed.post [])
              all_inside_examples
          in
          match V.synth ~consts testbed with
@@ -113,7 +113,7 @@ struct
                              ~sep:", "
                              ~f:(fun v n -> n ^ " = " ^ (Value.to_string v)))
                         ^ "}"));
-               helper (tries_left - 1) (TestBed.add_neg_tests ~testbed test)
+               helper (tries_left - 1) (NonModuleTestBed.add_neg_tests ~testbed test)
            end)
     in
     begin match helper conf.max_tries testbed with

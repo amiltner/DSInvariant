@@ -4,7 +4,7 @@ open Lang
 let rec appify (e:Expr.t) (es:Expr.t list) : Expr.t =
   match es with
   | [] -> e
-  | e'::es -> appify (Expr.app e e') es
+  | e'::es -> appify (Expr.mk_app e e') es
 %}
 
 %token <string> LID
@@ -46,12 +46,12 @@ let rec appify (e:Expr.t) (es:Expr.t list) : Expr.t =
 
 %token EOF
 
-%start problem
-%type <Lang.problem> problem
+%start unprocessed_problem
+%type <Lang.unprocessed_problem> unprocessed_problem
 
 %%
 
-problem:
+unprocessed_problem:
     | ds=decl_list mi=module_implementation COLON ms=module_spec MAINTAINS f=formula EOF
                                                        { (ds,mi,ms,f) }
 
@@ -184,7 +184,7 @@ typ_paren:
   | LPAREN t=typ RPAREN { t }
 
 typ_unit:
-  | UNIT { Type.tuple [] }
+  | UNIT { Type.mk_tuple [] }
 
 (***** }}} *****)
 
@@ -218,9 +218,9 @@ arg:
 
 exp_base:
   | x=LID
-    { Expr.var x }
+    { Expr.mk_var x }
   | FUN x=arg ARR e=exp_base
-    { Expr.func x e }
+    { Expr.mk_func x e }
   | FIX a=arg EQ e=exp_base
     { Expr.mk_fix (fst a) (snd a) e }
   (*| LET f=LID xs=arg_list COLON t=typ EQ e1=exp IN e2=exp
@@ -230,29 +230,29 @@ exp_base:
   | c=INT
     { ctor_of_int c }*)
   | c=UID
-    { Expr.ctor c Expr.unit }
+    { Expr.mk_ctor c Expr.mk_unit }
   | c=UID LPAREN e=exp RPAREN
-    { Expr.ctor c e }
+    { Expr.mk_ctor c e }
   | c1=UID c2=UID                                         (* Sugar: ctor with ctor argument.   *)
-    { Expr.ctor c1 (Expr.ctor c2 Expr.unit) }
+    { Expr.mk_ctor c1 (Expr.mk_ctor c2 Expr.mk_unit) }
   | c=UID x=LID                                           (* Sugar: ctor with var argument.    *)
-    { Expr.ctor c (Expr.var x) }
+    { Expr.mk_ctor c (Expr.mk_var x) }
   | c=UID LPAREN RPAREN                                   (* Sugar: ctor with unit argument.   *)
-    { Expr.ctor c Expr.unit }
+    { Expr.mk_ctor c Expr.mk_unit }
   | c=UID LPAREN e=exp COMMA es=exp_comma_list_one RPAREN (* Sugar: ctor with tuple argument.  *)
-    { Expr.ctor c (Expr.tuple (e :: List.rev es)) }
+    { Expr.mk_ctor c (Expr.mk_tuple (e :: List.rev es)) }
   | MATCH e=exp BINDING i=LID WITH bs=branches
     { Expr.mk_match e i (List.rev bs) }
   (*| LBRACKET l=exp_semi_list RBRACKET
     { list_of_exps l }*)
   | LPAREN e=exp COMMA es=exp_comma_list_one RPAREN
-    { Expr.tuple (e :: List.rev es) }
+    { Expr.mk_tuple (e :: List.rev es) }
   | e=exp_base DOT n=INT
-    { Expr.proj n e }
+    { Expr.mk_proj n e }
   | LPAREN e=exp RPAREN
     { e }
   | LPAREN RPAREN
-    { Expr.unit }
+    { Expr.mk_unit }
 
 exp_comma_list_one:    (* NOTE: reversed *)
   | e=exp

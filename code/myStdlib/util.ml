@@ -550,6 +550,26 @@ let fold_until_fixpoint
        else
          Left x')
 
+let rec fold_until_right_or_list_end
+    ~f:(f:'b -> 'a -> ('b,'c) either)
+    ~init:(init:'b)
+    (l:'a list)
+  : ('b,'c) either =
+  begin match l with
+    | [] -> Left init
+    | h::t ->
+      let res = f init h in
+      begin match res with
+        | Left continue ->
+          fold_until_right_or_list_end
+            ~f
+            ~init:continue
+            t
+        | Right _ ->
+          res
+      end
+  end
+
 let cartesian_map ~f:(f:'a -> 'b -> 'c) (l1:'a list) (l2:'b list) : 'c list =
   (List.fold_right
     ~f:(fun x acc ->

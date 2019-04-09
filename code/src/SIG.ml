@@ -37,7 +37,7 @@ module SIGLearner(V : Verifier) = struct
       ~(states : Value.t list list)
     : model option =
     let testbed =
-      TestBed.create_positive
+      NonModuleTestBed.create_positive
         states
         ~args:sygus.synth_variables
         ~post:(fun _ res ->
@@ -97,7 +97,7 @@ module SIGLearner(V : Verifier) = struct
               ~eval
               ~consts:sygus.constants
               ~post:invf'_call
-              ~testbed:(TestBed.create_positive
+              ~testbed:(NonModuleTestBed.create_positive
                           states
                           ~args:sygus.synth_variables
                           ~post:(fun _ res ->
@@ -176,7 +176,7 @@ module SIGLearner(V : Verifier) = struct
           ~eval:pre_expr
           ~post:post_expr
           ~consts:sygus.constants
-          ~testbed:(TestBed.create_positive states
+          ~testbed:(NonModuleTestBed.create_positive states
                       ~args:sygus.synth_variables
                       ~post:(fun _ res ->
                           match res with
@@ -344,12 +344,12 @@ module SIGLearner(V : Verifier) = struct
                                                 (V.integer_var_exp "x")
                                                 (V.integer_var_exp "y"))
                                              (V.integer_var_exp "z"))) then
-            TestBed.add_neg_test ~testbed:tb [IntList l]
+            NonModuleTestBed.add_neg_test ~testbed:tb [IntList l]
           else
-            TestBed.add_pos_test ~testbed:tb [IntList l]
+            NonModuleTestBed.add_pos_test ~testbed:tb [IntList l]
         )
       ~init:(
-        TestBed.create_positive
+        NonModuleTestBed.create_positive
           []
           ~args:sygus.synth_variables
           ~post:(fun _ res ->

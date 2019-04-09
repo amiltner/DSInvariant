@@ -28,7 +28,7 @@ let default_config : config = {
   max_conflict_group_size = base_max_conflict_group_size ;
 }
 
-let conflictingTests (testbed : TestBed.t) : 'a conflict list =
+let conflictingTests (testbed : NonModuleTestBed.t) : 'a conflict list =
   let make_f_vecs = List.map ~f:(fun (t, fvec) -> (t, Lazy.force fvec)) in
   let make_groups tests =
     List.group tests ~break:(fun (_, fv1) (_, fv2) -> fv1 <> fv2)
@@ -43,8 +43,8 @@ let conflictingTests (testbed : TestBed.t) : 'a conflict list =
                                    ; neg = map ~f:fst ntests
                                    ; fvec = pfv }))
 
-let synthFeature ?(consts = []) ~(testbed : TestBed.t) ~(logic : Logic.t)
-                 (conflict_group : Value.t list conflict) : Value.t list TestBed.feature TestBed.with_desc =
+let synthFeature ?(consts = []) ~(testbed : NonModuleTestBed.t) ~(logic : Logic.t)
+                 (conflict_group : Value.t list conflict) : Value.t list NonModuleTestBed.feature NonModuleTestBed.with_desc =
   let open Synthesizer in
   let result = solve consts {
     logic ;
@@ -58,9 +58,9 @@ let synthFeature ?(consts = []) ~(testbed : TestBed.t) ~(logic : Logic.t)
         (if result.constraints = [] then result.string
          else "(and " ^ result.string ^ (String.concat ~sep:" " result.constraints) ^ ")"))
 
-let resolveAConflict ?(conf = default_config) ?(consts = []) ~(testbed : TestBed.t)
+let resolveAConflict ?(conf = default_config) ?(consts = []) ~(testbed : NonModuleTestBed.t)
                      (conflict_group' : Value.t list conflict)
-                     : Value.t list TestBed.feature TestBed.with_desc =
+                     : Value.t list NonModuleTestBed.feature NonModuleTestBed.with_desc =
   let group_size = List.((length conflict_group'.pos) + (length conflict_group'.neg))
   in let group_size = group_size * (conf.synth_logic.conflict_group_size_multiplier)
   in let conflict_group = if group_size < conf.max_conflict_group_size then conflict_group'
@@ -83,25 +83,25 @@ let resolveAConflict ?(conf = default_config) ?(consts = []) ~(testbed : TestBed
      in Log.debug (lazy ("Synthesized feature:" ^ (Log.indented_sep 4) ^ (snd new_feature)))
       ; new_feature
 
-let rec resolveSomeConflicts ?(conf = default_config) ?(consts = []) ~(testbed : TestBed.t)
+let rec resolveSomeConflicts ?(conf = default_config) ?(consts = []) ~(testbed : NonModuleTestBed.t)
                              (conflict_groups : Value.t list conflict list)
-                             : Value.t list TestBed.feature TestBed.with_desc option =
+                             : Value.t list NonModuleTestBed.feature NonModuleTestBed.with_desc option =
   if conflict_groups = [] then None
   else try Some (resolveAConflict (List.hd_exn conflict_groups) ~conf ~consts ~testbed)
        with e -> Log.error (lazy ((Exn.to_string e) ^ (Printexc.get_backtrace ())))
                ; resolveSomeConflicts (List.tl_exn conflict_groups) ~conf ~consts ~testbed
 
-let rec augmentFeatures ?(conf = default_config) ?(consts = []) (testbed : TestBed.t) : TestBed.t =
+let rec augmentFeatures ?(conf = default_config) ?(consts = []) (testbed : NonModuleTestBed.t) : NonModuleTestBed.t =
   let conflict_groups = conflictingTests testbed
   in if conflict_groups = [] then testbed
      else if conf.disable_synth
           then (Log.error (lazy ("CONFLICT RESOLUTION FAILED")) ; raise NoSuchFunction)
      else match resolveSomeConflicts conflict_groups ~testbed ~conf ~consts with
           | None -> Log.error (lazy ("CONFLICT RESOLUTION FAILED")) ; raise NoSuchFunction
-          | Some new_feature -> augmentFeatures (TestBed.add_feature ~testbed new_feature) ~conf ~consts
+          | Some new_feature -> augmentFeatures (NonModuleTestBed.add_feature ~testbed new_feature) ~conf ~consts
 
-let learnPreCond ?(conf = default_config) ?(consts = []) (testbed : TestBed.t)
-                 : ('a TestBed.feature TestBed.with_desc) CNF.t option =
+let learnPreCond ?(conf = default_config) ?(consts = []) (testbed : NonModuleTestBed.t)
+                 : ('a NonModuleTestBed.feature NonModuleTestBed.with_desc) CNF.t option =
   Log.info (lazy ("New PI task with "
                   ^ (Int.to_string (List.length testbed.pos_tests))
                   ^ " POS + "
@@ -117,7 +117,7 @@ let learnPreCond ?(conf = default_config) ?(consts = []) (testbed : TestBed.t)
          with ClauseEncodingError -> None
   with _ -> None
 
-let cnf_opt_to_desc (pred : ('a TestBed.feature TestBed.with_desc) CNF.t option) : TestBed.desc =
+let cnf_opt_to_desc (pred : ('a NonModuleTestBed.feature NonModuleTestBed.with_desc) CNF.t option) : NonModuleTestBed.desc =
   match pred with
   | None -> "false"
   | Some pred -> CNF.to_string pred ~stringify:snd
