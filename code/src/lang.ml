@@ -138,6 +138,8 @@ struct
       (t:t)
     : t list =
     Option.value_exn (destruct_tuple t)
+
+  let mk_unit : t = mk_tuple []
 end
 
 module Arg =

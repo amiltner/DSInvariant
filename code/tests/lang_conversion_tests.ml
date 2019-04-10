@@ -1,171 +1,148 @@
 open MyStdlib
 open DSInvGen
 open Lang
-open Lang_asserts
 open OUnitPlusPlus
-
-(* begin type_equiv *)
-let type_equiv_context =
-  TypeContext.from_kvp_list
-    [("E",Type.mk_tuple [])
-    ;("Int"
-     ,Type.mk_mu
-         "IntInternal"
-         (Type.mk_variant[("O",Type.mk_tuple [])
-                         ;("S",Type.mk_var "IntInternal")]))
-    ;("List"
-     ,Type.mk_mu
-         "List"
-         (Type.mk_variant[("Nil",Type.mk_tuple [])
-                         ;("Cons",Type.mk_tuple [Type.mk_var "Int"
-                                                ;Type.mk_var "List"])])
-     )]
-
-let test_type_equiv_unit _ =
-  assert_true
-    (Typecheck.type_equiv
-       type_equiv_context
-       (Type.mk_tuple [])
-       (Type.mk_tuple []))
-
-let test_type_equiv_var_concrete _ =
-  assert_true
-    (Typecheck.type_equiv
-       type_equiv_context
-       (Type.mk_var "E")
-       (Type.mk_tuple []))
-
-let test_type_equiv_var_var _ =
-  assert_true
-    (Typecheck.type_equiv
-       type_equiv_context
-       (Type.mk_var "E")
-       (Type.mk_var "E"))
-
-let test_type_equiv_mu _ =
-  assert_true
-    (Typecheck.type_equiv
-       type_equiv_context
-       (Type.mk_var "Int")
-       (Type.mk_var "Int"))
-
-let test_type_equiv_mu_unfolded _ =
-  let unfolded =
-    (Type.mk_variant[("O",Type.mk_tuple [])
-                    ;("S",Type.mk_var "IntInternal")])
-  in
-  assert_true
-    (Typecheck.type_equiv
-       type_equiv_context
-       (Type.mk_var "Int")
-       unfolded)
-
-let test_type_equiv_mu_shadow _ =
-  assert_true
-    (Typecheck.type_equiv
-       type_equiv_context
-       (Type.mk_var "List")
-       (Type.mk_var "List"))
-
-let test_type_equiv_mu_shadow_unfolded _ =
-  let unfolded = Type.mk_variant[("Nil",Type.mk_tuple [])
-                                 ;("Cons",Type.mk_tuple [Type.mk_var "Int"; Type.mk_var "List"])] in
-  assert_true
-    (Typecheck.type_equiv
-       type_equiv_context
-       (Type.mk_var "List")
-       unfolded)
-
-let type_equiv_suite =
-  "type_equiv Unit Tests" >:::
-  ["test_type_equiv_unit" >:: test_type_equiv_unit
-  ;"test_type_equiv_var_concrete" >:: test_type_equiv_var_concrete
-  ;"test_type_equiv_var_var" >:: test_type_equiv_var_var
-  ;"test_type_equiv_mu" >:: test_type_equiv_mu
-  ;"test_type_equiv_mu_unfolded" >:: test_type_equiv_mu_unfolded
-  ;"test_type_equiv_mu_shadow" >:: test_type_equiv_mu_shadow
-  ;"test_type_equiv_mu_shadow_unfolded" >:: test_type_equiv_mu_shadow_unfolded
-  ]
-
-let _ = run_test_tt_main type_equiv_suite
-(* end type_equiv *)
+open Mythlang_asserts
+open Language_conversion
 
 
 
-
-
-(* begin typecheck_exp *)
-let typecheck_ec =
-  ExprContext.from_kvp_list
-    [("e1",Type.mk_tuple [])
-    ;("e2",Type.mk_var "E")
-    ;("i1",Type.mk_mu
-        "IntInternal"
-        (Type.mk_variant[("O",Type.mk_tuple [])
-                        ;("S",Type.mk_var "IntInternal")]))
-    ;("i2",Type.mk_var "Int")
+let to_myth_ti =
+  DSToMyth.TypeToId.from_kvp_list
+    [ (Type.mk_variant [("O", Type.mk_unit); "S", Type.mk_var "nat"], "nat")
+    ; (Type.mk_var "nat", "nat")
     ]
 
-let typecheck_tc =
-  TypeContext.from_kvp_list
-    [("E",Type.mk_tuple [])
-    ;("Int"
-     ,Type.mk_mu
-         "IntInternal"
-         (Type.mk_variant[("O",Type.mk_tuple [])
-                         ;("S",Type.mk_var "IntInternal")]))
-    ;("List"
-     ,Type.mk_mu
-         "List"
-         (Type.mk_variant[("Nil",Type.mk_tuple [])
-                         ;("Cons",Type.mk_tuple [Type.mk_var "Int"
-                                                ;Type.mk_var "List"])])
-     )]
 
-let typecheck_vc =
-  VariantContext.from_kvp_list
-    [("O",[("O",Type.mk_tuple []) ;("S",Type.mk_var "IntInternal")])
-    ;("S",[("O",Type.mk_tuple []) ;("S",Type.mk_var "IntInternal")])
-    ;("Nil",[("Nil",Type.mk_tuple [])
-            ;("Cons",Type.mk_tuple [Type.mk_var "Int"; Type.mk_var "List"])])
-    ;("Cons",[("Nil",Type.mk_tuple [])
-            ;("Cons",Type.mk_tuple [Type.mk_var "Int"; Type.mk_var "List"])])]
+(* begin to_myth_type_basic *)
+let to_myth_type_basic_unit _ =
+  assert_mythtype_equal
+    (TTuple [])
+    (DSToMyth.to_myth_type_basic
+       to_myth_ti
+       (Type.mk_unit))
 
-let typecheck_unit _ =
-  assert_type_equal
-    (Type.mk_tuple [])
-    (Typecheck.typecheck_exp
-       typecheck_ec
-       typecheck_tc
-       typecheck_vc
-       (Expr.mk_tuple []))
+let to_myth_type_basic_var _ =
+  assert_mythtype_equal
+    (TBase "nat")
+    (DSToMyth.to_myth_type_basic
+       to_myth_ti
+       (Type.mk_var "nat"))
 
-let typecheck_app _ =
-  assert_type_equal
-    (Type.mk_tuple [])
-       (Typecheck.typecheck_exp
-          typecheck_ec
-          typecheck_tc
-          typecheck_vc
-          (Expr.mk_app
-             (Expr.mk_func ("x",Type.Tuple []) (Expr.mk_var "x"))
-             (Expr.mk_tuple [])))
+let to_myth_type_basic_arrow _ =
+  assert_mythtype_equal
+    (TArr (TBase "nat",TTuple []))
+    (DSToMyth.to_myth_type_basic
+       to_myth_ti
+       (Type.mk_arr (Type.mk_var "nat") Type.mk_unit))
 
-let typecheck_proj_tuple _ =
-  assert_type_equal
-    (Type.mk_var "Int")
-    (Typecheck.typecheck_exp
-       typecheck_ec
-       typecheck_tc
-       typecheck_vc
-       (Expr.mk_proj 0 (Expr.mk_tuple [Expr.mk_var "i2";Expr.mk_var "e1"])))
+let to_myth_type_basic_tuple _ =
+  assert_mythtype_equal
+    (TTuple [TBase "nat";TTuple []])
+    (DSToMyth.to_myth_type_basic
+       to_myth_ti
+       (Type.mk_tuple [Type.mk_var "nat";Type.mk_unit]))
 
-let type_equiv_suite =
-  "typecheck_exp Unit Tests" >:::
-  ["typecheck_unit" >:: typecheck_unit
-  ;"typecheck_app" >:: typecheck_app
-  ;"typecheck_proj_tuple" >:: typecheck_proj_tuple;
+let to_myth_type_basic_variant _ =
+  assert_mythtype_equal
+    (TBase "nat")
+    (DSToMyth.to_myth_type_basic
+       to_myth_ti
+       (Type.mk_variant [("O", Type.mk_unit); "S", Type.mk_var "nat"]))
+
+let to_myth_type_basic_suite =
+  "to_myth_type_basic Unit Tests" >:::
+  ["to_myth_type_basic_unit" >:: to_myth_type_basic_unit
+  ;"to_myth_type_basic_var" >:: to_myth_type_basic_var
+  ;"to_myth_type_basic_arrow" >:: to_myth_type_basic_arrow
+  ;"to_myth_type_basic_tuple" >:: to_myth_type_basic_tuple
+  ;"to_myth_type_basic_variant" >:: to_myth_type_basic_variant
   ]
 
-let _ = run_test_tt_main type_equiv_suite
-(* end typecheck_exp *)
+let _ = run_test_tt_main to_myth_type_basic_suite
+(* end to_myth_type_basic *)
+
+
+
+
+(* begin to_myth_exp *)
+let to_myth_exp_unit _ =
+  assert_mythexpr_equal
+    (ETuple [])
+    (DSToMyth.to_myth_exp
+       to_myth_ti
+       Expr.mk_unit)
+
+let to_myth_exp_var _ =
+  assert_mythexpr_equal
+    (EVar "x")
+    (DSToMyth.to_myth_exp
+       to_myth_ti
+       (Expr.mk_var "x"))
+
+let to_myth_exp_app _ =
+  assert_mythexpr_equal
+    (EApp ((EVar "f"),(EVar "x")))
+    (DSToMyth.to_myth_exp
+       to_myth_ti
+       (Expr.mk_app (Expr.mk_var "f") (Expr.mk_var "x")))
+
+let to_myth_exp_func _ =
+  assert_mythexpr_equal
+    (EFun (("x",TBase "nat"), EVar "x"))
+    (DSToMyth.to_myth_exp
+       to_myth_ti
+       (Expr.mk_func ("x",Type.mk_var "nat") (Expr.mk_var "x")))
+
+let to_myth_exp_ctor _ =
+  assert_mythexpr_equal
+    (ECtor ("S",ECtor ("O",ETuple [])))
+    (DSToMyth.to_myth_exp
+       to_myth_ti
+       (Expr.mk_ctor "S" (Expr.mk_ctor "O" Expr.mk_unit)))
+
+let to_myth_exp_match _ =
+  assert_mythexpr_equal
+    (EMatch (EVar "x", [(("O", Some (PVar "y")), EVar "y");(("S", Some (PVar "y")), ETuple [])]))
+    (DSToMyth.to_myth_exp
+       to_myth_ti
+       (Expr.mk_match (Expr.mk_var "x") "y" [("O",Expr.mk_var "y");("S",Expr.mk_unit)]))
+
+let to_myth_exp_fix _ =
+  assert_mythexpr_equal
+    (EFix ("f", ("x", TBase "nat"), TTuple [], EVar "y"))
+    (DSToMyth.to_myth_exp
+       to_myth_ti
+       (Expr.mk_fix "f" (Type.mk_arr (Type.mk_var "nat") (Type.mk_unit)) (Expr.mk_func ("x",Type.mk_var "nat") (Expr.mk_var "y"))))
+
+let to_myth_exp_tuple _ =
+  assert_mythexpr_equal
+    (ETuple [ETuple []; EVar "x"])
+    (DSToMyth.to_myth_exp
+       to_myth_ti
+       (Expr.mk_tuple [Expr.mk_unit; Expr.mk_var "x"]))
+
+let to_myth_exp_proj _ =
+  assert_mythexpr_equal
+    (EProj (10, EVar "x"))
+    (DSToMyth.to_myth_exp
+       to_myth_ti
+       (Expr.mk_proj 9 (Expr.mk_var "x")))
+
+
+
+let to_myth_type_basic_suite =
+  "to_myth_exp_var Unit Tests" >:::
+  ["to_myth_exp_unit" >:: to_myth_exp_unit
+  ;"to_myth_exp_var" >:: to_myth_exp_var
+  ;"to_myth_exp_app" >:: to_myth_exp_app
+  ;"to_myth_exp_func" >:: to_myth_exp_func
+  ;"to_myth_exp_ctor" >:: to_myth_exp_ctor
+  ;"to_myth_exp_match" >:: to_myth_exp_match
+  ;"to_myth_exp_fix" >:: to_myth_exp_fix
+  ;"to_myth_exp_tuple" >:: to_myth_exp_tuple
+  ;"to_myth_exp_proj" >:: to_myth_exp_proj
+  ]
+
+let _ = run_test_tt_main to_myth_type_basic_suite
+(* end to_myth_exp *)
