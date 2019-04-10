@@ -2,7 +2,6 @@ open MyStdlib
 open DSInvGen
 open Lang
 open Lang_asserts
-open OUnit2
 open OUnitPlusPlus
 
 (* begin type_equiv *)
@@ -24,35 +23,31 @@ let type_equiv_context =
 
 let test_type_equiv_unit _ =
   assert_true
-    (either_left_exn
-       (Typecheck.type_equiv
-          type_equiv_context
-          (Type.mk_tuple [])
-          (Type.mk_tuple [])))
+    (Typecheck.type_equiv
+       type_equiv_context
+       (Type.mk_tuple [])
+       (Type.mk_tuple []))
 
 let test_type_equiv_var_concrete _ =
   assert_true
-    (either_left_exn
-       (Typecheck.type_equiv
-          type_equiv_context
-          (Type.mk_var "E")
-          (Type.mk_tuple [])))
+    (Typecheck.type_equiv
+       type_equiv_context
+       (Type.mk_var "E")
+       (Type.mk_tuple []))
 
 let test_type_equiv_var_var _ =
   assert_true
-    (either_left_exn
-       (Typecheck.type_equiv
-          type_equiv_context
-          (Type.mk_var "E")
-          (Type.mk_var "E")))
+    (Typecheck.type_equiv
+       type_equiv_context
+       (Type.mk_var "E")
+       (Type.mk_var "E"))
 
 let test_type_equiv_mu _ =
   assert_true
-    (either_left_exn
-       (Typecheck.type_equiv
-          type_equiv_context
-          (Type.mk_var "Int")
-          (Type.mk_var "Int")))
+    (Typecheck.type_equiv
+       type_equiv_context
+       (Type.mk_var "Int")
+       (Type.mk_var "Int"))
 
 let test_type_equiv_mu_unfolded _ =
   let unfolded =
@@ -60,29 +55,26 @@ let test_type_equiv_mu_unfolded _ =
                     ;("S",Type.mk_var "IntInternal")])
   in
   assert_true
-    (either_left_exn
-       (Typecheck.type_equiv
-          type_equiv_context
-          (Type.mk_var "Int")
-          unfolded))
+    (Typecheck.type_equiv
+       type_equiv_context
+       (Type.mk_var "Int")
+       unfolded)
 
 let test_type_equiv_mu_shadow _ =
   assert_true
-    (either_left_exn
-       (Typecheck.type_equiv
-          type_equiv_context
-          (Type.mk_var "List")
-          (Type.mk_var "List")))
+    (Typecheck.type_equiv
+       type_equiv_context
+       (Type.mk_var "List")
+       (Type.mk_var "List"))
 
 let test_type_equiv_mu_shadow_unfolded _ =
   let unfolded = Type.mk_variant[("Nil",Type.mk_tuple [])
                                  ;("Cons",Type.mk_tuple [Type.mk_var "Int"; Type.mk_var "List"])] in
   assert_true
-    (either_left_exn
-       (Typecheck.type_equiv
-          type_equiv_context
-          (Type.mk_var "List")
-          unfolded))
+    (Typecheck.type_equiv
+       type_equiv_context
+       (Type.mk_var "List")
+       unfolded)
 
 let type_equiv_suite =
   "type_equiv Unit Tests" >:::
@@ -142,34 +134,31 @@ let typecheck_vc =
 let typecheck_unit _ =
   assert_type_equal
     (Type.mk_tuple [])
-    (either_left_exn
-       (Typecheck.typecheck_exp
-          typecheck_ec
-          typecheck_tc
-          typecheck_vc
-          (Expr.tuple [])))
+    (Typecheck.typecheck_exp
+       typecheck_ec
+       typecheck_tc
+       typecheck_vc
+       (Expr.mk_tuple []))
 
 let typecheck_app _ =
   assert_type_equal
     (Type.mk_tuple [])
-    (either_left_exn
        (Typecheck.typecheck_exp
           typecheck_ec
           typecheck_tc
           typecheck_vc
-          (Expr.app
-             (Expr.func ("x",Type.Tuple []) (Expr.var "x"))
-             (Expr.tuple []))))
+          (Expr.mk_app
+             (Expr.mk_func ("x",Type.Tuple []) (Expr.mk_var "x"))
+             (Expr.mk_tuple [])))
 
 let typecheck_proj_tuple _ =
   assert_type_equal
     (Type.mk_var "Int")
-    (either_left_exn
-       (Typecheck.typecheck_exp
-          typecheck_ec
-          typecheck_tc
-          typecheck_vc
-          (Expr.proj 0 (Expr.tuple [Expr.var "i2";Expr.var "e1"]))))
+    (Typecheck.typecheck_exp
+       typecheck_ec
+       typecheck_tc
+       typecheck_vc
+       (Expr.mk_proj 0 (Expr.mk_tuple [Expr.mk_var "i2";Expr.mk_var "e1"])))
 
 let type_equiv_suite =
   "typecheck_exp Unit Tests" >:::

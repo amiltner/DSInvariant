@@ -1,5 +1,5 @@
 open Core
-open OUnit2
+include OUnit2
 open String_utilities
 open Util
 
