@@ -2,68 +2,55 @@ open MyStdlib
 
 module DSToMyth = struct
   open Lang
-  module IdSet = struct
-    include SetOf(Id)
-
-    let fresh_id (s:t) (b:elt) : elt =
-      let rec fresh_id_internal (i:int) =
-        let prospective = b ^ (string_of_int i) in
-        if member s prospective then
-          fresh_id_internal (i+1)
-        else
-          prospective
-      in
-      fresh_id_internal 0
-  end
+  module IdSet = SetOf(Id)
   module MythLang = Myth.Lang
-  module TypeToId = DictOf(Type)(Id)
-  module TypeToCtor = DictOf(Type)(MythLang.Ctor)
+  module TypeToType = DictOf(Type)(MythLang.Type)
 
-  let merge_tis ti1 ti2 =
-    TypeToId.from_kvp_list @$
-    TypeToId.merge
+  let merge_tis tt1 tt2 =
+    TypeToType.from_kvp_list @$
+    TypeToType.merge
       ~combiner:(fun v1 v2 ->
-          if is_equal @$ Id.compare v1 v2 then
+          if is_equal @$ MythLang.Type.compare v1 v2 then
             v1
           else
             failwith "conflict")
       ~only_d1_fn:ident
       ~only_d2_fn:ident
-      ti1
-      ti2
+      tt1
+      tt2
 
   let bigmerge_tis
-      (rvs:TypeToId.t list)
-    : TypeToId.t =
+      (rvs:TypeToType.t list)
+    : TypeToType.t =
     fold_on_head_with_default
       ~f:merge_tis
-      ~default:TypeToId.empty
+      ~default:TypeToType.empty
       rvs
 
   let rec to_myth_type
       (real_vars:IdSet.t)
       (adjoining_var:Id.t option)
-      (ti:TypeToId.t)
+      (tt:TypeToType.t)
       (t:Type.t)
-    : (MythLang.id * MythLang.ctor list) list * MythLang.typ * TypeToId.t =
-    let to_myth_type_simple = to_myth_type real_vars adjoining_var ti in
-    begin match TypeToId.lookup ti t with
-      | Some mt -> ([],MythLang.TBase mt,ti)
+    : (MythLang.id * MythLang.ctor list) list * MythLang.typ * TypeToType.t =
+    let to_myth_type_simple = to_myth_type real_vars adjoining_var tt in
+    begin match TypeToType.lookup tt t with
+      | Some mt -> ([],mt,tt)
       | None ->
         begin match t with
           | Var v ->
             if IdSet.member real_vars v then
-              ([],MythLang.TBase v,ti)
+              ([],MythLang.TBase v,tt)
             else
-              failwith "non-real var"
+              failwith ("non-real var: " ^ v)
           | Arr (t1,t2) ->
-            let (ds1,mt1,ti1) = to_myth_type_simple t1 in
-            let (ds2,mt2,ti2) = to_myth_type_simple t2 in
-            ((ds1@ds2), MythLang.TArr (mt1, mt2), merge_tis ti1 ti2)
+            let (ds1,mt1,tt1) = to_myth_type_simple t1 in
+            let (ds2,mt2,tt2) = to_myth_type_simple t2 in
+            ((ds1@ds2), MythLang.TArr (mt1, mt2), merge_tis tt1 tt2)
           | Tuple ts ->
-            let (ds,mts,tis) = List.unzip3 @$ List.map ~f:to_myth_type_simple ts in
-            let ti = bigmerge_tis tis in
-            (List.concat ds, MythLang.TTuple mts, ti)
+            let (ds,mts,tts) = List.unzip3 @$ List.map ~f:to_myth_type_simple ts in
+            let tt = bigmerge_tis tts in
+            (List.concat ds, MythLang.TTuple mts, tt)
           | Mu (i,t) ->
             (*let fresh = IdSet.fresh_id used_ids i in*)
             assert
@@ -74,40 +61,40 @@ module DSToMyth = struct
                   (Some i)
                   adjoining_var));
             let real_vars = IdSet.insert i real_vars in
-            to_myth_type real_vars adjoining_var ti t
+            to_myth_type real_vars adjoining_var tt t
           | Variant branches ->
             let i = Option.value_exn adjoining_var in
-            let (unflattened_bs,its,tis) =
+            let (unflattened_bs,its,tts) =
               List.unzip3 @$
               List.map
                 ~f:(fun (i,t) ->
-                    let (b,mt,ti) = to_myth_type real_vars adjoining_var ti t in
-                    (b,(i,mt),ti))
+                    let (b,mt,tt) = to_myth_type real_vars adjoining_var tt t in
+                    (b,(i,mt),tt))
                 branches
             in
-            let ti = bigmerge_tis tis in
+            let tt = merge_tis tt (bigmerge_tis tts) in
             let bs = List.concat unflattened_bs in
-            let ti = TypeToId.insert ti (Variant branches) i in
-            (bs@[(i,its)], MythLang.TBase i,ti)
+            let tt = TypeToType.insert tt (Variant branches) (MythLang.TBase i) in
+            ((i,its)::bs, MythLang.TBase i,tt)
         end
     end
 
   let to_myth_type_basic
-      (ti:TypeToId.t)
+      (tt:TypeToType.t)
       (t:Type.t)
     : MythLang.typ =
-    snd3 @$ to_myth_type IdSet.empty None ti t
+    snd3 @$ to_myth_type IdSet.empty None tt t
 
   let rec to_myth_exp
-      (ti:TypeToId.t)
+      (tt:TypeToType.t)
       (e:Expr.t)
     : MythLang.exp =
-    let to_myth_exp = to_myth_exp ti in
+    let to_myth_exp = to_myth_exp tt in
     begin match e with
       | Var i -> MythLang.EVar i
       | App (e1,e2) -> MythLang.EApp (to_myth_exp e1, to_myth_exp e2)
       | Func ((i,t),e) ->
-        let mt = to_myth_type_basic ti t in
+        let mt = to_myth_type_basic tt t in
         MythLang.EFun ((i,mt), to_myth_exp e)
       | Ctor (i,e) ->
         ECtor (i,to_myth_exp e)
@@ -123,8 +110,8 @@ module DSToMyth = struct
         let (t1,t2) = Type.destruct_arr_exn t in
         let ((i',t'),e) = Expr.destruct_func_exn e in
         assert (is_equal @$ Type.compare t1 t');
-        let mt1 = to_myth_type_basic ti t1 in
-        let mt2 = to_myth_type_basic ti t2 in
+        let mt1 = to_myth_type_basic tt t1 in
+        let mt2 = to_myth_type_basic tt t2 in
         let me = to_myth_exp e in
         MythLang.EFix (i, (i',mt1), mt2, me)
       | Tuple es ->
@@ -132,4 +119,42 @@ module DSToMyth = struct
       | Proj (i,e) ->
         MythLang.EProj (i+1, to_myth_exp e)
     end
+
+  let convert_decl_list_to_myth
+      (ec:ExprContext.t)
+      (ds:Declaration.t list)
+    : MythLang.decl list =
+    List.rev @$
+    snd @$
+    List.fold_left
+      ~f:(fun (tt,dsrev) d ->
+          Declaration.fold
+            ~type_f:(fun i t ->
+                let (ctors,mt,tt) = to_myth_type IdSet.empty (Some i) tt t in
+                let new_ds =
+                  List.map
+                    ~f:(fun (i,cs) -> MythLang.DData (i,cs))
+                    ctors
+                in
+                let tt = TypeToType.insert tt (Type.mk_var i) mt in
+                (tt,new_ds@dsrev))
+            ~expr_f:(fun i e ->
+                let new_d =
+                  MythLang.DLet
+                    (i
+                    ,false
+                    ,[]
+                    ,to_myth_type_basic tt (ExprContext.lookup_exn ec i)
+                    ,to_myth_exp tt e)
+                in
+                (tt,new_d::dsrev))
+            d)
+      ~init:(TypeToType.empty,[])
+      ds
+
+  let convert_problem_to_decl_list
+      (p:problem)
+    : MythLang.decl list =
+    let (decls,modi,_,_) = p.unprocessed in
+    convert_decl_list_to_myth p.ec (decls@modi)
 end

@@ -95,8 +95,9 @@ let validate_module_satisfies_spec
     es
 
 let process_full_problem
-    ((decs,modi,mods,uf):unprocessed_problem)
+    (unprocessed:unprocessed_problem)
   : problem =
+  let (decs,modi,mods,uf) = unprocessed in
   let (ec,tc,vc,i_e) =
     process_decl_list
       ExprContext.empty
@@ -176,4 +177,5 @@ let process_full_problem
       ~mod_vals:module_vals
       ~post:uf
       ~eval_context:i_e
+      ~unprocessed
       ()

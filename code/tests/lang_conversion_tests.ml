@@ -7,10 +7,11 @@ open Language_conversion
 
 
 
-let to_myth_ti =
-  DSToMyth.TypeToId.from_kvp_list
-    [ (Type.mk_variant [("O", Type.mk_unit); "S", Type.mk_var "nat"], "nat")
-    ; (Type.mk_var "nat", "nat")
+let to_myth_tt =
+  DSToMyth.TypeToType.from_kvp_list
+    [ (Type.mk_variant [("O", Type.mk_unit); "S", Type.mk_var "nat"], TBase "nat")
+    ; (Type.mk_var "nat", TBase "nat")
+    ; (Type.mk_var "x", TTuple [TBase "nat"; TBase "nat"])
     ]
 
 
@@ -19,41 +20,49 @@ let to_myth_type_basic_unit _ =
   assert_mythtype_equal
     (TTuple [])
     (DSToMyth.to_myth_type_basic
-       to_myth_ti
+       to_myth_tt
        (Type.mk_unit))
 
 let to_myth_type_basic_var _ =
   assert_mythtype_equal
     (TBase "nat")
     (DSToMyth.to_myth_type_basic
-       to_myth_ti
+       to_myth_tt
        (Type.mk_var "nat"))
+
+let to_myth_type_basic_var_2 _ =
+  assert_mythtype_equal
+    (TTuple [TBase "nat"; TBase "nat"])
+    (DSToMyth.to_myth_type_basic
+       to_myth_tt
+       (Type.mk_var "x"))
 
 let to_myth_type_basic_arrow _ =
   assert_mythtype_equal
     (TArr (TBase "nat",TTuple []))
     (DSToMyth.to_myth_type_basic
-       to_myth_ti
+       to_myth_tt
        (Type.mk_arr (Type.mk_var "nat") Type.mk_unit))
 
 let to_myth_type_basic_tuple _ =
   assert_mythtype_equal
     (TTuple [TBase "nat";TTuple []])
     (DSToMyth.to_myth_type_basic
-       to_myth_ti
+       to_myth_tt
        (Type.mk_tuple [Type.mk_var "nat";Type.mk_unit]))
 
 let to_myth_type_basic_variant _ =
   assert_mythtype_equal
     (TBase "nat")
     (DSToMyth.to_myth_type_basic
-       to_myth_ti
+       to_myth_tt
        (Type.mk_variant [("O", Type.mk_unit); "S", Type.mk_var "nat"]))
 
 let to_myth_type_basic_suite =
   "to_myth_type_basic Unit Tests" >:::
   ["to_myth_type_basic_unit" >:: to_myth_type_basic_unit
   ;"to_myth_type_basic_var" >:: to_myth_type_basic_var
+  ;"to_myth_type_basic_var_2" >:: to_myth_type_basic_var_2
   ;"to_myth_type_basic_arrow" >:: to_myth_type_basic_arrow
   ;"to_myth_type_basic_tuple" >:: to_myth_type_basic_tuple
   ;"to_myth_type_basic_variant" >:: to_myth_type_basic_variant
@@ -70,63 +79,63 @@ let to_myth_exp_unit _ =
   assert_mythexpr_equal
     (ETuple [])
     (DSToMyth.to_myth_exp
-       to_myth_ti
+       to_myth_tt
        Expr.mk_unit)
 
 let to_myth_exp_var _ =
   assert_mythexpr_equal
     (EVar "x")
     (DSToMyth.to_myth_exp
-       to_myth_ti
+       to_myth_tt
        (Expr.mk_var "x"))
 
 let to_myth_exp_app _ =
   assert_mythexpr_equal
     (EApp ((EVar "f"),(EVar "x")))
     (DSToMyth.to_myth_exp
-       to_myth_ti
+       to_myth_tt
        (Expr.mk_app (Expr.mk_var "f") (Expr.mk_var "x")))
 
 let to_myth_exp_func _ =
   assert_mythexpr_equal
     (EFun (("x",TBase "nat"), EVar "x"))
     (DSToMyth.to_myth_exp
-       to_myth_ti
+       to_myth_tt
        (Expr.mk_func ("x",Type.mk_var "nat") (Expr.mk_var "x")))
 
 let to_myth_exp_ctor _ =
   assert_mythexpr_equal
     (ECtor ("S",ECtor ("O",ETuple [])))
     (DSToMyth.to_myth_exp
-       to_myth_ti
+       to_myth_tt
        (Expr.mk_ctor "S" (Expr.mk_ctor "O" Expr.mk_unit)))
 
 let to_myth_exp_match _ =
   assert_mythexpr_equal
     (EMatch (EVar "x", [(("O", Some (PVar "y")), EVar "y");(("S", Some (PVar "y")), ETuple [])]))
     (DSToMyth.to_myth_exp
-       to_myth_ti
+       to_myth_tt
        (Expr.mk_match (Expr.mk_var "x") "y" [("O",Expr.mk_var "y");("S",Expr.mk_unit)]))
 
 let to_myth_exp_fix _ =
   assert_mythexpr_equal
     (EFix ("f", ("x", TBase "nat"), TTuple [], EVar "y"))
     (DSToMyth.to_myth_exp
-       to_myth_ti
+       to_myth_tt
        (Expr.mk_fix "f" (Type.mk_arr (Type.mk_var "nat") (Type.mk_unit)) (Expr.mk_func ("x",Type.mk_var "nat") (Expr.mk_var "y"))))
 
 let to_myth_exp_tuple _ =
   assert_mythexpr_equal
     (ETuple [ETuple []; EVar "x"])
     (DSToMyth.to_myth_exp
-       to_myth_ti
+       to_myth_tt
        (Expr.mk_tuple [Expr.mk_unit; Expr.mk_var "x"]))
 
 let to_myth_exp_proj _ =
   assert_mythexpr_equal
     (EProj (10, EVar "x"))
     (DSToMyth.to_myth_exp
-       to_myth_ti
+       to_myth_tt
        (Expr.mk_proj 9 (Expr.mk_var "x")))
 
 
@@ -146,3 +155,82 @@ let to_myth_type_basic_suite =
 
 let _ = run_test_tt_main to_myth_type_basic_suite
 (* end to_myth_exp *)
+
+(* start convert_decl_list_to_myth *)
+let ec =
+  ExprContext.from_kvp_list
+    [("u",Type.mk_unit)
+    ;("i",Type.mk_var "i")
+    ;("func",Type.mk_arr (Type.mk_var "i") (Type.mk_var "nat"))]
+
+let convert_decl_list_to_myth_empty _ =
+  assert_decl_list_equal
+    []
+    (DSToMyth.convert_decl_list_to_myth ec [])
+
+let convert_decl_list_to_myth_useless_type_decl _ =
+  assert_decl_list_equal
+    []
+    (DSToMyth.convert_decl_list_to_myth ec [TypeDeclaration ("i",Type.mk_unit)])
+
+let convert_decl_list_to_myth_useful_type_decl _ =
+  assert_decl_list_equal
+    [DData ("bool",[("True",TTuple []);("False",TTuple [])])]
+    (DSToMyth.convert_decl_list_to_myth
+       ec
+       [TypeDeclaration
+          ("bool"
+          ,Type.mk_variant [("True",Type.mk_unit);("False",Type.mk_unit)])])
+
+let convert_decl_list_to_myth_mu_type_decl _ =
+  assert_decl_list_equal
+    [DData ("nat",[("O",TTuple []);("S",TBase "nat")])]
+    (DSToMyth.convert_decl_list_to_myth
+       ec
+       [TypeDeclaration
+          ("nat",
+           Type.mk_mu "nat"
+             (Type.mk_variant
+                [("O",Type.mk_unit);("S",Type.mk_var "nat")]))])
+
+let convert_decl_list_to_myth_simple_let_decl _ =
+  assert_decl_list_equal
+    [DLet ("u",false,[],TTuple [], ETuple [])]
+    (DSToMyth.convert_decl_list_to_myth ec [ExprDeclaration ("u",Expr.mk_unit)])
+
+let convert_decl_list_to_myth_hard_let_decl _ =
+  assert_decl_list_equal
+    [DLet ("i",false,[],TTuple [], ETuple [])]
+    (DSToMyth.convert_decl_list_to_myth ec [TypeDeclaration ("i",Type.mk_unit);ExprDeclaration ("i",Expr.mk_unit)])
+
+let convert_decl_list_to_myth_let_func_decl _ =
+  assert_decl_list_equal
+    [DData ("nat",[("O",TTuple []);("S",TBase "nat")])
+    ;DData ("bool",[("True",TTuple []);("False",TTuple [])])
+    ;DLet ("func",false,[],TArr (TTuple [],TBase "nat"), EFun (("x",TTuple []), ECtor ("O",ETuple [])))
+    ]
+    (DSToMyth.convert_decl_list_to_myth
+       ec
+       [TypeDeclaration ("i",Type.mk_unit)
+       ;TypeDeclaration
+           ("nat",
+            Type.mk_mu "nat"
+              (Type.mk_variant
+                 [("O",Type.mk_unit);("S",Type.mk_var "nat")]))
+       ;TypeDeclaration ("bool",Type.mk_variant [("True",Type.mk_unit);("False",Type.mk_unit)])
+       ;ExprDeclaration ("func",Expr.mk_func ("x",Type.mk_var "i") (Expr.mk_ctor "O" Expr.mk_unit))])
+
+
+let convert_decl_list_to_myth_suite =
+  "convert_decl_list_to_myth Unit Tests" >:::
+  ["convert_decl_list_to_myth_empty" >:: convert_decl_list_to_myth_empty
+  ;"convert_decl_list_to_myth_useless_type_decl" >:: convert_decl_list_to_myth_useless_type_decl
+  ;"convert_decl_list_to_myth_useful_type_decl" >:: convert_decl_list_to_myth_useful_type_decl
+  ;"convert_decl_list_to_myth_mu_type_decl" >:: convert_decl_list_to_myth_useful_type_decl
+  ;"convert_decl_list_to_myth_simple_let_decl" >:: convert_decl_list_to_myth_simple_let_decl
+  ;"convert_decl_list_to_myth_hard_let_decl" >:: convert_decl_list_to_myth_hard_let_decl
+  ;"convert_decl_list_to_myth_let_func_decl" >:: convert_decl_list_to_myth_let_func_decl
+  ]
+
+let _ = run_test_tt_main convert_decl_list_to_myth_suite
+(* end convert_decl_list_to_myth *)

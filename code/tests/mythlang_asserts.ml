@@ -20,3 +20,12 @@ let assert_mythtype_equal
     ~cmp:compare_typ
     expected
     actual
+
+let assert_decl_list_equal
+    (expected:decl list)
+    (actual:decl list) =
+  assert_equal
+    ~printer:(string_of_list Myth.Pp.pp_decl)
+    ~cmp:(compare_list ~cmp:compare_decl)
+    expected
+    actual

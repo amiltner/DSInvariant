@@ -69,8 +69,16 @@ and value =
   | VRcd of value record
   | VUnit
 
+module Type = struct
+  type t = typ
+  [@@deriving ord, show, hash]
+end
+
 let compare_exp (e1:exp) (e2:exp) : int =
   compare e1 e2
+
+let compare_decl (d1:decl) (d2:decl) : int =
+  compare d1 d2
 
 type synth_problem = id * typ * exp list
 

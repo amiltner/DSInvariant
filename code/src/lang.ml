@@ -687,6 +687,7 @@ struct
 end
 
 type unprocessed_problem = Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t
+[@@deriving ord, show, hash]
 
 type problem =
   {
@@ -697,5 +698,6 @@ type problem =
     mod_vals     : Expr.t list          ;
     post         : UniversalFormula.t   ;
     eval_context : (Id.t * Expr.t) list ;
+    unprocessed  : unprocessed_problem  ;
   }
 [@@deriving ord, show, hash, make]
