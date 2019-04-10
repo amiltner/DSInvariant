@@ -4,9 +4,13 @@ open Printf
 (**** Language {{{ *****)
 
 type id = string
+[@@deriving ord, show, hash]
+
 type label = string
+[@@deriving ord, show, hash]
 
 type 'a record = (label * 'a) list
+[@@deriving ord, show, hash]
 
 type typ =
   | TBase of id
@@ -14,8 +18,15 @@ type typ =
   | TTuple of typ list (* Invariant: List must always have two members. *)
   | TRcd of typ record
   | TUnit
+[@@deriving ord, show, hash]
 
 type ctor = id * typ
+[@@deriving ord, show, hash]
+
+module Ctor = struct
+  type t = ctor
+  [@@deriving ord, show, hash]
+end
 
 type pattern =
   | PWildcard

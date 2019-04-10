@@ -35,8 +35,8 @@ module Typecheck : Typecheck_Sig = struct
                else if not (Gamma.is_valid_app e1 e2 g) then
                    type_error
                       (sprintf "Non-decreasing argument wrt recursive function: %s" 
-                      (Pp.pp_exp e))      
-               else t2  
+                      (Pp.pp_exp e))
+               else t2
            | _ -> type_error
                (sprintf "Function type expected but not found: %s" (Pp.pp_typ t_func))
            end

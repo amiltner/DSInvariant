@@ -139,7 +139,6 @@ struct
     let desired_t = Type.mk_var "t" in
     let num_checks = 100 in
     let eval_t =
-      either_left_exn @$
       Typecheck.typecheck_exp
         problem.ec
         problem.tc

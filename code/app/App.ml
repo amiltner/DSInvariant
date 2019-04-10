@@ -380,21 +380,18 @@ let full_spec =
 open Lang
 open MyStdlib
 
-let _ = begin match full_spec with
-  | Left fs ->
-    let ans =
-      Verifiers.QuickCheckVerifier.implication_counter_example
-        ~problem:fs
+let _ =
+  let ans =
+    Verifiers.QuickCheckVerifier.implication_counter_example
+      ~problem:full_spec
       ~pre:(Expr.mk_func ("i",Type.Var "t") (Value.to_exp (Verifiers.QuickCheckVerifier.true_val)))
       ~eval:(Expr.mk_func ("i",Type.Var "t") (Expr.mk_var "i"))
-      ~post:fs.post
-    in
-    begin match ans with
-      | None -> failwith "None"
-      | Some anses -> print_endline (string_of_list Value.show anses)
-    end
-  | Right s -> Stdio.print_endline s
-end
+      ~post:full_spec.post
+  in
+  begin match ans with
+    | None -> failwith "None"
+    | Some anses -> print_endline (string_of_list Value.show anses)
+  end
 (*
 
 let concat : list -> list |>

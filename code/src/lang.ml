@@ -72,6 +72,11 @@ struct
     : t -> (t * t) option =
     arr_apply ~f:(fun ty1 ty2 -> (ty1,ty2))
 
+  let destruct_arr_exn
+      (t:t)
+    : t * t =
+    Option.value_exn (destruct_arr t)
+
   let id_apply
       (type a)
       ~(f:Id.t -> a)
@@ -128,6 +133,11 @@ struct
   let destruct_tuple
     : t -> (t list) option =
     tuple_apply ~f:ident
+
+  let destruct_tuple_exn
+      (t:t)
+    : t list =
+    Option.value_exn (destruct_tuple t)
 end
 
 module Arg =
@@ -477,6 +487,14 @@ struct
     (and_exps
        replaced_internal1
        internal2)
+
+  let mk_let_in
+      (i:Id.t)
+      (t:Type.t)
+      (e1:t)
+      (e2:t)
+    : t =
+    mk_app (mk_func (i,t) e2) e1
 end
 
 module Context(D : Data) =

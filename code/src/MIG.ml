@@ -117,14 +117,10 @@ module MIGLearner(V : Verifier) = struct
   let learnInvariant
       ~unprocessed_problem:(unprocessed_problem : unprocessed_problem)
     : string =
-    let problem_e = ProcessFile.process_full_problem unprocessed_problem in
-    begin match problem_e with
-      | Right err -> failwith err
-      | Left problem ->
-        Expr.show
-          (learnInvariant_internal
-             ~problem
-             ~positives:[]
-             ~attempt:0)
-    end
+    let problem = ProcessFile.process_full_problem unprocessed_problem in
+    Expr.show
+      (learnInvariant_internal
+         ~problem
+         ~positives:[]
+         ~attempt:0)
 end

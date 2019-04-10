@@ -26,47 +26,40 @@ let process_decl_list
     (tc:TypeContext.t)
     (vc:VariantContext.t)
     (ds:Declaration.t list)
-  : (ExprContext.t * TypeContext.t * VariantContext.t * (Id.t * Expr.t) list) except =
-  except_map
-    ~f:fst
+  : (ExprContext.t * TypeContext.t * VariantContext.t * (Id.t * Expr.t) list) =
+  fst
     (List.fold_left
-       ~f:(fun ec_tc_vc_e decl ->
-           except_bind
-             ~f:(fun ((new_ec,new_tc,new_vc,i_e),(ec,tc,vc)) ->
-                 Declaration.fold
-                   ~type_f:(fun i t ->
-                       let all_variants = extract_variants t in
-                       Left
-                         ((new_ec
-                          ,TypeContext.insert new_tc i t
-                          ,List.fold_left
-                              ~f:(fun vc (k,v) -> VariantContext.insert vc k v)
-                              ~init:new_vc
-                              all_variants
-                          ,i_e)
-                         ,(ec
-                          ,TypeContext.insert tc i t
-                          ,List.fold_left
-                              ~f:(fun vc (k,v) -> VariantContext.insert vc k v)
-                              ~init:vc
-                              all_variants))
-                     )
-                   ~expr_f:(fun i e ->
-                       except_map
-                         ~f:(fun t ->
-                             ((ExprContext.insert new_ec i t
-                              ,new_tc
-                              ,new_vc
-                              ,(i,e)::i_e)
-                             ,(ExprContext.insert ec i t
-                              ,tc
-                              ,vc)))
-                         (typecheck_exp ec tc vc e))
-                   decl)
-             ec_tc_vc_e)
-       ~init:(Left
-                ((ExprContext.empty,TypeContext.empty,VariantContext.empty,[])
-                ,(ec,tc,vc)))
+       ~f:(fun ((new_ec,new_tc,new_vc,i_e),(ec,tc,vc)) decl ->
+           Declaration.fold
+             ~type_f:(fun i t ->
+                 let all_variants = extract_variants t in
+                 ((new_ec
+                  ,TypeContext.insert new_tc i t
+                  ,List.fold_left
+                      ~f:(fun vc (k,v) -> VariantContext.insert vc k v)
+                      ~init:new_vc
+                      all_variants
+                  ,i_e)
+                 ,(ec
+                  ,TypeContext.insert tc i t
+                  ,List.fold_left
+                      ~f:(fun vc (k,v) -> VariantContext.insert vc k v)
+                      ~init:vc
+                      all_variants))
+               )
+             ~expr_f:(fun i e ->
+                 let t = typecheck_exp ec tc vc e in
+                 ((ExprContext.insert new_ec i t
+                  ,new_tc
+                  ,new_vc
+                  ,(i,e)::i_e)
+                 ,(ExprContext.insert ec i t
+                  ,tc
+                  ,vc))
+               )
+             decl)
+       ~init:(((ExprContext.empty,TypeContext.empty,VariantContext.empty,[])
+              ,(ec,tc,vc)))
        ds)
 
 let process_module_sig
@@ -88,131 +81,99 @@ let validate_module_satisfies_spec
     (ec:ExprContext.t)
     (tc:TypeContext.t)
     ((i,es):ModuleSpec.t)
-  : bool except =
+  : bool =
   List.fold_left
-    ~f:(fun acc_e (i,t) ->
-        except_bind
-          ~f:(fun acc ->
-              if not acc then
-                Left acc
-              else
-                begin match ExprContext.lookup ec i with
-                  | None -> Left false
-                  | Some t' -> Typecheck.type_equiv full_tc t t'
-                end)
-          acc_e
-      )
-    ~init:(Left (Option.is_some @$ TypeContext.lookup tc i))
+    ~f:(fun acc (i,t) ->
+            if not acc then
+              acc
+            else
+              begin match ExprContext.lookup ec i with
+                | None -> false
+                | Some t' -> Typecheck.type_equiv full_tc t t'
+              end)
+    ~init:(Option.is_some @$ TypeContext.lookup tc i)
     es
 
 let process_full_problem
     ((decs,modi,mods,uf):unprocessed_problem)
-  : problem except =
-  let ec_tc_vc_e =
+  : problem =
+  let (ec,tc,vc,i_e) =
     process_decl_list
       ExprContext.empty
       TypeContext.empty
       VariantContext.empty
       decs
   in
-  let context_modonly_context_e =
-    except_bind
-      ~f:(fun (ec,tc,vc,i_e) ->
-          except_map
-            ~f:(fun ectcvc' ->
-                let (ec',tc',vc',i_e') = ectcvc' in
-                ((ec,tc,vc),(ec',tc',vc'),i_e'@i_e))
-            (process_decl_list ec tc vc modi))
-      ec_tc_vc_e
+  let m_ec,m_tc,m_vc,i_e' = process_decl_list ec tc vc modi in
+  let i_e = i_e'@i_e in
+  let full_tc =
+    TypeContext.from_kvp_list
+      (TypeContext.merge
+         ~combiner:(fun _ v -> v)
+         ~only_d1_fn:ident
+         ~only_d2_fn:ident
+         tc
+         m_tc)
   in
-  let validated_context_modonly_context_e =
-    except_bind
-      ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),i_e) ->
-          let full_tc =
-            TypeContext.from_kvp_list
-              (TypeContext.merge
-                 ~combiner:(fun _ v -> v)
-                 ~only_d1_fn:ident
-                 ~only_d2_fn:ident
-                 tc
-                 m_tc)
-          in
-          let satisfies_e =
-            validate_module_satisfies_spec
-              full_tc
-              m_ec
-              m_tc
-              mods
-          in
-          except_bind
-            ~f:(fun b ->
-                if (not b) then
-                  Right "module doesn't satisfy spec"
-                else
-                  let module_vals =
-                    List.map
-                      ~f:(fun it ->
-                          List.Assoc.find_exn
-                            ~equal:(is_equal %% Id.compare)
-                            i_e
-                            (fst it))
-                      (snd mods)
-                  in
-                  Left (((ec,tc,vc),(m_ec,m_tc,m_vc),i_e,module_vals)))
-            satisfies_e)
-      context_modonly_context_e
+  let satisfies =
+    validate_module_satisfies_spec
+      full_tc
+      m_ec
+      m_tc
+      mods
   in
-  let validated_context_modonly_context_uf_e =
-    except_bind
-      ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),i_e,mvs) ->
-          let ec_sig = process_module_sig ec mods in
-          let ftl_e = typecheck_formula ec_sig tc vc uf in
-          except_map
-            ~f:(fun _ -> ((ec,tc,vc),(m_ec,m_tc,m_vc),uf,i_e,mvs))
-            ftl_e)
-      validated_context_modonly_context_e
-  in
-  except_map
-    ~f:(fun ((ec,tc,vc),(m_ec,m_tc,m_vc),uf,i_e,mvs) ->
-        let full_ec =
-          TypeContext.from_kvp_list
-            (ExprContext.merge
-               ~combiner:(fun _ v -> v)
-               ~only_d1_fn:ident
-               ~only_d2_fn:ident
-               ec
-               m_ec)
-        in
-        let full_tc =
-          TypeContext.from_kvp_list
-            (TypeContext.merge
-               ~combiner:(fun _ v -> v)
-               ~only_d1_fn:ident
-               ~only_d2_fn:ident
-               tc
-               m_tc)
-        in
-        let full_vc =
-          VariantContext.from_kvp_list
-            (VariantContext.merge
-               ~combiner:(fun _ v -> v)
-               ~only_d1_fn:ident
-               ~only_d2_fn:ident
-               vc
-               m_vc)
-        in
-        let type_instantiation =
-          TypeContext.lookup_exn
-            full_tc
-            (fst mods)
-        in
-        make_problem
-          ~module_type:type_instantiation
-          ~ec:full_ec
-          ~tc:full_tc
-          ~vc:full_vc
-          ~mod_vals:mvs
-          ~post:uf
-          ~eval_context:i_e
-          ())
-    validated_context_modonly_context_uf_e
+  if not satisfies then
+    failwith "module doesn't satisfy spec"
+  else
+    let module_vals =
+      List.map
+        ~f:(fun it ->
+            List.Assoc.find_exn
+              ~equal:(is_equal %% Id.compare)
+              i_e
+              (fst it))
+        (snd mods)
+    in
+    let ec_sig = process_module_sig ec mods in
+    let _ = typecheck_formula ec_sig tc vc uf in
+    let full_ec =
+      TypeContext.from_kvp_list
+        (ExprContext.merge
+           ~combiner:(fun _ v -> v)
+           ~only_d1_fn:ident
+           ~only_d2_fn:ident
+           ec
+           m_ec)
+    in
+    let full_tc =
+      TypeContext.from_kvp_list
+        (TypeContext.merge
+           ~combiner:(fun _ v -> v)
+           ~only_d1_fn:ident
+           ~only_d2_fn:ident
+           tc
+           m_tc)
+    in
+    let full_vc =
+      VariantContext.from_kvp_list
+        (VariantContext.merge
+           ~combiner:(fun _ v -> v)
+           ~only_d1_fn:ident
+           ~only_d2_fn:ident
+           vc
+           m_vc)
+    in
+    let type_instantiation =
+      TypeContext.lookup_exn
+        full_tc
+        (fst mods)
+    in
+    make_problem
+      ~module_type:type_instantiation
+      ~ec:full_ec
+      ~tc:full_tc
+      ~vc:full_vc
+      ~mod_vals:module_vals
+      ~post:uf
+      ~eval_context:i_e
+      ()

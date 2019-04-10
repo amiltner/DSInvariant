@@ -5,4 +5,5 @@
 (library
     (name Myth)
     (public_name Myth)
-    (libraries core str ounit))
+    (libraries core str ounit)
+    (preprocess (pps ppx_hash ppx_deriving.std ppx_optcomp ppx_compare ppx_sexp_conv)))
