@@ -52,7 +52,7 @@ and exp =
   | ECtor of id * exp
   | EMatch of exp * branch list
   | EPFun of (exp * exp) list
-  | EFix  of id * arg * typ * exp
+  | EFix of id * arg * typ * exp
   | ETuple of exp list  (* Invariant: List must always have two members. *)
   | EProj of int * exp  (* int is the index of projection of the tuple (1-indexed). *)
   | ERcd of exp record
