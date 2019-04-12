@@ -1,8 +1,7 @@
 open Base
 open DSInvGen
-open SetVerifiers
+open Verifiers
 
-let _ = z3_verifier
 let empty = (Int.max_value, Int.max_value)
 
 let insert z (x,y) =
@@ -127,88 +126,6 @@ let v = register_func v lookup_func
     synth_variables = [];
   }*)
 
-let make_lookup
-    (type expr)
-    ~verifier:(module V : Verifier with type expr = expr)
-    (_:expr)
-    (_:expr)
-  : expr =
-  V.integer_var_exp "lookup"
-  (*V.mk_or
-    [V.mk_equals z (V.get_fst t)
-    ;V.mk_equals z (V.get_snd t)]*)
-
-let make_empty
-    (type expr)
-    ~verifier:(module V : Verifier with type expr = expr)
-    (_:expr)
-    (_:expr)
-  : expr =
-  V.integer_var_exp "empty"
-  (*V.bin_and_exps
-    (V.mk_equals (V.get_fst t) (V.integer_exp 2147483647))
-    (V.mk_equals (V.get_snd t) (V.integer_exp 2147483647))*)
-
-let make_precond
-    (type expr)
-    ~verifier:(module V : Verifier with type expr = expr)
-    (_:expr)
-    (_:expr)
-  : expr =
-  V.integer_var_exp "precond"
-  (*V.and_exps
-    [V.mk_le (V.get_fst t) (V.integer_exp 2147483647)
-    ;V.mk_le (V.get_snd t) (V.integer_exp 2147483647)
-    ;V.mk_lt z (V.integer_exp 2147483647)]*)
-
-let make_delete
-    (type expr)
-    ~verifier:(module V : Verifier with type expr = expr)
-    (_:expr)
-    (_:expr)
-  : expr =
-  V.integer_var_exp "delete"
-  (*V.if_then_else_exp
-    (V.mk_lt z (V.get_fst t))
-    t
-    (V.if_then_else_exp
-       (V.mk_equals z (V.get_fst t))
-       (V.make_pair (V.get_snd t) (V.integer_exp 2147483647))
-       (V.if_then_else_exp
-          (V.mk_equals z (V.get_snd t))
-          (V.make_pair (V.get_fst t) (V.integer_exp 2147483647))
-          t))*)
-
-let make_insert
-    (type expr)
-    ~verifier:(module V : Verifier with type expr = expr)
-    (_:expr)
-    (_:expr)
-  : expr =
-  V.integer_var_exp "insert"
-  (*V.if_then_else_exp
-    (V.mk_le z (V.get_fst t))
-    (V.make_pair z (V.get_snd t))
-    (V.make_pair (V.get_fst t) z)*)
-
-let make_post
-    (type expr)
-    ~verifier:(module V : Verifier with type expr = expr)
-    (_:expr)
-    (_:expr)
-  : expr =
-  V.integer_var_exp "post"
-  (*V.bin_and_exps
-    (make_lookup
-       ~verifier:(module V)
-       (make_insert ~verifier:(module V) t z)
-       z)
-    (V.mk_not
-       (make_lookup
-          ~verifier:(module V)
-          (make_delete ~verifier:(module V) t z)
-          z))*)
-
 (*let x = Z3Verifier.make_pair (Z3Verifier.integer_exp 3) (Z3Verifier.integer_exp 4)
 
 let _ = Stdio.print_endline (Z3Verifier.to_string x)
@@ -221,24 +138,7 @@ let _ = Stdio.print_endline (Z3Verifier.to_string z)
 
   let q = make_lookup x z z3_verifier*)
 
-open SyGuS_Set
-open SIG
-
-let sygus_call =
-  {
-    precond_func = make_precond;
-    empty_func = make_empty;
-    delete_func = make_delete;
-    insert_func = make_insert;
-    lookup_func = make_lookup;
-    post_func = make_post;
-    constants = [Value.Int 2147483647];
-    synth_variables = [("x",Type.INTLIST)];
-  }
-
 let _ = Log.enable (Some "log")
-
-module MySig = SIGLearner(QuickCheckVerifier)
 
 (*let ans =
   MySig.learnSetInvariant
@@ -377,21 +277,31 @@ let full_spec =
   ProcessFile.process_full_problem
     problem
 
-open Lang
 open MyStdlib
 
-let _ =
+(*let _ =
   let ans =
     Verifiers.QuickCheckVerifier.implication_counter_example
       ~problem:full_spec
-      ~pre:(Expr.mk_func ("i",Type.Var "t") (Value.to_exp (Verifiers.QuickCheckVerifier.true_val)))
-      ~eval:(Expr.mk_func ("i",Type.Var "t") (Expr.mk_var "i"))
+      ~pre:(Expr.mk_func ("x",Type.Var "t")
+              (Expr.mk_app
+                 (Expr.mk_app
+                    (Expr.mk_var "and")
+                    ((Value.to_exp (Verifiers.QuickCheckVerifier.true_val))))
+                 (Value.to_exp (Verifiers.QuickCheckVerifier.true_val))
+              )
+              )
+      ~eval:(Expr.mk_func ("x",Type.Var "t") (Expr.mk_var "x"))
       ~post:full_spec.post
   in
   begin match ans with
     | None -> failwith "None"
     | Some anses -> print_endline (string_of_list Value.show anses)
-  end
+  end*)
+
+module QCMIG = MIG.MIGLearner(QuickCheckVerifier)
+
+let _ = print_endline @$ QCMIG.learnInvariant ~unprocessed_problem:problem
 (*
 
 let concat : list -> list |>

@@ -16,18 +16,21 @@ module type Sigma_Sig = sig
   val restrict        : id -> t -> t
   val types           : t  -> typ list
   val ctors           : id -> t -> (id * (typ * id)) list
+  val show            : t -> string
 end
 
 (* A signature stores the definitions of all constructors and datatypes currently  *)
 (* available for use.                                                              *)
-module Sigma : Sigma_Sig = struct
+module Sigma = struct
   (* A single entry of a signature.                                                *)
   type entry = { ctor_name     : id       (* The name of the constructor.          *)
                ; datatype_name : id       (* The name of the datatype it inhabits. *)
                ; ctor_type     : typ      (* The type of the constructor contents. *)
                }
+  [@@deriving ord, show, hash]
   (* A signature is a list of entries.                                             *)
   type t = entry list
+  [@@deriving ord, show, hash]
 
   let empty : t = []                      (* Create an empty signature.            *)
   let append : t -> t -> t = (@)          (* Append two signatures.                *)

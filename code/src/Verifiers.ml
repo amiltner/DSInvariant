@@ -19,6 +19,7 @@ sig
     Value.t option
 
   val synth :
+    problem:problem ->
     testbed:TestBed.t ->
     Expr.t option
 end
@@ -204,7 +205,7 @@ struct
       in
       let result_gen = QC.of_list result_list in
       let uf_types_seqs
-        : (string * Expr.t) Sequence.t list =
+        : (Expr.t * string * Type.t) Sequence.t list =
         List.map
           ~f:(fun (i,t) ->
               let gen =
@@ -215,7 +216,7 @@ struct
               in
               let seq = QC.g_to_seq gen in
               Sequence.map
-                ~f:(fun e -> (i,e))
+                ~f:(fun e -> (e,i,t))
                 seq)
           post_quants
       in
@@ -225,7 +226,7 @@ struct
               if i = 100 then
                 Right None
               else
-                let (exps_names,uf_types_seqs) =
+                let (exps_names_types,uf_types_seqs) =
                   List.fold_right
                     ~f:(fun seq (exps_names,uf_types_seqs) ->
                         let (exp_name,seq) = Option.value_exn (Sequence.next seq) in
@@ -233,23 +234,29 @@ struct
                     ~init:([],[])
                     uf_types_seqs
                 in
+                let (names_exps,exps_types) =
+                  List.unzip @$
+                  List.map
+                    ~f:(fun (exp,name,typ) -> ((name,exp),(exp,typ)))
+                    exps_names_types
+                in
                 let post_held =
                   is_equal @$
                   Value.compare
                     true_val
-                    (Eval.evaluate_with_holes ~eval_context:(problem.eval_context@exps_names) post_expr)
+                    (Eval.evaluate_with_holes ~eval_context:(problem.eval_context@names_exps) post_expr)
                 in
                 if post_held then
                   Left (uf_types_seqs,i+1)
                 else
                   let relevant =
                     List.filter_map
-                      ~f:(fun (_,e) ->
-                          (*if is_equal @$ Type.compare desired_t t then*)
+                      ~f:(fun (e,t) ->
+                          if is_equal @$ Type.compare desired_t t then
                             Some e
-                          (*else
-                            None*))
-                      exps_names
+                          else
+                            None)
+                      exps_types
                   in
                   Right (Some relevant))
           (uf_types_seqs,0)
@@ -267,9 +274,35 @@ struct
     failwith "TODO"
 
   let synth
-      ~testbed:(_:TestBed.t)
+      ~(problem:problem)
+      ~(testbed:TestBed.t)
     : Expr.t option =
-    failwith "TODO"
+    Myth.Consts.verbose_mode := true;
+    let pos_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_true_exp)) testbed.pos_tests in
+    let neg_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_false_exp)) testbed.neg_tests in
+    let examples = pos_examples@neg_examples in
+    if (List.length examples = 0) then
+      Some (Expr.mk_constant_true_func (Type.mk_var "t"))
+    else
+      let (decls,examples,t) = DSToMyth.convert_problem_examples_type_to_myth problem examples in
+      let (sigma,gamma) =
+        Myth.Typecheck.Typecheck.check_decls
+          Myth.Sigma.Sigma.empty
+          Myth.Gamma.Gamma.empty
+          decls
+      in
+      let env = Myth.Eval.gen_init_env decls in
+      let w = Myth.Eval.gen_init_world env [Myth.Lang.EPFun examples] in
+      Option.map
+        ~f:MythToDS.convert_expr
+        (Myth.Synth.synthesize
+           sigma
+           env
+           (Myth.Rtree.create_rtree
+              sigma
+              gamma
+              env
+              (TArr (t,TBase "bool")) w 0))
 end
 
 let quickcheck_verifier = (module QuickCheckVerifier : Verifier)

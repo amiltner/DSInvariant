@@ -91,7 +91,7 @@ module MIGLearner(V : Verifier) = struct
       VPIE.learnVPreCond
         ~problem
         ~pre:(Expr.mk_constant_true_func problem.module_type)
-        ~eval:(Expr.mk_identity_func problem.module_type)
+        ~eval:(Expr.mk_identity_func (Type.mk_var "t"))
         ~post:problem.post
         ~positives:positives
     in

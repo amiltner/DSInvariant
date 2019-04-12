@@ -472,12 +472,9 @@ struct
   let and_predicates
       (e1:t)
       (e2:t)
-    : t = 
-  let ((arg1,t1),internal1) = destruct_func_exn e1 in
+    : t =
+  let ((arg1,_),internal1) = destruct_func_exn e1 in
   let ((arg2,t2),internal2) = destruct_func_exn e2 in
-  if not @$ is_equal @$ Type.compare t1 t2 then
-    failwith "bad predicate merging"
-  else
   let replaced_internal1 =
     replace
       arg1

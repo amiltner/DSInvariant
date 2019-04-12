@@ -47,9 +47,12 @@ let rec to_myth_type
           let (ds2,mt2,tt2) = to_myth_type_simple t2 in
           ((ds1@ds2), MythLang.TArr (mt1, mt2), merge_tis tt1 tt2)
         | Tuple ts ->
-          let (ds,mts,tts) = List.unzip3 @$ List.map ~f:to_myth_type_simple ts in
-          let tt = bigmerge_tis tts in
-          (List.concat ds, MythLang.TTuple mts, tt)
+          if List.length ts = 0 then
+            ([],MythLang.TUnit,tt)
+          else
+            let (ds,mts,tts) = List.unzip3 @$ List.map ~f:to_myth_type_simple ts in
+            let tt = bigmerge_tis tts in
+            (List.concat ds, MythLang.TTuple mts, tt)
         | Mu (i,t) ->
           (*let fresh = IdSet.fresh_id used_ids i in*)
           assert
@@ -114,7 +117,10 @@ let rec to_myth_exp
       let me = to_myth_exp e in
       MythLang.EFix (i, (i',mt1), mt2, me)
     | Tuple es ->
-      MythLang.ETuple (List.map ~f:to_myth_exp es)
+      if List.length es = 0 then
+        MythLang.EUnit
+      else
+        MythLang.ETuple (List.map ~f:to_myth_exp es)
     | Proj (i,e) ->
       MythLang.EProj (i+1, to_myth_exp e)
   end
@@ -122,37 +128,46 @@ let rec to_myth_exp
 let convert_decl_list_to_myth
     (ec:ExprContext.t)
     (ds:Declaration.t list)
-  : MythLang.decl list =
-  List.rev @$
-  snd @$
-  List.fold_left
-    ~f:(fun (tt,dsrev) d ->
-        Declaration.fold
-          ~type_f:(fun i t ->
-              let (ctors,mt,tt) = to_myth_type IdSet.empty (Some i) tt t in
-              let new_ds =
-                List.map
-                  ~f:(fun (i,cs) -> MythLang.DData (i,cs))
-                  ctors
-              in
-              let tt = TypeToType.insert tt (Type.mk_var i) mt in
-              (tt,new_ds@dsrev))
-          ~expr_f:(fun i e ->
-              let new_d =
-                MythLang.DLet
-                  (i
-                  ,false
-                  ,[]
-                  ,to_myth_type_basic tt (ExprContext.lookup_exn ec i)
-                  ,to_myth_exp tt e)
-              in
-              (tt,new_d::dsrev))
-          d)
-    ~init:(TypeToType.empty,[])
-    ds
+  : MythLang.decl list * TypeToType.t =
+  let (tt,ds) =
+    List.fold_left
+      ~f:(fun (tt,dsrev) d ->
+          Declaration.fold
+            ~type_f:(fun i t ->
+                let (ctors,mt,tt) = to_myth_type IdSet.empty (Some i) tt t in
+                let new_ds =
+                  List.map
+                    ~f:(fun (i,cs) -> MythLang.DData (i,cs))
+                    ctors
+                in
+                let tt = TypeToType.insert tt (Type.mk_var i) mt in
+                (tt,new_ds@dsrev))
+            ~expr_f:(fun i e ->
+                let new_d =
+                  MythLang.DLet
+                    (i
+                    ,false
+                    ,[]
+                    ,to_myth_type_basic tt (ExprContext.lookup_exn ec i)
+                    ,to_myth_exp tt e)
+                in
+                (tt,new_d::dsrev))
+            d)
+      ~init:(TypeToType.empty,[])
+      ds
+  in
+  (List.rev ds, tt)
 
-let convert_problem_to_decl_list
+let convert_problem_examples_type_to_myth
     (p:problem)
-  : MythLang.decl list =
+    (examples:(Expr.t * Expr.t) list)
+  : MythLang.decl list * (MythLang.exp * MythLang.exp) list * MythLang.typ =
   let (decls,modi,_,_) = p.unprocessed in
-  convert_decl_list_to_myth p.ec (decls@modi)
+  let (ds,tt) = convert_decl_list_to_myth p.ec (decls@modi) in
+  let examples =
+    List.map
+      ~f:(fun (e1,e2) -> (to_myth_exp tt e1, to_myth_exp tt e2))
+      examples
+  in
+  let t = to_myth_type_basic tt (Type.mk_var "t") in
+  (ds,examples,t)
