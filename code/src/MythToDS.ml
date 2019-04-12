@@ -3,12 +3,14 @@ open Lang
 
 let rec explode (binder: Expr.t) : Myth.Lang.pattern list -> (Expr.t * Id.t) list =
   let rec helper i acc = 
-    function [@warning "-8"]
+    function
     | [] -> acc
     | (Myth.Lang.PVar id) :: plist
       -> helper (i + 1) (((Expr.Proj (i, binder)), id) :: acc) plist
     | (Myth.Lang.PTuple _plist) :: plist
       -> helper (i + 1) ((explode (Expr.Proj (i, binder)) _plist) @ acc) plist
+    | _ :: plist
+      -> helper (i + 1) acc plist
    in helper 0 []
 
 let rec convert_type : Myth.Lang.typ -> Type.t =
