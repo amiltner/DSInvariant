@@ -16,6 +16,14 @@ type ('a, 'b) _t = {
 
 type t = (Value.t, Value.t) _t
 
+let show x =
+  let show_value_list = string_of_list Value.show in
+  string_of_pair
+    show_value_list
+    show_value_list
+    (List.map ~f:fst x.pos_tests,List.map ~f:fst x.neg_tests)
+
+
 let to_string (x:t) =
   "negs:"^(string_of_list (Value.show % fst) x.neg_tests)^
   "pos:"^(string_of_list (Value.show % fst) x.pos_tests)
@@ -69,9 +77,9 @@ let add_neg_test ~(testbed : t) (test : Value.t) : t option =
     Some
       {
         testbed with
-        pos_tests =
+        neg_tests =
           (test ,lazy (compute_feature_vector test testbed.features))
-          :: testbed.pos_tests
+          :: testbed.neg_tests
       }
 
 let add_pos_test_allow_dups ~(testbed : t) (test : Value.t) : t =

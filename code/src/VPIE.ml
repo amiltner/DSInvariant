@@ -54,7 +54,7 @@ struct
              ~init:(TestBed.create_positive ~args:(List.zip_exn testbed.farg_names testbed.farg_types) ~post:testbed.post [])
              all_inside_examples
            in*)
-         let synthed_pre = Option.value_exn (V.synth ~problem ~testbed) in
+         let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed) in
          Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
          let full_pre = Expr.and_predicates pre synthed_pre in
          begin match V.implication_counter_example ~problem ~pre:full_pre ~eval:eval ~post:post with

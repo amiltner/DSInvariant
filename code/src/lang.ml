@@ -456,6 +456,11 @@ struct
     : t =
     mk_constant_func t mk_true_exp
 
+  let mk_constant_false_func
+      (t:Type.t)
+    : t =
+    mk_constant_func t mk_false_exp
+
   let mk_identity_func
       (t:Type.t)
     : t =
@@ -463,17 +468,102 @@ struct
 
   let mk_and_func : t = mk_var "and"
 
+  let rec contains_var
+      (v:Id.t)
+      (e:t)
+    : bool =
+    let contains_var_simple = contains_var v in
+    begin match e with
+      | Var i -> is_equal @$ Id.compare i v
+      | App (e1,e2) -> contains_var_simple e1 || contains_var_simple e2
+      | Func ((i,_),e) ->
+        if is_equal @$ Id.compare i v then
+          false
+        else
+          contains_var_simple e
+      | Ctor (_,e) -> contains_var_simple e
+      | Match (e,i,branches) ->
+        contains_var_simple e ||
+        (if is_equal @$ Id.compare i v then
+           false
+         else
+           List.exists
+             ~f:(fun (_,e) -> contains_var_simple e)
+             branches)
+      | Fix (i,_,e) ->
+        if is_equal @$ Id.compare i v then
+          false
+        else
+          contains_var_simple e
+      | Tuple es -> List.exists ~f:contains_var_simple es
+      | Proj (_,e) -> contains_var_simple e
+    end
+
+  let rec simplify
+      (e:t)
+    : t =
+    begin match e with
+      | Var _ -> e
+      | App (e1,e2) ->
+        mk_app (simplify e1) (simplify e2)
+      | Func (a,e) ->
+        mk_func a (simplify e)
+      | Match (e,v,branches) ->
+        mk_match
+          (simplify e)
+          v
+          (List.map ~f:(fun (i,e) -> (i,simplify e)) branches)
+      | Fix (i,t,e) ->
+        let e = simplify e in
+        if not (contains_var i e) then
+          e
+        else
+          mk_fix i t e
+      | Ctor (i,e) ->
+        mk_ctor i (simplify e)
+      | Tuple es -> mk_tuple (List.map ~f:simplify es)
+      | Proj (i,e) -> mk_proj i (simplify e)
+    end
+
   let and_exps
       (e1:t)
       (e2:t)
     : t =
+    print_endline @$ show e1;
+    print_endline @$ show e2;
     mk_app (mk_app mk_and_func e1) e2
+
+  let is_func
+      ~(func_internals:t)
+      (e:t)
+    : bool =
+    begin match e with
+      | Func (_,e) -> is_equal @$ compare e func_internals
+      | _ -> false
+    end
 
   let and_predicates
       (e1:t)
       (e2:t)
     : t =
-  let ((arg1,_),internal1) = destruct_func_exn e1 in
+    let is_true_func = is_func ~func_internals:mk_true_exp in
+    let is_false_func = is_func ~func_internals:mk_false_exp in
+    if is_true_func e1 then
+      e2
+    else if is_true_func e2 then
+      e1
+    else if is_false_func e1 || is_false_func e2 then
+      mk_constant_false_func (Type.mk_var "t")
+    else
+      let var = "x" in
+      let var_exp = mk_var var in
+      let apped_e1 = mk_app e1 var_exp in
+      let apped_e2 = mk_app e2 var_exp in
+      mk_func
+        (var,Type.mk_var "t")
+        (and_exps apped_e1 apped_e2)
+
+  (*let ((arg1,_),internal1) = destruct_func_exn e1 in
   let ((arg2,t2),internal2) = destruct_func_exn e2 in
   let replaced_internal1 =
     replace
@@ -485,7 +575,7 @@ struct
     (arg2,t2)
     (and_exps
        replaced_internal1
-       internal2)
+       internal2)*)
 
   let mk_let_in
       (i:Id.t)
