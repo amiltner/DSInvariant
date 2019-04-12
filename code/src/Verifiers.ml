@@ -131,16 +131,50 @@ struct
       | _ -> ([],t)
     end
 
+  let make_random_evaluator
+      ~(problem:problem)
+      ~(eval:Expr.t)
+      ~(generators:Type.t -> Expr.t Sequence.t)
+    : Value.t =
+    let eval_t =
+      Typecheck.typecheck_exp
+        problem.ec
+        problem.tc
+        problem.vc
+        eval
+    in
+    let (args_t,_) = extract_args eval_t in
+    let seqs =
+      List.map
+        ~f:generators
+        args_t
+    in
+    let args =
+      List.map
+        ~f:(fun seq -> fst @$ Option.value_exn (Sequence.next seq))
+        seqs
+    in
+    Eval.evaluate_with_holes ~eval_context:problem.eval_context @$
+    List.fold_left
+      ~f:Expr.mk_app
+      ~init:eval
+      args
+
+
   let implication_counter_example
       ~problem:(problem:problem)
       ~pre:(pre:Expr.t)
       ~eval:(eval:Expr.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
     : Value.t list option =
-    if Expr.is_func ~func_internals:Expr.mk_false_exp pre then
+    let desired_t = Type.mk_var "t" in
+    if Expr.is_func ~func_internals:Expr.mk_false_exp pre
+    && List.exists
+         ~f:(fun (_,t) -> is_equal @$ Type.compare t desired_t)
+         post_quants
+    then
       None
     else
-      let desired_t = Type.mk_var "t" in
       let num_checks = 100 in
       let eval_t =
         Typecheck.typecheck_exp
@@ -149,51 +183,36 @@ struct
           problem.vc
           eval
       in
-      let (args_t,result_t) = extract_args eval_t in
+      let (_,result_t) = extract_args eval_t in
       if not @$ contains_any problem.tc desired_t result_t then
         None
       else
-        let pre_args_seqs =
-          List.map
-            ~f:(fun t ->
-                let g = generator_of_type problem.tc t in
-                let seq = QC.g_to_seq g in
-                if is_equal (Type.compare desired_t t) then
-                  Sequence.filter
-                    ~f:(fun e ->
-                        let pre_e_app =
-                          Expr.mk_app
-                            pre
-                            e
-                        in
-                        let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
-                        is_equal (Value.compare v (Value.mk_ctor "True" (Value.mk_tuple []))))
-                    seq
-                else
-                  seq)
-            args_t
+        let generators
+            (t:Type.t)
+          : Expr.t Sequence.t =
+          let g = generator_of_type problem.tc t in
+          let seq = QC.g_to_seq g in
+          if is_equal (Type.compare desired_t t) then
+            Sequence.filter
+              ~f:(fun e ->
+                  let pre_e_app =
+                    Expr.mk_app
+                      pre
+                      e
+                  in
+                  let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
+                  is_equal (Value.compare v (Value.mk_ctor "True" (Value.mk_tuple []))))
+              seq
+          else
+            seq
         in
         let result_list =
           fold_until_completion
-            ~f:(fun (resultant,i,seqs) ->
+            ~f:(fun (resultant,i) ->
                 if i > num_checks then
                   Right resultant
                 else
-                  let (args,seqs) =
-                    List.fold_right
-                      ~f:(fun seq (exps_names,uf_types_seqs) ->
-                          let (exp_name,seq) = Option.value_exn (Sequence.next seq) in
-                          (exp_name::exps_names,seq::uf_types_seqs))
-                      ~init:([],[])
-                      seqs
-                  in
-                  let res =
-                    Eval.evaluate_with_holes ~eval_context:problem.eval_context @$
-                    List.fold_left
-                      ~f:Expr.mk_app
-                      ~init:eval
-                      args
-                  in
+                  let res = make_random_evaluator ~problem ~eval ~generators in
                   let split_res =
                     extract_typed_subcomponents
                       problem.tc
@@ -203,8 +222,8 @@ struct
                   in
                   let split_res_exps = List.map ~f:Value.to_exp split_res in
                   let i = i + List.length split_res in
-                  Left (split_res_exps@resultant,i,seqs))
-            ([],0,pre_args_seqs)
+                  Left (split_res_exps@resultant,i))
+            ([],0)
         in
         let result_gen = QC.of_list result_list in
         let uf_types_seqs
@@ -269,23 +288,121 @@ struct
           ce_option
 
   let true_on_examples
-      ~problem:(_:problem)
-      ~examples:(_:Value.t list)
-      ~eval:(_:Expr.t)
-      ~post:(_:UniversalFormula.t)
+      ~(problem:problem)
+      ~(examples:Value.t list)
+      ~(eval:Expr.t)
+      ~post:((post_quants,post_expr):UniversalFormula.t)
     : Value.t option =
-    failwith "TODO"
+    let num_checks = 100 in
+    if List.length examples = 0 then
+      None
+    else
+      let desired_t = Type.mk_var "t" in
+      let eval_t =
+        Typecheck.typecheck_exp
+          problem.ec
+          problem.tc
+          problem.vc
+          eval
+      in
+      let (_,result_t) = extract_args eval_t in
+      let generators
+          (t:Type.t)
+        : Expr.t Sequence.t =
+        if is_equal @$ Type.compare t desired_t then
+          QC.g_to_seq @$ QC.of_list (List.map ~f:Value.to_exp examples)
+        else
+          QC.g_to_seq @$ generator_of_type problem.tc t
+      in
+      let result_list =
+        fold_until_completion
+          ~f:(fun (resultant,i) ->
+              if i > num_checks then
+                Right resultant
+              else
+                let res = make_random_evaluator ~problem ~eval ~generators in
+                let split_res =
+                  extract_typed_subcomponents
+                    problem.tc
+                    desired_t
+                    result_t
+                    res
+                in
+                let split_res_exps = List.map ~f:Value.to_exp split_res in
+                let i = i + List.length split_res in
+                Left (split_res_exps@resultant,i))
+          ([],0)
+      in
+      let result_gen = QC.of_list result_list in
+      let uf_types_seqs
+        : (Expr.t * string * Type.t) Sequence.t list =
+        List.map
+          ~f:(fun (i,t) ->
+              let gen =
+                if is_equal (Type.compare (Type.mk_var "t") t) then
+                  result_gen
+                else
+                  generator_of_type problem.tc t
+              in
+              let seq = QC.g_to_seq gen in
+              Sequence.map
+                ~f:(fun e -> (e,i,t))
+                seq)
+          post_quants
+      in
+      let ce_option =
+        fold_until_completion
+          ~f:(fun (uf_types_seqs,i) ->
+              if i = 100 then
+                Right None
+              else
+                let (exps_names_types,uf_types_seqs) =
+                  List.fold_right
+                    ~f:(fun seq (exps_names,uf_types_seqs) ->
+                        let (exp_name,seq) = Option.value_exn (Sequence.next seq) in
+                        (exp_name::exps_names,seq::uf_types_seqs))
+                    ~init:([],[])
+                    uf_types_seqs
+                in
+                let (names_exps,exps_types) =
+                  List.unzip @$
+                  List.map
+                    ~f:(fun (exp,name,typ) -> ((name,exp),(exp,typ)))
+                    exps_names_types
+                in
+                let post_held =
+                  is_equal @$
+                  Value.compare
+                    true_val
+                    (Eval.evaluate_with_holes ~eval_context:(problem.eval_context@names_exps) post_expr)
+                in
+                if post_held then
+                  Left (uf_types_seqs,i+1)
+                else
+                  let relevant =
+                    List.filter_map
+                      ~f:(fun (e,t) ->
+                          if is_equal @$ Type.compare desired_t t then
+                            Some e
+                          else
+                            None)
+                      exps_types
+                  in
+                  Right (Some relevant))
+          (uf_types_seqs,0)
+      in
+      Option.map ~f:List.hd_exn @$
+      Option.map
+        ~f:(List.map ~f:Value.from_exp_exn)
+        ce_option
 
   let synth
       ~(problem:problem)
       ~(testbed:TestBed.t)
     : Expr.t option =
-    print_endline @$ TestBed.show testbed;
-    Myth.Consts.verbose_mode := true;
     let pos_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_true_exp)) testbed.pos_tests in
     let neg_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_false_exp)) testbed.neg_tests in
     let examples = pos_examples@neg_examples in
-    print_endline (string_of_list (string_of_pair Expr.show Expr.show) examples);
     if (List.length examples = 0) then
       Some (Expr.mk_constant_true_func (Type.mk_var "t"))
     else
