@@ -60,31 +60,44 @@ struct
       end
         i
 
-  let rec contains_any
+  module TypeSet = SetOf(Type)
+
+  let contains_any
       (tc:TypeContext.t)
       (desired_t:Type.t)
       (t:Type.t)
     : bool =
-    let contains_any_simple = contains_any tc desired_t in
-    if is_equal (Type.compare t desired_t) then
-      true
-    else
-      begin match t with
-        | Var v ->
-          begin match TypeContext.lookup tc v with
-            | Some t -> contains_any_simple t
-            | None -> false
-          end
-        | Arr (t1,t2) ->
-          contains_any_simple t1 || contains_any_simple t2
-        | Tuple ts ->
-          List.exists ~f:contains_any_simple ts
-        | Mu (i,t) ->
-          let tc = TypeContext.insert tc i t in
-          contains_any tc desired_t t
-        | Variant branches ->
-          List.exists ~f:contains_any_simple (List.map ~f:snd branches)
-      end
+    let rec contains_any
+        (tc:TypeContext.t)
+        (desired_t:Type.t)
+        (checked:TypeSet.t)
+        (t:Type.t)
+      : bool =
+      if TypeSet.member checked t then
+        false
+      else if is_equal (Type.compare t desired_t) then
+        true
+      else
+        let checked = TypeSet.insert t checked in
+        let contains_any_simple = contains_any tc desired_t checked in
+        begin match t with
+          | Var v ->
+            begin match TypeContext.lookup tc v with
+              | Some t -> contains_any_simple t
+              | None -> false
+            end
+          | Arr (t1,t2) ->
+            contains_any_simple t1 || contains_any_simple t2
+          | Tuple ts ->
+            List.exists ~f:contains_any_simple ts
+          | Mu (i,t) ->
+            let tc = TypeContext.insert tc i t in
+            contains_any tc desired_t checked t
+          | Variant branches ->
+            List.exists ~f:contains_any_simple (List.map ~f:snd branches)
+        end
+    in
+    contains_any tc desired_t TypeSet.empty t
 
   let rec extract_typed_subcomponents
       (tc:TypeContext.t)
