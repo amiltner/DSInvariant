@@ -60,7 +60,7 @@ struct
          begin match V.implication_counter_example ~problem ~pre:full_pre ~eval:eval ~post:post with
            | None ->
              Log.info (lazy ("Verified Precondition: " ^ (Expr.show synthed_pre)));
-             pre
+             full_pre
            | Some model ->
              if (List.length model <> 1) then
                failwith ("cannot do such functions yet: " ^ (string_of_list Value.show model))

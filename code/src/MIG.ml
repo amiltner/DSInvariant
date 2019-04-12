@@ -23,9 +23,12 @@ module MIGLearner(V : Verifier) = struct
       ~eval:(eval : Expr.t)
       ~positives:(positives : Value.t list)
     : ((Expr.t,Value.t) either) =
+    Log.info
+      (lazy ("Checking Satisfy Transitivity for: " ^ Expr.show eval));
     let rec helper
         (invariant : Expr.t)
       : ((Expr.t,Value.t) either) =
+      print_endline @$ Expr.show invariant;
       let (arg,invariant_internal) =
         Expr.destruct_func_exn
           invariant
@@ -59,7 +62,7 @@ module MIGLearner(V : Verifier) = struct
               ~positives:positives
           in
           Log.debug (lazy ("IND Delta: " ^ (Expr.show pre_inv))) ;
-          if is_equal @$ Expr.compare pre_inv (Expr.mk_constant_true_func problem.module_type) then
+          if is_equal @$ Expr.compare pre_inv invariant then
             Left invariant
           else
             let new_inv = Expr.and_predicates pre_inv invariant in
