@@ -158,6 +158,21 @@ let convert_decl_list_to_myth
   in
   (List.rev ds, tt)
 
+let to_myth_exp_with_problem
+    ~(problem:problem)
+    (e:Expr.t)
+  : MythLang.exp =
+  let (decls,modi,_,_) = problem.unprocessed in
+  let (_,tt) = convert_decl_list_to_myth problem.ec (decls@modi) in
+  to_myth_exp tt e
+
+let to_pretty_myth_string
+    ~(problem:problem)
+    (e:Expr.t)
+  : string =
+  let me = to_myth_exp_with_problem ~problem e in
+  Myth.Pp.pp_exp me
+
 let convert_problem_examples_type_to_myth
     (p:problem)
     (examples:(Expr.t * Expr.t) list)
