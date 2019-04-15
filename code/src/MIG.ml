@@ -8,6 +8,7 @@ module MIGLearner(V : Verifier) = struct
   let push_boundary
       ~(problem : problem)
       ~eval:(eval : Expr.t)
+      ~(eval_t : Type.t)
       ~post:(post : UniversalFormula.t)
       ~positives:(positives : Value.t list)
     : Value.t option =
@@ -15,12 +16,14 @@ module MIGLearner(V : Verifier) = struct
       ~problem
       ~examples:positives
       ~eval
+      ~eval_t
       ~post
 
   let satisfyTrans
       ~problem:(problem : problem)
       ~invariant:(invariant : Expr.t)
       ~eval:(eval : Expr.t)
+      ~eval_t:(eval_t : Type.t)
       ~positives:(positives : Value.t list)
     : ((Expr.t,Value.t) either) =
     Log.info
@@ -28,16 +31,15 @@ module MIGLearner(V : Verifier) = struct
     let rec helper
         (invariant : Expr.t)
       : ((Expr.t,Value.t) either) =
-      print_endline @$ Expr.show invariant;
-      let (arg,invariant_internal) =
-        Expr.destruct_func_exn
-          invariant
-      in
-      let post = ([arg],invariant_internal) in
+      let app_var = "x" in
+      let invariant_applied = Expr.mk_app invariant (Expr.mk_var app_var) in
+      let applied_arg = (app_var, Type.mk_var "t") in
+      let post = ([applied_arg],invariant_applied) in
       let boundary_validity =
         push_boundary
           ~problem
           ~eval
+          ~eval_t
           ~post
           ~positives
       in
@@ -58,6 +60,7 @@ module MIGLearner(V : Verifier) = struct
               ~problem
               ~pre:invariant
               ~eval
+              ~eval_t
               ~post
               ~positives:positives
           in
@@ -80,7 +83,7 @@ module MIGLearner(V : Verifier) = struct
         (positive : Value.t)
       : Expr.t =
       begin
-        Log.warn (lazy ("Restarting inference engine. Attempt "
+        Log.warn (lazy ("Restarting inference engine. Attempt was "
                         ^ (string_of_int attempt)
                         ^ ".")) ;
         learnInvariant_internal
@@ -95,6 +98,7 @@ module MIGLearner(V : Verifier) = struct
         ~problem
         ~pre:(Expr.mk_constant_true_func problem.module_type)
         ~eval:(Expr.mk_identity_func (Type.mk_var "t"))
+        ~eval_t:(Type.mk_arr (Type.mk_var "t") (Type.mk_var "t"))
         ~post:problem.post
         ~positives:positives
     in
@@ -103,11 +107,12 @@ module MIGLearner(V : Verifier) = struct
     (* or until it becomes too strong, and a positive counterexample is added *)
     let inv_or_pos =
       fold_until_right_or_list_end
-        ~f:(fun acc e ->
+        ~f:(fun acc (e,t) ->
             satisfyTrans
               ~problem
               ~invariant:acc
               ~eval:e
+              ~eval_t:t
               ~positives)
         ~init:initial_invariant
         problem.mod_vals

@@ -48,7 +48,7 @@ let product
   let list_gen
       (s:int)
     : a list option =
-    let s = if len = 0 then 0 else s / len in
+    let s = if len = 0 then 0 else s - 1 in
     let gs = List.map ~f:(fun g -> g s) gs in
     distribute_option gs
   in
@@ -65,7 +65,9 @@ let map
 let size_seq
   ()
   : int Sequence.t =
-  Quickcheck.random_sequence Quickcheck.Generator.size
+  Sequence.map
+    ~f:(( * ) 5)
+    (Quickcheck.random_sequence Quickcheck.Generator.size)
 
 let of_list
     (type a)
@@ -76,9 +78,8 @@ let of_list
     Some (List.nth_exn l i)
 
 let g_to_seq
-    (type a)
-    (g:a g)
-  : a Sequence.t =
+    (g:'a g)
+  : 'a Sequence.t =
   let size_seq = size_seq () in
   Sequence.unfold_step
     ~init:size_seq

@@ -418,7 +418,7 @@ struct
         if is_equal @$ Id.compare i i' then
           e
         else
-          Fix (i,t,replace_simple e')
+          Fix (i',t,replace_simple e')
       | Tuple es ->
         Tuple
           (List.map ~f:replace_simple es)
@@ -529,8 +529,6 @@ struct
       (e1:t)
       (e2:t)
     : t =
-    print_endline @$ show e1;
-    print_endline @$ show e2;
     mk_app (mk_app mk_and_func e1) e2
 
   let is_func
@@ -771,6 +769,21 @@ struct
       (e:Expr.t)
     : t =
     Option.value_exn (from_exp e)
+
+  let rec subvalues
+      (v:t)
+    : t list =
+    v::
+    begin match v with
+      | Func _ -> []
+      | Ctor (_,v) -> subvalues v
+      | Tuple vs -> List.concat_map ~f:subvalues vs
+    end
+
+  let strict_subvalues
+      (e:t)
+    : t list =
+    List.tl_exn (subvalues e)
 end
 
 type unprocessed_problem = Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t
@@ -778,13 +791,13 @@ type unprocessed_problem = Declaration.t list * ModuleImplementation.t * ModuleS
 
 type problem =
   {
-    module_type  : Type.t               ;
-    ec           : ExprContext.t        ;
-    tc           : TypeContext.t        ;
-    vc           : VariantContext.t     ;
-    mod_vals     : Expr.t list          ;
-    post         : UniversalFormula.t   ;
-    eval_context : (Id.t * Expr.t) list ;
-    unprocessed  : unprocessed_problem  ;
+    module_type  : Type.t                 ;
+    ec           : ExprContext.t          ;
+    tc           : TypeContext.t          ;
+    vc           : VariantContext.t       ;
+    mod_vals     : (Expr.t * Type.t) list ;
+    post         : UniversalFormula.t     ;
+    eval_context : (Id.t * Expr.t) list   ;
+    unprocessed  : unprocessed_problem    ;
   }
 [@@deriving ord, show, hash, make]

@@ -128,11 +128,12 @@ let process_full_problem
   else
     let module_vals =
       List.map
-        ~f:(fun it ->
-            List.Assoc.find_exn
+        ~f:(fun (i,t) ->
+            (List.Assoc.find_exn
               ~equal:(is_equal %% Id.compare)
               i_e
-              (fst it))
+              i
+            ,t))
         (snd mods)
     in
     let ec_sig = process_module_sig ec mods in

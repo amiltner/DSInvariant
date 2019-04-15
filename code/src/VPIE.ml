@@ -8,6 +8,7 @@ struct
       ~(problem:problem)
       ~(pre:Expr.t)
       ~(eval : Expr.t)
+      ~(eval_t : Type.t)
       ~(post : UniversalFormula.t)
       ~(positives : Value.t list)
     : Expr.t =
@@ -19,45 +20,43 @@ struct
         (Log.info (lazy ("VPIE Attempt "
                          ^ (Int.to_string attempt)
                          ^ "."));
-         (*let pos_examples = List.map ~f:(fun (v,_) -> List.hd_exn v) testbed.pos_tests in
-         let neg_examples = List.map ~f:(fun (v,_) -> List.hd_exn v) testbed.neg_tests in
-         let basic_examples =
-           List.map
-             ~f:(fun x -> match x with
-                 | IntList l -> l
-                 | _ -> failwith "nope")
+         let pos_examples = List.map ~f:(fun (v,_) -> v) testbed.pos_tests in
+         let neg_examples = List.map ~f:(fun (v,_) -> v) testbed.neg_tests in
+         let subvalues =
+           List.concat_map
+             ~f:Value.strict_subvalues
              (pos_examples@neg_examples)
          in
-         let rec sublists = function
-           | []    -> [[]]
-           | x::xs -> let ls = sublists xs in
-             (x::xs)::ls
-         in
          let all_inside_examples =
-           List.concat_map
-             ~f:sublists
-             basic_examples
+           List.filter
+             ~f:(fun e ->
+                 Typecheck.type_equiv
+                   problem.tc
+                   (Type.mk_var "t")
+                   (Typecheck.typecheck_exp problem.ec problem.tc problem.vc (Value.to_exp e)))
+             subvalues
          in
-         let _(*testbed*) =
+         let testbed =
            List.fold_left
-             ~f:(fun tb l ->
+             ~f:(fun tb e ->
                  if Option.is_some
                      (V.true_on_examples
                         ~problem
-                        ~examples:(*[V.from_value (IntList l)]*) (failwith "ah")
+                        ~examples:[e]
                         ~eval:eval
+                        ~eval_t
                         ~post:post) then
-                   TestBed.add_neg_tests ~testbed:tb [IntList l]
+                   TestBed.add_neg_test_allow_dups ~testbed:tb e
                  else
-                   TestBed.add_pos_test ~testbed:tb [IntList l]
+                   TestBed.add_pos_test_allow_dups ~testbed:tb e
               )
-             ~init:(TestBed.create_positive ~args:(List.zip_exn testbed.farg_names testbed.farg_types) ~post:testbed.post [])
+             ~init:testbed
              all_inside_examples
-           in*)
+           in
          let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed) in
          Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
          let full_pre = Expr.and_predicates pre synthed_pre in
-         begin match V.implication_counter_example ~problem ~pre:full_pre ~eval:eval ~post:post with
+         begin match V.implication_counter_example ~problem ~pre:full_pre ~eval ~eval_t ~post with
            | None ->
              Log.info (lazy ("Verified Precondition: " ^ (Expr.show synthed_pre)));
              full_pre

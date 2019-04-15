@@ -23,7 +23,6 @@ let rec evaluate
       let branch =
         begin match branch_o with
           | None ->
-            print_endline @$ Expr.show e;
             failwith ("constructor " ^ choice ^ " not matched")
           | Some b -> b
         end

@@ -67,6 +67,7 @@ let rec convert_expr : Myth.Lang.exp -> Expr.t =
 
 and convert_branch (binder : Id.t) : Myth.Lang.branch -> (Id.t * Expr.t) =
   function [@warning "-8"]
+  | ((id, None), exp) -> (id, convert_expr exp)
   | ((id, Some (Myth.Lang.PVar _id)), exp)
     -> (id, (Expr.mk_let_in _id Type.mk_unit (Expr.Var binder) (convert_expr exp)))
   | ((id, Some (Myth.Lang.PTuple _plist)), exp)

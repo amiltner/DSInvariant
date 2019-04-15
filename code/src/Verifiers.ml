@@ -8,6 +8,7 @@ sig
     problem:problem ->
     pre:Expr.t ->
     eval:Expr.t ->
+    eval_t:Type.t ->
     post:UniversalFormula.t ->
     (Value.t list) option
 
@@ -15,6 +16,7 @@ sig
     problem:problem ->
     examples:Value.t list ->
     eval:Expr.t ->
+    eval_t:Type.t ->
     post:UniversalFormula.t ->
     Value.t option
 
@@ -28,6 +30,44 @@ end
 module QuickCheckVerifier =
 struct
   let true_val : Value.t = (Value.mk_ctor "True" (Value.mk_tuple []))
+
+  module TypeToGeneratorDict =
+  struct
+    module Generators =
+    struct
+      type t = Expr.t Sequence.t
+      [@@deriving ord]
+
+      let hash _ = failwith "dont"
+      let hash_fold_t _ = failwith "don't"
+      let pp _ = failwith "don't"
+      let show _ = failwith "don't"
+    end
+    module D = DictOf(Type)(Generators)
+
+    type t = D.t * (Type.t -> Expr.t Sequence.t)
+
+    let get_val
+        ((d,fs):t)
+        (t:Type.t)
+      : t * Expr.t =
+      begin match D.lookup d t with
+        | None ->
+          let g = fs t in
+          let (v,g) = Option.value_exn (Sequence.next g) in
+          let d = D.insert d t g in
+          ((d,fs),v)
+        | Some g ->
+          let (v,g) = Option.value_exn (Sequence.next g) in
+          let d = D.insert d t g in
+          ((d,fs),v)
+      end
+
+    let create
+        (fs:(Type.t -> Expr.t Sequence.t))
+      : t =
+      (D.empty,fs)
+  end
 
   let rec generator_of_type
       (tc:TypeContext.t)
@@ -147,37 +187,30 @@ struct
   let make_random_evaluator
       ~(problem:problem)
       ~(eval:Expr.t)
-      ~(generators:Type.t -> Expr.t Sequence.t)
-    : Value.t =
-    let eval_t =
-      Typecheck.typecheck_exp
-        problem.ec
-        problem.tc
-        problem.vc
-        eval
-    in
+      ~(eval_t:Type.t)
+      ~(gen:TypeToGeneratorDict.t)
+    : Value.t * TypeToGeneratorDict.t =
     let (args_t,_) = extract_args eval_t in
-    let seqs =
-      List.map
-        ~f:generators
+    let (args,d) =
+      List.fold_right
+        ~f:(fun t (args,d) ->
+            let (d,e) = TypeToGeneratorDict.get_val d t in
+            (e::args,d))
+        ~init:([],gen)
         args_t
     in
-    let args =
-      List.map
-        ~f:(fun seq -> fst @$ Option.value_exn (Sequence.next seq))
-        seqs
-    in
-    Eval.evaluate_with_holes ~eval_context:problem.eval_context @$
-    List.fold_left
-      ~f:Expr.mk_app
-      ~init:eval
-      args
-
+    (Eval.evaluate_with_holes ~eval_context:problem.eval_context @$
+     List.fold_left
+       ~f:Expr.mk_app
+       ~init:eval
+       args
+    ,d)
 
   let implication_counter_example
       ~problem:(problem:problem)
       ~pre:(pre:Expr.t)
       ~eval:(eval:Expr.t)
+      ~(eval_t:Type.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
     : Value.t list option =
     let desired_t = Type.mk_var "t" in
@@ -189,18 +222,11 @@ struct
       None
     else
       let num_checks = 100 in
-      let eval_t =
-        Typecheck.typecheck_exp
-          problem.ec
-          problem.tc
-          problem.vc
-          eval
-      in
       let (_,result_t) = extract_args eval_t in
       if not @$ contains_any problem.tc desired_t result_t then
-        None
+        (None)
       else
-        let generators
+        (let generators
             (t:Type.t)
           : Expr.t Sequence.t =
           let g = generator_of_type problem.tc t in
@@ -218,14 +244,15 @@ struct
               seq
           else
             seq
-        in
+         in
+         let gen = TypeToGeneratorDict.create generators in
         let result_list =
           fold_until_completion
-            ~f:(fun (resultant,i) ->
+            ~f:(fun (resultant,i,gen) ->
                 if i > num_checks then
                   Right resultant
                 else
-                  let res = make_random_evaluator ~problem ~eval ~generators in
+                  let (res,gen) = make_random_evaluator ~problem ~eval ~eval_t ~gen in
                   let split_res =
                     extract_typed_subcomponents
                       problem.tc
@@ -235,8 +262,8 @@ struct
                   in
                   let split_res_exps = List.map ~f:Value.to_exp split_res in
                   let i = i + List.length split_res in
-                  Left (split_res_exps@resultant,i))
-            ([],0)
+                  Left (split_res_exps@resultant,i,gen))
+            ([],0,gen)
         in
         let result_gen = QC.of_list result_list in
         let uf_types_seqs
@@ -298,27 +325,23 @@ struct
         in
         Option.map
           ~f:(List.map ~f:Value.from_exp_exn)
-          ce_option
+          ce_option)
 
   let true_on_examples
       ~(problem:problem)
       ~(examples:Value.t list)
       ~(eval:Expr.t)
+      ~(eval_t:Type.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
     : Value.t option =
-    let num_checks = 100 in
-    if List.length examples = 0 then
+    let num_checks = 500 in
+    let desired_t = Type.mk_var "t" in
+    let (args_t,result_t) = extract_args eval_t in
+    if (List.length examples = 0
+        && List.mem ~equal:(is_equal %% Type.compare) args_t desired_t)
+    || not (contains_any problem.tc desired_t result_t) then
       None
     else
-      let desired_t = Type.mk_var "t" in
-      let eval_t =
-        Typecheck.typecheck_exp
-          problem.ec
-          problem.tc
-          problem.vc
-          eval
-      in
-      let (_,result_t) = extract_args eval_t in
       let generators
           (t:Type.t)
         : Expr.t Sequence.t =
@@ -327,13 +350,14 @@ struct
         else
           QC.g_to_seq @$ generator_of_type problem.tc t
       in
+      let gen = TypeToGeneratorDict.create generators in
       let result_list =
         fold_until_completion
-          ~f:(fun (resultant,i) ->
+          ~f:(fun (resultant,i,gen) ->
               if i > num_checks then
                 Right resultant
               else
-                let res = make_random_evaluator ~problem ~eval ~generators in
+                let (res,gen) = make_random_evaluator ~problem ~eval ~eval_t ~gen in
                 let split_res =
                   extract_typed_subcomponents
                     problem.tc
@@ -343,8 +367,8 @@ struct
                 in
                 let split_res_exps = List.map ~f:Value.to_exp split_res in
                 let i = i + List.length split_res in
-                Left (split_res_exps@resultant,i))
-          ([],0)
+                Left (split_res_exps@resultant,i,gen))
+          ([],0,gen)
       in
       let result_gen = QC.of_list result_list in
       let uf_types_seqs
@@ -428,8 +452,9 @@ struct
       in
       let env = Myth.Eval.gen_init_env decls in
       let w = Myth.Eval.gen_init_world env [Myth.Lang.EPFun examples] in
+      let desired_t = Type.mk_arr (Type.mk_var "t") (Type.mk_var "bool") in
       Option.map
-        ~f:MythToDS.convert_expr
+        ~f:((Typecheck.align_types desired_t) % MythToDS.convert_expr)
         (Myth.Synth.synthesize
            sigma
            env

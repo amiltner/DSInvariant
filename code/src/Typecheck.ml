@@ -218,3 +218,15 @@ let typecheck_formula
     ts
   else
     failwith "universal formula was not a proposition"
+
+let rec align_types
+    (t:Type.t)
+    (e:Expr.t)
+  : Expr.t =
+  begin match (t,e) with
+    | (_, Expr.Fix (i,_,e)) ->
+      Expr.mk_fix i t (align_types t e)
+    | (Type.Arr (t1,t2), Expr.Func ((i,_),e)) ->
+      Expr.mk_func (i,t1) (align_types t2 e)
+    | _ -> e
+  end
