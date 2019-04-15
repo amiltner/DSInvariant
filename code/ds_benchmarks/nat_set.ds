@@ -8,7 +8,8 @@ let not =
   fun (v : bool) ->
     match v binding i with
     | True -> False
-    | False -> True ;;
+    | False -> True
+;;
 
 let and =
   fun (b1 : bool) ->
@@ -26,6 +27,12 @@ let or =
       | False -> b2
 ;;
 
+let implies =
+  fun (b1 : bool) ->
+    fun (b2 : bool) ->
+      (or (not b1) b2)
+;;
+
 (* END_PRELUDE *)
 
 
@@ -33,10 +40,6 @@ let or =
 type nat = mu nat .
   | O
   | S of nat
-
-type list = mu list .
-  | Nil
-  | Cons of (nat * list)
 
 type cmp =
   | LT
@@ -56,9 +59,21 @@ let compare =
                 | S -> (compare x1) x2);;
 
 struct
+  type list = mu list .
+    | Nil
+    | Cons of (nat * list)
+
   type t = list
 
-  let empty = Nil;;
+  let empty = Nil ;;
+
+  let length =
+    fix (length : t -> nat) =
+      fun (l : t) ->
+        match l binding l with
+        | Nil -> O
+        | Cons -> S (length l.1)
+  ;;
 
   let lookup =
     fix (lookup : t -> nat -> bool) =
@@ -100,8 +115,11 @@ end
 sig
   type t
 
-  val lookup : t -> nat -> bool
   val empty : t
+
+  val length : t -> nat
+  val lookup : t -> nat -> bool
+
   val insert : t -> nat -> t
   val delete : t -> nat -> t
 end
@@ -110,4 +128,4 @@ maintains
 
 forall (s : t) .
   forall (i : nat) .
-    not (lookup (delete s i) i)
+    (not (lookup (delete s i) i))

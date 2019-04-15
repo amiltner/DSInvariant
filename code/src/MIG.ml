@@ -125,10 +125,11 @@ module MIGLearner(V : Verifier) = struct
   let learnInvariant
       ~unprocessed_problem:(unprocessed_problem : unprocessed_problem)
     : string =
-    let problem = ProcessFile.process_full_problem unprocessed_problem in
-    Expr.show
-      (learnInvariant_internal
-         ~problem
-         ~positives:[]
-         ~attempt:0)
+    let problem = ProcessFile.process_full_problem unprocessed_problem
+     in DSToMyth.to_pretty_myth_string
+          ~problem
+          (learnInvariant_internal
+             ~problem
+             ~positives:[]
+             ~attempt:0)
 end
