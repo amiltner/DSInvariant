@@ -29,6 +29,9 @@ end
 
 module QuickCheckVerifier =
 struct
+
+  let _NUM_CHECKS_ = 2048
+
   let true_val : Value.t = (Value.mk_ctor "True" (Value.mk_tuple []))
 
   module TypeToGeneratorDict =
@@ -221,7 +224,7 @@ struct
     then
       None
     else
-      let num_checks = 100 in
+      let num_checks = _NUM_CHECKS_ in
       let (_,result_t) = extract_args eval_t in
       if not @$ contains_any problem.tc desired_t result_t then
         (None)
@@ -334,7 +337,7 @@ struct
       ~(eval_t:Type.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
     : Value.t option =
-    let num_checks = 500 in
+    let num_checks = _NUM_CHECKS_ in
     let desired_t = Type.mk_var "t" in
     let (args_t,result_t) = extract_args eval_t in
     if (List.length examples = 0

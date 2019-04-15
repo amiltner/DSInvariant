@@ -81,9 +81,9 @@ struct
         fun (x : nat) ->
           match l binding l with
           | Nil -> False
-          | Cons -> match compare (l.0) x binding c with
+          | Cons -> match compare l.0 x binding c with
                     | EQ -> True
-                    | LT -> lookup (l.1) x
+                    | LT -> lookup l.1 x
                     | GT -> False
   ;;
 
@@ -93,7 +93,7 @@ struct
         fun (x : nat) ->
           match l binding lp with
           | Nil -> Cons (x, Nil)
-          | Cons -> (match compare x (lp.0) binding c with
+          | Cons -> (match compare x lp.0 binding c with
                      | LT -> Cons (x, l)
                      | EQ -> l
                      | GT -> Cons (lp.0, (insert lp.1 x)))
@@ -105,10 +105,30 @@ struct
         fun (x : nat) ->
           match l binding lp with
           | Nil -> Nil
-          | Cons -> (match compare x (lp.0) binding c with
+          | Cons -> (match compare x lp.0 binding c with
                      | LT -> l
                      | EQ -> lp.1
                      | GT -> Cons (lp.0, (delete lp.1 x)))
+  ;;
+
+  let union =
+    fix (union : t -> t -> t) =
+      fun (la : t) ->
+        fun (lb : t) ->
+          match la binding la with
+          | Nil -> lb
+          | Cons -> (union la.1 (insert lb la.0))
+  ;;
+
+  let inter =
+    fix (inter : t -> t -> t) =
+      fun (la : t) ->
+        fun (lb : t) ->
+          match la binding la with
+          | Nil -> Nil
+          | Cons -> (match lookup lb la.0 binding r with
+                     | True -> Cons (la.0, (inter la.1 lb))
+                     | False -> inter la.1 lb)
   ;;
 end
 :
@@ -122,10 +142,17 @@ sig
 
   val insert : t -> nat -> t
   val delete : t -> nat -> t
+
+  val union : t -> t -> t
+  val inter : t -> t -> t
 end
 
 maintains
 
 forall (s : t) .
   forall (i : nat) .
-    (not (lookup (delete s i) i))
+    forall (j : nat) .
+      (and
+        (not (lookup (delete s j) j))
+        (implies (lookup (delete s i) j)
+                 (lookup s j)))
