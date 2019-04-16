@@ -56,7 +56,8 @@ let compare =
                 | S -> LT)
         | S -> (match x2 binding x2 with
                 | O -> GT
-                | S -> (compare x1) x2);;
+                | S -> compare x1 x2)
+;;
 
 struct
   type list = mu list .
@@ -153,6 +154,6 @@ forall (s : t) .
   forall (i : nat) .
     forall (j : nat) .
       (and
-        (not (lookup (delete s j) j))
+        (not (lookup (delete s i) i))
         (implies (lookup (delete s i) j)
                  (lookup s j)))
