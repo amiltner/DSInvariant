@@ -36,7 +36,7 @@ struct
                    (Typecheck.typecheck_exp problem.ec problem.tc problem.vc (Value.to_exp e)))
              subvalues
          in
-         let testbed =
+         let temp_testbed =
            List.fold_left
              ~f:(fun tb e ->
                  if Option.is_some
@@ -53,7 +53,7 @@ struct
              ~init:testbed
              all_inside_examples
            in
-         let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed) in
+         let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed:temp_testbed) in
          Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
          let full_pre = Expr.and_predicates pre synthed_pre in
          begin match V.implication_counter_example ~problem ~pre:full_pre ~eval ~eval_t ~post with
