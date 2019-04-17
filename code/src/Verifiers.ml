@@ -192,21 +192,23 @@ struct
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
       ~(gen:TypeToGeneratorDict.t)
-    : Value.t * TypeToGeneratorDict.t =
+    : (Expr.t * Type.t) list * Value.t * TypeToGeneratorDict.t =
     let (args_t,_) = extract_args eval_t in
     let (args,d) =
       List.fold_right
         ~f:(fun t (args,d) ->
             let (d,e) = TypeToGeneratorDict.get_val d t in
-            (e::args,d))
+            ((e,t)::args,d))
         ~init:([],gen)
         args_t
     in
-    (Eval.evaluate_with_holes ~eval_context:problem.eval_context @$
-     List.fold_left
-       ~f:Expr.mk_app
-       ~init:eval
-       args
+    (args
+    ,Eval.evaluate_with_holes
+        ~eval_context:problem.eval_context
+        (List.fold_left
+           ~f:(fun acc (e,_) -> Expr.mk_app acc e)
+           ~init:eval
+           args)
     ,d)
 
   let implication_counter_example
@@ -255,7 +257,13 @@ struct
                 if i > num_checks then
                   Right resultant
                 else
-                  let (res,gen) = make_random_evaluator ~problem ~eval ~eval_t ~gen in
+                  let (args,res,gen) =
+                    make_random_evaluator
+                      ~problem
+                      ~eval
+                      ~eval_t
+                      ~gen
+                  in
                   let split_res =
                     extract_typed_subcomponents
                       problem.tc
@@ -263,25 +271,29 @@ struct
                       result_t
                       res
                   in
-                  let split_res_exps = List.map ~f:Value.to_exp split_res in
+                  let arged_split_res =
+                    List.map
+                      ~f:(fun r -> (args,Value.to_exp r))
+                      split_res
+                  in
                   let i = i + List.length split_res in
-                  Left (split_res_exps@resultant,i,gen))
+                  Left (arged_split_res@resultant,i,gen))
             ([],0,gen)
         in
         let result_gen = QC.of_list result_list in
         let uf_types_seqs
-          : (Expr.t * string * Type.t) Sequence.t list =
+          : ((Expr.t * Type.t) list * Expr.t * string * Type.t) Sequence.t list =
           List.map
             ~f:(fun (i,t) ->
                 let gen =
                   if is_equal (Type.compare (Type.mk_var "t") t) then
                     result_gen
                   else
-                    generator_of_type problem.tc t
+                    QC.map ~f:(fun g -> ([],g)) (generator_of_type problem.tc t)
                 in
                 let seq = QC.g_to_seq gen in
                 Sequence.map
-                  ~f:(fun e -> (e,i,t))
+                  ~f:(fun (ts,e) -> (ts,e,i,t))
                   seq)
             post_quants
         in
@@ -291,7 +303,7 @@ struct
                 if i = 100 then
                   Right None
                 else
-                  let (exps_names_types,uf_types_seqs) =
+                  let (args_exps_names_types,uf_types_seqs) =
                     List.fold_right
                       ~f:(fun seq (exps_names,uf_types_seqs) ->
                           let (exp_name,seq) = Option.value_exn (Sequence.next seq) in
@@ -299,12 +311,13 @@ struct
                       ~init:([],[])
                       uf_types_seqs
                   in
-                  let (names_exps,exps_types) =
+                  let (args_l,names_exps) =
                     List.unzip @$
                     List.map
-                      ~f:(fun (exp,name,typ) -> ((name,exp),(exp,typ)))
-                      exps_names_types
+                      ~f:(fun (args,exp,name,_) -> (args,(name,exp)))
+                      args_exps_names_types
                   in
+                  let args = List.concat args_l in
                   let post_held =
                     is_equal @$
                     Value.compare
@@ -321,7 +334,7 @@ struct
                               Some e
                             else
                               None)
-                        exps_types
+                        args
                     in
                     Right (Some relevant))
             (uf_types_seqs,0)
@@ -360,7 +373,7 @@ struct
               if i > num_checks then
                 Right resultant
               else
-                let (res,gen) = make_random_evaluator ~problem ~eval ~eval_t ~gen in
+                let (_,res,gen) = make_random_evaluator ~problem ~eval ~eval_t ~gen in
                 let split_res =
                   extract_typed_subcomponents
                     problem.tc
