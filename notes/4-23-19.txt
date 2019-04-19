@@ -1,0 +1,199 @@
+=======================================
+Invariants:
+=======================================
+
+I think a version of invariants I'm interested in is "single-pass" invariants --
+invariants that can be performed in one pass over the data structure.
+
+In particular, given a type mu X. T, a single-pass invariant is the following:
+
+type DA (downward accum), UA (upward accum)
+initialize :: T -> (DA,T)
+recurse :: (T -> DA -> UA) -> T -> DA -> UA
+project :: UA -> Bool
+
+Where each of initialize, recurse, and project are nonrecursive functions
+
+
+From these, an invariant is defined as:
+let invariant
+    (x:T)
+  : Bool =
+  let (da,x) = initialize x in
+  let ua = (fix recurse) x da in
+  project ua
+
+
+==========================
+Example: BST
+DA = Unit
+UA = Bool * (Nat * Nat) Option
+initialize x = (x,unit)
+recurse (recursive_f) x _ =
+  match x with
+  | Nil -> (true,None)
+  | Cons(l,x,r) ->
+    let (lb,lro) = recursive_f l () in
+    let (rb,rro) = recursive_f r () in
+    match (lro,rro) with
+    | (Some (ll,rl), Some (lr,rr)) ->
+      (lb && rb && rl < x && lr > x
+      ,Some (ll,rr))
+    | (Some (ll,rl), None)) ->
+      (lb && rb && rl < x
+      ,Some (ll,x))
+    | (None, Some (lr,rr)) ->
+      (lb && rb && lr > x
+      ,Some (x,rr))
+    | (None, None) ->
+      (lb && rb, Some (x,x))
+    end
+  end
+project (b,ro) = b
+==========================
+Example: Ordered List
+DA = Nat
+UA = Bool
+initialize x = match x with | Nil -> (Z,Nil) | Cons (h,t) -> (h,t) end
+recurse (recursive_f) x pre =
+  match x with
+  | Nil -> (true,None)
+  | Cons(h,t) ->
+    x > pre && recursive_f h t
+  end
+project b = b
+==========================
+
+A simple single-pass invariant is a single-pass invariant where DA is Unit.
+I think one could turn all single-pass invariants into simple single-pass
+invariants, but sometimes at the cost of simplicity.
+
+
+==========================
+Example (ordered list)
+DA = unit
+UA = Nat Option * Bool
+initialize x = (x,unit)
+recurse (recursive_f) x _ =
+  match x with
+  | Nil -> (true,None)
+  | Cons(h,t) ->
+    match recursive_f t with
+    | (None,b) -> (Some h, b)
+    | (Some x, b) -> (Some h, x < h && b)
+    end
+  end
+project (_,b) = b
+==========================
+
+Here's some other invariant accums using simple single-pass
+
+==========================
+Example (tree heap)
+DA = unit
+UA = Int Option * Bool
+
+OR
+
+DA = Int
+UA = Bool
+==========================
+
+
+==========================
+Example (red-black set)
+DA = unit
+UA = Int Option * Int Option * Int Option * Bool Option * Bool
+
+OR
+
+DA = Bool
+UA = Int Option * Int Option * Int Option * Bool
+==========================
+
+
+==========================
+Example (fibonacci heap)
+DA = unit
+UA = Bool
+
+BUT this has the additional complexity that there are two recursive types in it:
+one recursive type for the list, and one recursive type for the trees within the
+list, how is the correct way to do this?
+==========================
+
+
+
+Questions:
+What is a good way to synthesize these, from input-output examples on the final
+"invariant" program?
+How to handle mutually recursive types / nested recursive types
+
+
+
+
+=======================================
+Theorems:
+=======================================
+
+
+Let A be assertions of the form
+forall (x_1 : t_1) ... forall (x_n : t_n) phi(x_1,...,x_n), where
+x_1 : t_1 , ... , x_n : t_n |- phi(x_1,...,x_n) : bool
+
+An assertion is valid if there are no x_1 ... x_n such that -phi(x_1,...,x_n)
+An assertion is not valid if there exists some x_1 ... x_n such that -phi(x_1,...,x_n)
+
+A verifier is a function
+Verify :: A -> model option
+
+A verifier is sound if:
+for all assertions a, if a is not valid
+then Verify(a) will return some x_1 ... x_n such that -phi(x_1',...,x_n')
+
+A verifier is complete if:
+for all assertions a, if a is valid
+then Verify(a) will return None
+
+
+
+
+A synthesizer is a function
+Synthesize :: (L -> A) -> L option
+
+A synthesizer is sound if, given a function f from the language to A
+if there does not exists a function l such that f(l) is satisfiable,
+Synthesize(f) will return None.
+
+A synthesizer is complete if, given a function f from the language to A
+if there exists a function l such that f(l) is satisfiable,
+Synthesize(f) will satisfy such a function.
+
+
+
+
+
+LoopInvGen :: Synthesizer -> Verifier -> Module -> A -> L option
+
+LoopInvGen S V is complete if, given a module m and an assertion a, if there is an
+function that is invariant on m, and that proves a, then LoopInvGen m a will
+return such an invariant.
+
+(* What's the proper name for this *)
+LoopInvGen S V is kinda sound if, given a module m and an assertion a, if there is no
+function that is invariant on m, and that proves a, then LoopInvGen m a will
+not return an invariant.
+
+LoopInvGen S V is sound if, given a module m and an assertion a, if there is no
+function that is invariant on m, and that proves a, then LoopInvGen m a will
+return None.
+
+
+
+Theorem: If S and V are complete, then LoopInvGen is complete
+Theorem: If S and V are sound, then LoopInvGen is kinda sound
+
+
+
+
+

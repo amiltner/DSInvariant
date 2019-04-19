@@ -127,8 +127,13 @@ so does the algorithm if there is such an invariant
 
 Enumerate templates ---> get data on what types of templates are needed in benchmarks + practice
                     ---> look at the actual data type definition to get ideas on the template
+
 Doing multiple synthesis / invariant generation in parallel ---> get multiples sampels of examples / invariants
+
 Multiple types, having two of the same value, how do we focus on the various things
 Small model hypothesis ---> have a bounded, enumerative check on all the things up to a certain size
+
 Related work ---> Lyon paper + forward references
+
 Could we actually plug this into coq in some way? ---> next steps, big delta
+
