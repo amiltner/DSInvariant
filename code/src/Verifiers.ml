@@ -4,6 +4,11 @@ open Lang
 
 module type Verifier =
 sig
+  val equiv_false :
+    problem:problem ->
+    cond:Expr.t ->
+    bool
+
   val implication_counter_example :
     problem:problem ->
     pre:Expr.t ->
@@ -211,6 +216,38 @@ struct
            args)
     ,d)
 
+  let equiv_false
+      ~(problem:problem)
+      ~cond:(cond:Expr.t)
+    : bool =
+    let num_checks = _NUM_CHECKS_ in
+    let cond_t = Type.mk_arr Type.mk_t_var Type.mk_bool_var in
+    let generators
+        (t:Type.t)
+      : Expr.t Sequence.t =
+       let g = generator_of_type problem.tc t in
+       QC.g_to_seq g
+     in
+     let gen = TypeToGeneratorDict.create generators in
+     fold_until_completion
+       ~f:(fun (i,gen) ->
+           if i > num_checks then
+             Right true
+           else
+             let (_,res,gen) =
+               make_random_evaluator
+                 ~problem
+                 ~eval:cond
+                 ~eval_t:cond_t
+                 ~gen
+             in
+             if is_equal @$ Value.compare res Value.mk_true then
+               Right false
+             else
+               Left (i+1,gen))
+       (0,gen)
+
+
   let implication_counter_example
       ~problem:(problem:problem)
       ~pre:(pre:Expr.t)
@@ -219,12 +256,15 @@ struct
       ~post:((post_quants,post_expr):UniversalFormula.t)
     : Value.t list option =
     let desired_t = Type.mk_var "t" in
-    if Expr.is_func ~func_internals:Expr.mk_false_exp pre
+    if equiv_false ~problem ~cond:pre
     && List.exists
          ~f:(fun (_,t) -> is_equal @$ Type.compare t desired_t)
          post_quants
     then
-      None
+      begin
+        print_endline "SKIP OUT FAST";
+        None
+      end
     else
       let num_checks = _NUM_CHECKS_ in
       let (_,result_t) = extract_args eval_t in
@@ -449,36 +489,239 @@ struct
         ~f:(List.map ~f:Value.from_exp_exn)
         ce_option
 
+  let convert_foldable_to_full
+      (tc:TypeContext.t)
+      (fold_completion:Type.t)
+    : Expr.t =
+    let convert_internal_id = "convert'" in
+    let convert_internal_exp = Expr.mk_var convert_internal_id in
+    let rec convert_foldable_internal
+        (i:Id.t)
+        (t:Type.t)
+        (incoming_exp:Expr.t)
+      : Expr.t =
+      begin match t with
+        | Var i' ->
+          if is_equal @$ Id.compare i i' then
+            Expr.mk_app
+              convert_internal_exp
+              incoming_exp
+          else
+            incoming_exp
+        | Tuple ts ->
+          Expr.mk_tuple
+            (List.mapi
+               ~f:(fun num t ->
+                   convert_foldable_internal
+                     i
+                     t
+                     (Expr.mk_proj num incoming_exp))
+               ts)
+        | Variant branches ->
+          Expr.mk_match
+            incoming_exp
+            "x"
+            (List.map
+               ~f:(fun (b,t) ->
+                   (b,Expr.mk_ctor
+                      (Id.mk_prime b)
+                      (convert_foldable_internal
+                         i
+                         t
+                         (Expr.mk_var "x"))))
+               branches)
+        | Mu _
+        | Arr _ ->
+          incoming_exp
+      end
+    in
+    let t = TypeContext.lookup_exn tc "t" in
+    let tv = Type.destruct_id_exn t in
+    let t = TypeContext.lookup_exn tc tv in
+    let ito = Type.destruct_mu t in
+    let t' = Type.mk_var (Id.mk_prime "t") in
+    begin match ito with
+      | None ->
+        Expr.mk_func
+          ("x",Type.mk_arr t' t')
+          (Expr.mk_var "x")
+      | Some (i,t_internal) ->
+        Expr.mk_func
+          ("f",Type.mk_arr
+             t'
+             fold_completion)
+          (Expr.mk_fix
+             convert_internal_id
+             (Type.mk_arr Type.mk_t_var fold_completion)
+             (Expr.mk_func
+                ("x",Type.mk_t_var)
+                (Expr.mk_app
+                   (Expr.mk_var "f")
+                   (convert_foldable_internal
+                      i
+                      t_internal
+                      (Expr.mk_var "x")))))
+    end
+
+
+  let get_foldable_t
+      (tc:TypeContext.t)
+      (fold_completion:Type.t)
+    : Type.t =
+    let rec type_to_folded_type_internal
+        (i:Id.t)
+        (t:Type.t)
+      : Type.t =
+      begin match t with
+        | Var i' ->
+          if is_equal @$ Id.compare i i' then
+            fold_completion
+          else
+            t
+        | Tuple ts ->
+          Tuple (List.map ~f:(type_to_folded_type_internal i) ts)
+        | Variant branches ->
+          Variant
+            (List.map
+               ~f:(fun (b,t) ->
+                   (Id.mk_prime b
+                   ,type_to_folded_type_internal i t))
+               branches)
+        | Arr _ | Mu _ -> t
+      end
+    in
+    let t = TypeContext.lookup_exn tc "t" in
+    let tv = Type.destruct_id_exn t in
+    let t = TypeContext.lookup_exn tc tv in
+    let ito = Type.destruct_mu t in
+    begin match ito with
+      | None -> t
+      | Some (i,t) ->
+        type_to_folded_type_internal i t
+    end
+
   let synth
       ~(problem:problem)
       ~(testbed:TestBed.t)
     : Expr.t option =
+    let acc_type = Type.mk_var "natoption" in
+    let end_type = Type.mk_tuple [Type.mk_bool_var;acc_type] in
     let pos_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_true_exp)) testbed.pos_tests in
     let neg_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_false_exp)) testbed.neg_tests in
     let examples = pos_examples@neg_examples in
+    let (decls,_,_,_) =
+      DSToMyth.convert_problem_examples_type_to_myth
+        problem
+        examples
+        None
+    in
+    let (_,gamma) =
+      Myth_folds.Typecheck.Typecheck.check_decls
+        Myth_folds.Sigma.Sigma.empty
+        Myth_folds.Gamma.Gamma.empty
+        decls
+    in
+    let foldable_t = get_foldable_t problem.tc end_type in
+    let fold_creater =
+      convert_foldable_to_full
+        problem.tc
+        end_type
+    in
+    let (ds,mi,ms,uf) = problem.unprocessed in
+    let unprocessed =
+      (ds
+      ,mi@[Declaration.type_dec (Id.mk_prime "t") foldable_t
+          ;Declaration.expr_dec "convert" fold_creater]
+      ,ms
+      ,uf)
+    in
+    let problem = ProcessFile.process_full_problem unprocessed in
     if (List.length examples = 0) then
       Some (Expr.mk_constant_true_func (Type.mk_var "t"))
     else
-      let (decls,examples,t) = DSToMyth.convert_problem_examples_type_to_myth problem examples in
-      let (sigma,gamma) =
-        Myth.Typecheck.Typecheck.check_decls
-          Myth.Sigma.Sigma.empty
-          Myth.Gamma.Gamma.empty
+      let (decls,myth_examples,t,end_type_myth) =
+        DSToMyth.convert_problem_examples_type_to_myth
+          problem
+          examples
+          (Some end_type)
+      in
+      let (sigma,_) =
+        Myth_folds.Typecheck.Typecheck.check_decls
+          Myth_folds.Sigma.Sigma.empty
+          Myth_folds.Gamma.Gamma.empty
           decls
       in
-      let env = Myth.Eval.gen_init_env decls in
-      let w = Myth.Eval.gen_init_world env [Myth.Lang.EPFun examples] in
-      let desired_t = Type.mk_arr (Type.mk_var "t") (Type.mk_var "bool") in
+      let env = Myth_folds.Eval.gen_init_env decls in
+      let desired_t =
+        Type.mk_arr
+          (Type.mk_var "t")
+          (Type.mk_var "bool")
+      in
+      let correct_check =
+        fun e ->
+              (*print_endline @$ Myth_folds.Pp.pp_exp e;*)
+              let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
+              let corrects =
+                List.map
+                  ~f:(fun (e1,e2) ->
+                      try
+                        let ans =
+                          Myth_folds.Eval.eval
+                            env
+                            (Myth_folds.Lang.EProj
+                               (1
+                               ,Myth_folds.Lang.EApp(evaler,e1)))
+                        in
+                        if ans = Myth_folds.Eval.eval env e2 then
+                          1
+                        else
+                          0
+                      with
+                        Myth_folds.Eval.Eval_error _ -> 0)
+                  myth_examples
+              in
+              let total_correct = List.fold_left ~f:(+) ~init:0 corrects in
+              let total = List.length corrects in
+              (*print_endline (Float.to_string ((Float.of_int total_correct) /. (Float.of_int total)));*)
+              (Float.of_int total_correct) /. (Float.of_int total)
+      in
+      let _ =
+        fun e ->
+          let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
+          List.map
+            ~f:(fun (input,_) ->
+                try
+                  Left
+                    (Myth_folds.Eval.eval
+                       env
+                       (Myth_folds.Lang.EProj
+                          (1
+                          ,Myth_folds.Lang.EApp(evaler,input))))
+                with
+                  Myth_folds.Eval.Eval_error _ -> Right ())
+            myth_examples
+      in
+      let _ = compare_list ~cmp:(compare_either Myth_folds.Lang.compare_exp Unit.compare) in
       Option.map
-        ~f:((Typecheck.align_types desired_t) % MythToDS.convert_expr)
-        (Myth.Synth.synthesize
+        ~f:(fun me ->
+            let e = MythToDS.convert_expr me in
+            let e = Typecheck.align_types desired_t e in
+            let full_e = Expr.mk_app fold_creater e in
+            Expr.mk_func
+              ("x",Type.mk_t_var)
+              (Expr.mk_proj 0
+                 (Expr.mk_app full_e (Expr.mk_var "x"))))
+        (Myth_folds.Synth.synthesize
            sigma
            env
-           (Myth.Rtree.create_rtree
+           (Myth_folds.Rtree.create_rtree
               sigma
               gamma
               env
-              (TArr (t,TBase "bool")) w 0))
+              (TArr (t,end_type_myth))
+              0)
+           correct_check
+           )
 end
 
 let quickcheck_verifier = (module QuickCheckVerifier : Verifier)

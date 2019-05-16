@@ -750,6 +750,20 @@ let split_at_index_exn (l:'a list) (i:int) : 'a list * 'a list =
   else
     split_at_index_exn_internal l i (fun x -> x)
 
+let rec remove_at_index_exn
+    (l:'a list)
+    (i:int)
+  : 'a * 'a list =
+  begin match l with
+    | [] -> failwith "bad index"
+    | h::t ->
+      if i = 0 then
+        (h,t)
+      else
+        let (x,t) = remove_at_index_exn t (i-1) in
+        (x,h::t)
+  end
+
 let fold_on_head_exn ~f:(f:'a -> 'a -> 'a) (l:'a list) : 'a =
   let (h,t) = split_by_first_exn l in
   List.fold_left

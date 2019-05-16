@@ -18,7 +18,7 @@ struct
       (Log.info (lazy ("VPIE Attempt "
                        ^ (Int.to_string attempt)
                        ^ "."));
-       let pos_examples = List.map ~f:(fun (v,_) -> v) testbed.pos_tests in
+       (*let pos_examples = List.map ~f:(fun (v,_) -> v) testbed.pos_tests in
        let neg_examples = List.map ~f:(fun (v,_) -> v) testbed.neg_tests in
        let subvalues =
          List.concat_map
@@ -50,8 +50,8 @@ struct
              )
            ~init:testbed
            all_inside_examples
-       in
-       let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed:testbed_temp) in
+         in*)
+       let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed:testbed) in
        Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
        let full_pre = Expr.and_predicates pre synthed_pre in
        let model_o =
@@ -78,11 +78,13 @@ struct
            if (List.length model <> 1) then
              failwith ("cannot do such functions yet: " ^ (string_of_list Value.show model))
            else
+             let new_neg_example = List.hd_exn model in
+             Log.info (lazy ("Add negative example: " ^ (Value.show new_neg_example)));
              helper
                (attempt+1)
                (TestBed.add_neg_test_disallow_dups
                   ~testbed
-                  (List.hd_exn model))
+                  new_neg_example)
        end)
     in
     helper 0 testbed
@@ -136,6 +138,7 @@ struct
            ~init:testbed
            all_inside_examples
        in
+       print_endline (TestBed.show testbed);
        let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed:testbed) in
        Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
        let full_pre = Expr.and_predicates pre synthed_pre in
@@ -155,11 +158,13 @@ struct
            if (List.length model <> 1) then
              failwith ("cannot do such functions yet: " ^ (string_of_list Value.show model))
            else
+             let new_neg_example = List.hd_exn model in
+             Log.info (lazy ("Add negative example: " ^ (Value.show new_neg_example)));
              helper
                (attempt+1)
                (TestBed.add_neg_test_disallow_dups
                   ~testbed
-                  (List.hd_exn model))
+                  new_neg_example)
        end)
     in
     helper 0 testbed

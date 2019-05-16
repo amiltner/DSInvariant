@@ -4,6 +4,9 @@ type bool =
   | True
   | False
 
+let true = True;;
+let false = False;;
+
 let not =
   fun (v : bool) ->
     match v binding i with
@@ -40,6 +43,17 @@ let implies =
 type nat = mu nat .
   | O
   | S of nat
+
+let zero = O;;
+let succ = fun (x:nat) -> S x;;
+
+type natoption =
+  | None
+  | Some of nat
+
+let none = None ;;
+
+let some = fun (x:nat) -> Some x;;
 
 type cmp =
   | LT
@@ -144,8 +158,8 @@ sig
   val insert : t -> nat -> t
   val delete : t -> nat -> t
 
-  val union : t -> t -> t
-  val inter : t -> t -> t
+  (*val union : t -> t -> t
+  val inter : t -> t -> t*)
 end
 
 maintains

@@ -2,7 +2,7 @@ open MyStdlib
 open Lang
 
 module IdSet = SetOf(Id)
-module MythLang = Myth.Lang
+module MythLang = Myth_folds.Lang
 module TypeToType = DictOf(Type)(MythLang.Type)
 
 let merge_tis tt1 tt2 =
@@ -171,12 +171,16 @@ let to_pretty_myth_string
     (e:Expr.t)
   : string =
   let me = to_myth_exp_with_problem ~problem e in
-  Myth.Pp.pp_exp me
+  Myth_folds.Pp.pp_exp me
 
 let convert_problem_examples_type_to_myth
     (p:problem)
     (examples:(Expr.t * Expr.t) list)
-  : MythLang.decl list * (MythLang.exp * MythLang.exp) list * MythLang.typ =
+    (end_type_option:Type.t option)
+  : MythLang.decl list
+             * (MythLang.exp * MythLang.exp) list
+             * MythLang.typ
+             * MythLang.typ =
   let (decls,modi,_,_) = p.unprocessed in
   let (ds,tt) = convert_decl_list_to_myth p.ec (decls@modi) in
   let examples =
@@ -184,5 +188,13 @@ let convert_problem_examples_type_to_myth
       ~f:(fun (e1,e2) -> (to_myth_exp tt e1, to_myth_exp tt e2))
       examples
   in
-  let t = to_myth_type_basic tt (Type.mk_var "t") in
-  (ds,examples,t)
+  let (t,t_end) =
+    begin match end_type_option with
+      | None ->
+        (MythLang.TBase "x",MythLang.TBase "x")
+      | Some te ->
+        (to_myth_type_basic tt (Type.mk_var "t'")
+        ,to_myth_type_basic tt te)
+    end
+  in
+  (ds,examples,t,t_end)

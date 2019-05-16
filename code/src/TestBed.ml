@@ -38,6 +38,7 @@ let compute_feature_vector (test : 'a) (features : 'a feature with_desc list)
   [@@inline always]
 
 let create_positive ?(features = []) pos_tests : t =
+  if List.length (List.dedup_and_sort ~compare:Value.compare pos_tests) <> List.length pos_tests then failwith "bad pos set";
   { features
   ; pos_tests = List.map pos_tests ~f:(fun t -> (t, lazy (compute_feature_vector t features)))
   ; neg_tests = []
