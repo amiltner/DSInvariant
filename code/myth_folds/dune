@@ -1,0 +1,9 @@
+(menhir (modules parser))
+
+(ocamllex lexer)
+
+(library
+    (name Myth_folds)
+    (public_name Myth_folds)
+    (libraries core str oUnit MyStdlib)
+    (preprocess (pps ppx_hash ppx_deriving.std ppx_optcomp ppx_compare ppx_sexp_conv)))

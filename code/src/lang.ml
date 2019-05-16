@@ -4,6 +4,8 @@ module Id =
 struct
   type t = string
   [@@deriving ord, show, hash]
+
+  let mk_prime (x:t) : t = x ^ "'"
 end
 
 module Type =
@@ -91,6 +93,12 @@ struct
     : t -> Id.t option =
     id_apply ~f:ident
 
+  let destruct_id_exn
+    (x:t)
+    : Id.t =
+    Option.value_exn
+      (destruct_id x)
+
   let mk_variant
       (vs:(Id.t * t) list)
     : t =
@@ -139,7 +147,30 @@ struct
     : t list =
     Option.value_exn (destruct_tuple t)
 
+  let mu_apply
+      (type a)
+      ~(f:Id.t -> t -> a)
+      (ty:t)
+    : a option =
+    begin match ty with
+      | Mu (i,t)-> Some (f i t)
+      | _ -> None
+    end
+
+  let destruct_mu
+    : t -> (Id.t * t) option =
+    mu_apply ~f:(fun i t -> (i,t))
+
+  let destruct_mu_exn
+      (t:t)
+    : Id.t * t =
+    Option.value_exn (destruct_mu t)
+
   let mk_unit : t = mk_tuple []
+
+  let mk_t_var : t = mk_var "t"
+
+  let mk_bool_var : t = mk_var "bool"
 end
 
 module Arg =
@@ -722,6 +753,8 @@ struct
       (v:t)
     : t list =
     Option.value_exn (destruct_tuple v)
+
+  let mk_true : t = mk_ctor "True" (mk_tuple [])
 
   let rec fold
       ~(func_f:Arg.t -> Expr.t -> 'a)

@@ -23,7 +23,7 @@ let indented_sep (indent : int) = "\n" ^ (String.make (42 + indent) ' ')
   let fatal lstr = if !enabled > 0 then do_log `Fatal lstr
   let error lstr = if !enabled > 1 then do_log `Error lstr
   let warn  lstr = if !enabled > 2 then do_log `Warn lstr
-  let info  lstr = if !enabled > 3 then do_log `Info lstr
+  let info  lstr = print_endline (Lazy.force lstr); if !enabled > 3 then do_log `Info lstr
   let debug lstr = if !enabled > 4 then do_log `Debug lstr
 
   let disable () = enabled := 0
