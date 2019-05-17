@@ -1,9 +1,8 @@
 open Base
-open Verifiers
 
 type var = string * Type.t
 
-type 'a func = verifier:(module Verifier) -> 'a -> 'a -> 'a
+type 'a func = verifier:(module Verifier.t) -> 'a -> 'a -> 'a
 
 type 'a t = {
   precond_func    : 'a func ;
