@@ -1,8 +1,7 @@
 open MyStdlib
-open Verifiers
 open Lang
 
-module Make(V : Verifier) =
+module Make(V : Verifier.t) =
 struct
   let learnVPreCondAll
       ~(problem : problem)

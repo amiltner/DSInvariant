@@ -2,39 +2,8 @@ open MyStdlib
 open Utils
 open Lang
 
-module type Verifier =
-sig
-  val equiv_false :
-    problem:problem ->
-    cond:Expr.t ->
-    bool
-
-  val implication_counter_example :
-    problem:problem ->
-    pre:Expr.t ->
-    eval:Expr.t ->
-    eval_t:Type.t ->
-    post:UniversalFormula.t ->
-    (Value.t list) option
-
-  val true_on_examples :
-    problem:problem ->
-    examples:Value.t list ->
-    eval:Expr.t ->
-    eval_t:Type.t ->
-    post:UniversalFormula.t ->
-    Value.t option
-
-  val synth :
-    problem:problem ->
-    testbed:TestBed.t ->
-    Expr.t option
-end
-
-
-module QuickCheckVerifier =
+module T : Verifier.t =
 struct
-
   let _NUM_CHECKS_ = 2048
 
   let true_val : Value.t = (Value.mk_ctor "True" (Value.mk_tuple []))
@@ -192,13 +161,16 @@ struct
       | _ -> ([],t)
     end
 
-  let make_random_evaluator
+  let make_evaluators_upto_size
+      ~(size:int)
       ~(problem:problem)
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
       ~(gen:TypeToGeneratorDict.t)
-    : (Expr.t * Type.t) list * Value.t * TypeToGeneratorDict.t =
-    let (args_t,_) = extract_args eval_t in
+    : ((Expr.t * Type.t) list * Value.t) list =
+    (* Eagerly returning all expressions till size "size" ... *)
+    raise (Exceptions.Internal_Exn "NOT IMPLEMENTED")
+    (* let (args_t,_) = extract_args eval_t in
     let (args,d) =
       List.fold_right
         ~f:(fun t (args,d) ->
@@ -214,13 +186,12 @@ struct
            ~f:(fun acc (e,_) -> Expr.mk_app acc e)
            ~init:eval
            args)
-    ,d)
+    ,d) *)
 
   let equiv_false
       ~(problem:problem)
       ~cond:(cond:Expr.t)
     : bool =
-    let num_checks = _NUM_CHECKS_ in
     let cond_t = Type.mk_arr Type.mk_t_var Type.mk_bool_var in
     let generators
         (t:Type.t)
@@ -228,8 +199,17 @@ struct
        let g = generator_of_type problem.tc t in
        QC.g_to_seq g
      in
-     let gen = TypeToGeneratorDict.create generators in
-     fold_until_completion
+     let gen = TypeToGeneratorDict.create generators
+      in try List.fold (make_evaluators_upto_size ~size:_NUM_CHECKS_
+                                                  ~problem
+                                                  ~eval:cond
+                                                  ~eval_t:cond_t
+                                                  ~gen)
+                        ~init:true
+                        ~f:(fun _ (_,res) -> if is_equal @$ Value.compare res Value.mk_true
+                                             then true else raise Caml.Exit)
+         with Caml.Exit -> false
+     (* fold_until_completion
        ~f:(fun (i,gen) ->
            if i > num_checks then
              Right true
@@ -245,8 +225,7 @@ struct
                Right false
              else
                Left (i+1,gen))
-       (0,gen)
-
+       (0,gen) *)
 
   let implication_counter_example
       ~problem:(problem:problem)
@@ -563,7 +542,6 @@ struct
                       (Expr.mk_var "x")))))
     end
 
-
   let get_foldable_t
       (tc:TypeContext.t)
       (fold_completion:Type.t)
@@ -723,5 +701,3 @@ struct
            correct_check
            )
 end
-
-let quickcheck_verifier = (module QuickCheckVerifier : Verifier)
