@@ -81,6 +81,9 @@ module Type = struct
   [@@deriving ord, show, hash]
 end
 
+let compare_val (v1:value) (v2:value) : int =
+  compare v1 v2
+
 let compare_exp (e1:exp) (e2:exp) : int =
   compare e1 e2
 

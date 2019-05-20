@@ -78,7 +78,7 @@ let rec eval (env:env) (e:exp) : value =
   | Some ans -> ans
   | None ->
       let ans = begin match e with
-      | EVar x -> List.Assoc.find_exn ~equal:String.equal env x
+        | EVar x -> if Option.is_none (List.Assoc.find ~equal:String.equal env x) then print_endline ("HERE IT IS " ^ x); List.Assoc.find_exn ~equal:String.equal env x
       | EApp (e1, e2) ->
             let (v1, v2) = (eval env e1, eval env e2) in
             begin match v1 with

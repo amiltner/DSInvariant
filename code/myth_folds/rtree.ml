@@ -9,6 +9,27 @@ module Rope = MyRope
 open Util
 
 (***** Type definitions {{{ *****)
+type output = (value option) list
+let output_comparer = List.compare (Option.compare Myth_folds.Lang.compare_val)
+let pp_output = List.to_string ~f:(MyStdlib.string_of_option Pp.pp_value)
+
+let deduper
+    (type a)
+    (to_output:a -> output)
+    (xs:a list)
+  : a list =
+  let es_outputs =
+    List.map
+      ~f:(fun x -> (x,to_output x))
+      xs
+  in
+  List.map
+    ~f:fst
+    (List.dedup_and_sort
+       ~compare:(fun (_,e1) (_,e2) -> output_comparer e1 e2)
+       es_outputs)
+
+(* output: partial program outputs *)
 
 (* rtree: A single node of a refinement tree.                                             *)
 type rtree =
@@ -21,6 +42,7 @@ type rtree =
   ; mutable matches   : (rmatch list) option  (* Generated using IRefine-match rule.      *)
   ; mutable scrutinee_size : int          (* The size of scrutinees for matches.          *)
   ; forced_match      : bool              (* Generated using IRefine-match rule.      *)
+  ; matches_permitted : bool
   }
 
 and rnode =
@@ -133,6 +155,7 @@ let rec create_rtree
     (env:env)
     (t:typ)
     (matches_count:int)
+    (matches_permitted:bool)
   : rtree =
   begin match Gamma.peel_nonrecursive_variant g s with
     | None ->
@@ -141,11 +164,12 @@ let rec create_rtree
       ; g         = g
       ; es        = []
       ; timed_out = false
-      ; matches   = if matches_count <= 0 then None
+      ; matches   = if not matches_permitted || matches_count <= 0 then None
           else Some (create_matches s g env t matches_count 1 !scrutinee_size_lim)
       ; refinements  = create_non_matches s g env t matches_count
       ; scrutinee_size = !scrutinee_size_lim
       ; forced_match = false
+      ; matches_permitted = matches_permitted
       }
     | Some ((e,_),g) ->
       let m = Option.value_exn (create_match s g env t e matches_count) in
@@ -158,6 +182,7 @@ let rec create_rtree
       ; refinements  = []
       ; scrutinee_size = !scrutinee_size_lim
       ; forced_match = true
+      ; matches_permitted = matches_permitted
       }
   end
 
@@ -205,7 +230,7 @@ and create_match
     (* Every branch must have one example.                                                *)
     let branches = distribute_constraints s g e in
     let trees = List.map ~f:(fun (_, p, g) ->
-      (p, create_rtree s g env t (matches-1))) branches
+      (p, create_rtree s g env t (matches-1) true)) branches
     in
   Some (e, trees) 
 
@@ -254,12 +279,12 @@ and create_non_matches (s:Sigma.t) (g:Gamma.t) (env:env) (t:typ)
     let f  = Gamma.fresh_id (gen_var_base t ) g in
     let x  = Gamma.fresh_id (gen_var_base t1) (Gamma.insert f t true g) in
     let g  = Gamma.insert x t1 true g in
-    [SAbs (f, (x, t1), t2, create_rtree s g env t2 matches)]
+    [SAbs (f, (x, t1), t2, create_rtree s g env t2 matches true)]
 
   (* Refine tuples *)
   | TTuple ts ->
       let trees =
-        List.map ~f:(fun t -> create_rtree s g env t matches) ts
+        List.map ~f:(fun t -> create_rtree s g env t matches false) ts
       in
       [STuple trees]
 
@@ -270,16 +295,17 @@ and create_non_matches (s:Sigma.t) (g:Gamma.t) (env:env) (t:typ)
 
 (* Grows the given refinement tree by one level of matches. *)
 let rec grow_matches (s:Sigma.t) (env:env) (t:rtree) =
-  begin match t.matches with
-  | None ->
-      let ms = create_matches s t.g env t.t 1 1 !scrutinee_size_lim in
-      t.matches <- Some (ms);
-      t.scrutinee_size <- !scrutinee_size_lim
-  | Some ms ->
-      List.iter
-        ~f:(fun (_, bs) -> List.iter ~f:(fun (_, t) -> grow_matches s env t) bs)
-        ms
-  end;
+  if t.matches_permitted then
+    begin match t.matches with
+      | None ->
+        let ms = create_matches s t.g env t.t 1 1 !scrutinee_size_lim in
+        t.matches <- Some (ms);
+        t.scrutinee_size <- !scrutinee_size_lim
+      | Some ms ->
+        List.iter
+          ~f:(fun (_, bs) -> List.iter ~f:(fun (_, t) -> grow_matches s env t) bs)
+          ms
+    end;
   List.iter ~f:(grow_matches_rnode s env) t.refinements
 
 and grow_matches_rnode (s:Sigma.t) (env:env) (n:rnode) =
@@ -431,19 +457,19 @@ and reset_timeouts_refinements (n:rnode) =
 let select_tops
     (es:'a list)
     (ranking:'a -> Float.t)
-  : 'a list * Float.t =
+  : ('a list * Float.t) option =
   let e_rank = List.map ~f:(fun e -> (e,ranking e)) es in
   let sorted_e_rank = List.sort ~compare:(fun (_,f1) (_,f2) -> Float.compare f2 f1) e_rank in
   begin match sorted_e_rank with
-    | [] -> failwith "shouldnt happen i hope"
+    | [] -> None
     | (e,r)::t ->
       if r = 1. then
-        ([e],1.)
+        Some ([e],1.)
       else
-        (e::
-        (List.map
-           ~f:fst
-           (List.take_while ~f:(fun (_,r') -> r = r') t)),r)
+        Some (e::
+              (List.map
+                 ~f:fst
+                 (List.take_while ~f:(fun (_,r') -> r = r') t)),r)
   end
 
 let retrieve_max_and_index
@@ -497,17 +523,21 @@ let retrieve_match_exp_exn
 
 let rec retrieve_force_match_ppaths
     (t:rtree)
-    (exp_finder:rtree -> exp list)
-  : (ppath * exp list) list =
+  (*(exp_finder:(exp -> output) -> (exp -> Float.t) -> rtree -> exp list)*)
+  : (ppath * rtree) list =
   if t.forced_match then
     let (e,prts) = List.hd_exn (Option.value_exn t.matches) in
     List.concat_map
       ~f:(fun (p,rt) ->
-          let ppess = retrieve_force_match_ppaths rt exp_finder in
-          List.map ~f:(fun (pp,es) -> ((e,p)::pp,es)) ppess)
+          let ppess =
+            retrieve_force_match_ppaths
+              rt
+          in
+          List.map ~f:(fun (pp,t) -> ((e,p)::pp),t) ppess)
       prts
   else
-    [[],exp_finder t]
+    [[],t]
+    (*[([],exp_finder exp_to_output condition t)]*)
 
 let rec integrate_path
     (pp:ppath)
@@ -530,92 +560,229 @@ let rec integrate_path
     | _ -> failwith "shouldn't happen"
   end
 
-let rec propogate_exps ?short_circuit:(sc = true) (condition:exp -> Float.t) (t:rtree) : exp list =
+let rec propogate_exps ?short_circuit:(sc = true)
+    (exp_to_output:exp -> output)
+    (condition:exp -> Float.t)
+    (t:rtree) : exp list =
   if sc && List.length t.es > 0 then
     t.es
   else
     (* NOTE: Prioritize lambdas, matches, and then constructors, in that order. *)
     let es = t.es
-             @ propogate_exps_matches ~short_circuit:sc condition t
-             @ List.concat_map ~f:(propogate_exps_node ~short_circuit:sc condition) t.refinements
+             @ propogate_exps_matches ~short_circuit:sc exp_to_output condition t
+             @ List.concat_map ~f:(propogate_exps_node ~short_circuit:sc exp_to_output condition) t.refinements
     in
-    t.es <- es;
+    (*t.es <- es;*)
     es
 
-and propogate_exps_matches ?short_circuit:(sc = true) (condition:exp -> Float.t) (t:rtree) : exp list =
+and propogate_exps_matches ?short_circuit:(sc = true)
+    (exp_to_output:exp -> output)
+    (condition:exp -> Float.t)
+    (t:rtree)
+  : exp list =
   if t.forced_match then
-    propagate_enforced_matches ~short_circuit:sc condition t
+    propagate_enforced_matches ~short_circuit:sc exp_to_output condition t
   else
     match t.matches with
     | None -> []
-    | Some ms -> List.concat_map ~f:(propogate_exps_rmatch ~short_circuit:sc condition) ms
+    | Some ms ->
+      List.concat_map
+        ~f:(propogate_exps_rmatch
+              ~short_circuit:sc
+              exp_to_output
+              condition)
+        ms
 
-and propogate_exps_rmatch ?short_circuit:(sc = true) (condition:exp -> Float.t) (m:rmatch) : exp list =
+and propogate_exps_rmatch ?short_circuit:(sc = true)
+    (exp_to_output:exp -> output)
+    (condition:exp -> Float.t)
+    (m:rmatch)
+  : exp list =
+  let open MyStdlib in
   let (e, bs)  = m in
+  let is_desired = e = EApp ((EApp (EVar "compare", EVar "n1")), EVar "n3") in
+  if is_desired then print_endline "ITS HAPPENING";
   (*let (ps, ts) = List.unzip bs in*)
-  let branches =
-    List.fold_left
-      ~f:(fun bss (p,t) ->
-          let make_match e' bs = EMatch (e,(p,e')::bs) in
+  (*print_endline (Pp.pp_exp e);
+    print_endline (List.to_string ~f:(fun (p,r) -> "(" ^ Pp.pp_pat p ^ "," ^ pp_rtree r ^ ")") bs);*)
+  (*print_endline "startb";
+    print_endline (string_of_int (List.length bs));*)
+  let bs =
+    List.map
+      ~f:(fun (p,t) ->
+          let make_match e' = EMatch(e,[(p,e')]) in
+          let exp_to_output =
+            fun e' ->
+              exp_to_output (EMatch (e,[(p,e')]))
+          in
           let new_condition =
             fun e ->
-              Option.value_exn
-                (List.max_elt
-                   ~compare:Float.compare
-                   (List.map
-                      ~f:(fun bs -> condition (make_match e bs))
-                      bss))
+              condition (make_match e)
           in
-          let t_es = propogate_exps ~short_circuit:sc new_condition t in
-          let pe = List.map ~f:(fun e -> (p,e)) t_es in
-          let non_projected = Util.cartesian_map ~f:List.cons pe bss in
-          let ans = select_tops
-              non_projected
-              (fun bs -> condition (EMatch (e,bs))) in
-           fst ans)
-      ~init:([[]])
+          let es = propogate_exps ~short_circuit:sc exp_to_output new_condition t in
+          List.map ~f:(fun e -> (p,e)) es)
       bs
   in
-  List.map ~f:(fun bs -> EMatch (e, bs)) branches
+  let ans = fold_until_completion
+    ~f:(fun (established_branches,bs) ->
+        let make_match bs = EMatch(e,bs) in
+        if bs = [] then
+          Right (List.map ~f:make_match established_branches)
+        else
+          let integrations_rank_bos =
+            List.map
+              ~f:(fun pes ->
+                  let full_bes =
+                    cartesian_map
+                      ~f:(fun pe eb -> pe::eb)
+                      pes
+                      established_branches
+                  in
+                  select_tops
+                    full_bes
+                    (condition % make_match))
+              bs
+          in
+          let integrations_rank_bs_o = distribute_option integrations_rank_bos in
+          begin match integrations_rank_bs_o with
+            | None -> Right []
+            | Some integrations_ranks ->
+              let ((established_branches,_),i) =
+                retrieve_max_and_index
+                  integrations_ranks
+                  (fun (_,f1) (_,f2) -> Float.compare f1 f2)
+              in
+              let pns =
+                deduper
+                  (exp_to_output % make_match)
+                  established_branches
+              in
+              let (_,bs) = remove_at_index_exn bs i in
+              Left (pns,bs)
+          end)
+    ([[]],bs)
+  in
+  if is_desired then print_endline "it happened";
+  ans
+  (*let branches_o =
+    List.fold_left
+      ~f:(fun bss_o (p,t) ->
+          begin match bss_o with
+            | None -> None
+            | Some bss ->
+              let above_adder =
+                fun e' ->
+                  above_adder (EMatch (e,[(p,e')]))
+              in
+              let make_match e' bs = EMatch (e,(p,e')::bs) in
+              let new_condition =
+                fun e ->
+                  Option.value_exn
+                    (List.max_elt
+                       ~compare:Float.compare
+                       (List.map
+                          ~f:(fun bs -> condition (make_match e bs))
+                          bss))
+              in
+              print_endline "hi there";
+              print_endline (pp_rtree t);
+              let t_es = propogate_exps ~short_circuit:sc above_adder new_condition deduper t in
+              let pe = List.map ~f:(fun e -> (p,e)) t_es in
+              print_endline (string_of_int (List.length pe));
+              print_endline (string_of_int (List.length bss));
+              let non_projected = Util.cartesian_map ~f:List.cons pe bss in
+              print_endline "why?";
+              let ans = select_tops
+                  non_projected
+                  (fun bs -> condition (EMatch (e,bs))) in
+              Option.map ~f:fst ans
+          end)
+      ~init:(Some [[]])
+      bs
+  in
+    print_endline "endb";
+  begin match branches_o with
+    | None -> []
+    | Some branches ->
+      List.map ~f:(fun bs -> EMatch (e, bs)) branches
+    end*)
 
-and propogate_exps_node ?short_circuit:(sc = true) (condition:exp -> Float.t) (n:rnode) : exp list =
+and propogate_exps_node
+    ?short_circuit:(sc = true)
+    (exp_to_output:exp -> output)
+    (condition:exp -> Float.t)
+    (n:rnode)
+  : exp list =
   match n with
   | SUnit -> [EUnit]
 
   | SAbs (f, x, ty, t) ->
     let e_transformer = fun e -> EFix (f, x, ty, e) in
-    List.map ~f:e_transformer (propogate_exps ~short_circuit:sc (fun e -> (condition (e_transformer e)) ) t)
+    let above_adder = fun e -> (exp_to_output (e_transformer e)) in
+    List.map ~f:e_transformer (propogate_exps ~short_circuit:sc above_adder (fun e -> (condition (e_transformer e))) t)
 
   | SCtor (c, t) ->
-      propogate_exps ~short_circuit:sc condition t |> List.map ~f:(fun e -> ECtor (c, e))
+    propogate_exps ~short_circuit:sc exp_to_output condition t |> List.map ~f:(fun e -> ECtor (c, e))
 
   | STuple ts ->
-      List.map ~f:(propogate_exps ~short_circuit:sc condition) ts
+    List.map ~f:(propogate_exps ~short_circuit:sc exp_to_output condition) ts
         |> Util.combinations
         |> List.map ~f:(fun es -> ETuple es)
 
   | SRcd ts ->
       List.map ~f:(fun (l,t) ->
-        List.map ~f:(fun e -> (l,e)) (propogate_exps ~short_circuit:sc condition t)) ts
+        List.map ~f:(fun e -> (l,e)) (propogate_exps ~short_circuit:sc exp_to_output condition t)) ts
         |> Util.combinations
         |> List.map ~f:(fun es -> ERcd es)
 
 and propagate_enforced_matches
     ?short_circuit:(sc = true)
+    (exp_to_output:exp -> output)
     (condition:exp -> Float.t)
     (t:rtree)
   : exp list =
   let open MyStdlib in
-  let ppaths = retrieve_force_match_ppaths t (propogate_exps ~short_circuit:sc condition) in
+  let ppaths =
+    retrieve_force_match_ppaths
+      t
+      (*(fun above_adder condition ->
+         propogate_exps
+           ~short_circuit:sc
+           above_adder
+           condition)*)
+  in
   fold_until_completion
     ~f:(fun (pns,bs) ->
         if bs = [] then
           Right (List.map ~f:pnode_to_exp pns)
         else
-          let integrations_ranks =
+          let integrations_rank_os =
             List.map
-              ~f:(fun (p,es) ->
-                  print_endline ("PNS SIZE " ^ (string_of_int (List.length pns * List.length es)));
+              ~f:(fun (p,t) ->
+                  let make_match pn e = pnode_to_exp
+                      (integrate_path
+                         p
+                         pn
+                         e)
+                  in
+                  let es =
+                    propogate_exps
+                      ~short_circuit:sc
+                      (fun e ->
+                         List.concat_map
+                           ~f:(fun pn ->
+                               exp_to_output
+                                 (make_match pn e))
+                           pns)
+                      (fun e ->
+                         Option.value_exn
+                           (List.max_elt
+                              ~compare:Float.compare
+                              (List.map
+                                 ~f:(fun pn -> condition (make_match pn e))
+                                 pns)))
+                      t
+                  in
                   let pns =
                     cartesian_map
                       ~f:(integrate_path p)
@@ -627,15 +794,25 @@ and propagate_enforced_matches
                     (condition % pnode_to_exp))
               bs
           in
-          let ((pns,f),i) =
-            retrieve_max_and_index
-              integrations_ranks
-              (fun (_,f1) (_,f2) -> Float.compare f1 f2)
-          in
-          print_endline ("chose " ^ (string_of_int i));
-            print_endline (Float.to_string f);
-          let (_,bs) = remove_at_index_exn bs i in
-          Left (pns,bs))
+          let integrations_ranks_o = distribute_option integrations_rank_os in
+          begin match integrations_ranks_o with
+            | None -> Right []
+            | Some integrations_ranks ->
+              let ((pns,f),i) =
+                retrieve_max_and_index
+                  integrations_ranks
+                  (fun (_,f1) (_,f2) -> Float.compare f1 f2)
+              in
+              print_endline (Float.to_string f);
+              let pns =
+                deduper
+                  (exp_to_output % pnode_to_exp)
+                  pns
+              in
+              print_endline (string_of_int (List.length pns));
+              let (_,bs) = remove_at_index_exn bs i in
+              Left (pns,bs)
+          end)
     ([Node (retrieve_match_exp_exn t,[])], ppaths)
 
 (***** }}} *****)

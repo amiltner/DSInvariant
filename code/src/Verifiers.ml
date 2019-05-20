@@ -35,7 +35,7 @@ end
 module QuickCheckVerifier =
 struct
 
-  let _NUM_CHECKS_ = 2048
+  let _NUM_CHECKS_ = 4096
 
   let true_val : Value.t = (Value.mk_ctor "True" (Value.mk_tuple []))
 
@@ -261,10 +261,7 @@ struct
          ~f:(fun (_,t) -> is_equal @$ Type.compare t desired_t)
          post_quants
     then
-      begin
-        print_endline "SKIP OUT FAST";
-        None
-      end
+      None
     else
       let num_checks = _NUM_CHECKS_ in
       let (_,result_t) = extract_args eval_t in
@@ -659,9 +656,8 @@ struct
       in
       let correct_check =
         fun e ->
-              (*print_endline @$ Myth_folds.Pp.pp_exp e;*)
               let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
-              let corrects =
+              let [@warning "-3"] corrects =
                 List.map
                   ~f:(fun (e1,e2) ->
                       try
@@ -677,7 +673,8 @@ struct
                         else
                           0
                       with
-                        Myth_folds.Eval.Eval_error _ -> 0)
+                      | Myth_folds.Eval.Eval_error _ -> 0
+                      | Not_found -> print_endline @$ Myth_folds.Pp.pp_exp e; failwith "ah")
                   myth_examples
               in
               let total_correct = List.fold_left ~f:(+) ~init:0 corrects in
@@ -685,23 +682,20 @@ struct
               (*print_endline (Float.to_string ((Float.of_int total_correct) /. (Float.of_int total)));*)
               (Float.of_int total_correct) /. (Float.of_int total)
       in
-      let _ =
+      let to_outputs =
         fun e ->
           let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
           List.map
             ~f:(fun (input,_) ->
                 try
-                  Left
+                  Some
                     (Myth_folds.Eval.eval
                        env
-                       (Myth_folds.Lang.EProj
-                          (1
-                          ,Myth_folds.Lang.EApp(evaler,input))))
+                       (Myth_folds.Lang.EApp(evaler,input)))
                 with
-                  Myth_folds.Eval.Eval_error _ -> Right ())
+                  Myth_folds.Eval.Eval_error _ -> None)
             myth_examples
       in
-      let _ = compare_list ~cmp:(compare_either Myth_folds.Lang.compare_exp Unit.compare) in
       Option.map
         ~f:(fun me ->
             let e = MythToDS.convert_expr me in
@@ -719,9 +713,10 @@ struct
               gamma
               env
               (TArr (t,end_type_myth))
-              0)
+              0
+              true)
            correct_check
-           )
+           to_outputs)
 end
 
 let quickcheck_verifier = (module QuickCheckVerifier : Verifier)
