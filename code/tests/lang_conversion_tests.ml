@@ -4,7 +4,7 @@ open Lang
 open OUnitPlusPlus
 open Mythlang_asserts
 
-
+let run_test_tt_main _ = ()
 
 let to_myth_tt =
   DSToMyth.TypeToType.from_kvp_list
@@ -17,7 +17,7 @@ let to_myth_tt =
 (* begin to_myth_type_basic *)
 let to_myth_type_basic_unit _ =
   assert_mythtype_equal
-    (TTuple [])
+    TUnit
     (DSToMyth.to_myth_type_basic
        to_myth_tt
        (Type.mk_unit))
@@ -38,14 +38,14 @@ let to_myth_type_basic_var_2 _ =
 
 let to_myth_type_basic_arrow _ =
   assert_mythtype_equal
-    (TArr (TBase "nat",TTuple []))
+    (TArr (TBase "nat",TUnit))
     (DSToMyth.to_myth_type_basic
        to_myth_tt
        (Type.mk_arr (Type.mk_var "nat") Type.mk_unit))
 
 let to_myth_type_basic_tuple _ =
   assert_mythtype_equal
-    (TTuple [TBase "nat";TTuple []])
+    (TTuple [TBase "nat";TUnit])
     (DSToMyth.to_myth_type_basic
        to_myth_tt
        (Type.mk_tuple [Type.mk_var "nat";Type.mk_unit]))
@@ -118,7 +118,7 @@ let to_myth_exp_match _ =
 
 let to_myth_exp_fix _ =
   assert_mythexpr_equal
-    (EFix ("f", ("x", TBase "nat"), TTuple [], EVar "y"))
+    (EFix ("f", ("x", TBase "nat"), TUnit, EVar "y"))
     (DSToMyth.to_myth_exp
        to_myth_tt
        (Expr.mk_fix "f" (Type.mk_arr (Type.mk_var "nat") (Type.mk_unit)) (Expr.mk_func ("x",Type.mk_var "nat") (Expr.mk_var "y"))))
@@ -176,7 +176,7 @@ let convert_decl_list_to_myth_useless_type_decl _ =
 
 let convert_decl_list_to_myth_useful_type_decl _ =
   assert_decl_list_equal
-    [DData ("bool",[("True",TTuple []);("False",TTuple [])])]
+    [DData ("bool",[("True",TUnit);("False",TUnit)])]
     (convert_decl_list
        [TypeDeclaration
           ("bool"
@@ -184,7 +184,7 @@ let convert_decl_list_to_myth_useful_type_decl _ =
 
 let convert_decl_list_to_myth_mu_type_decl _ =
   assert_decl_list_equal
-    [DData ("nat",[("O",TTuple []);("S",TBase "nat")])]
+    [DData ("nat",[("O",TUnit);("S",TBase "nat")])]
     (convert_decl_list
        [TypeDeclaration
           ("nat",
@@ -194,19 +194,19 @@ let convert_decl_list_to_myth_mu_type_decl _ =
 
 let convert_decl_list_to_myth_simple_let_decl _ =
   assert_decl_list_equal
-    [DLet ("u",false,[],TTuple [], ETuple [])]
+    [DLet ("u",false,[],TUnit, ETuple [])]
     (convert_decl_list [ExprDeclaration ("u",Expr.mk_unit)])
 
 let convert_decl_list_to_myth_hard_let_decl _ =
   assert_decl_list_equal
-    [DLet ("i",false,[],TTuple [], ETuple [])]
+    [DLet ("i",false,[],TUnit, ETuple [])]
     (convert_decl_list [TypeDeclaration ("i",Type.mk_unit);ExprDeclaration ("i",Expr.mk_unit)])
 
 let convert_decl_list_to_myth_let_func_decl _ =
   assert_decl_list_equal
-    [DData ("nat",[("O",TTuple []);("S",TBase "nat")])
-    ;DData ("bool",[("True",TTuple []);("False",TTuple [])])
-    ;DLet ("func",false,[],TArr (TTuple [],TBase "nat"), EFun (("x",TTuple []), ECtor ("O",ETuple [])))
+    [DData ("nat",[("O",TUnit);("S",TBase "nat")])
+    ;DData ("bool",[("True",TUnit);("False",TUnit)])
+    ;DLet ("func",false,[],TArr (TUnit,TBase "nat"), EFun (("x",TUnit), ECtor ("O",ETuple [])))
     ]
     (convert_decl_list
        [TypeDeclaration ("i",Type.mk_unit)

@@ -3,5 +3,5 @@
     (_ (ocamlopt_flags (:standard -O3 -rounds 6))))
 
 (tests
-    (names lang_tests lang_conversion_tests)
+    (names enumerate_tests lang_tests lang_conversion_tests)
     (libraries MyStdlib DSInvGen))

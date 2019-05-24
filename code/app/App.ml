@@ -3,7 +3,6 @@ open MyStdlib
 
 open DSInvGen
 
-
 (*let _ = let full_spec = ProcessFile.process_full_problem problem in
   let ans =
     Verifiers.QuickCheckVerifier.implication_counter_example
@@ -24,7 +23,7 @@ open DSInvGen
     | Some anses -> print_endline (string_of_list Value.show anses)
   end*)
 
-module QCMIG = MIG.MIGLearner(Verifiers.QuickCheckVerifier)
+module QCMIG = MIG.MIGLearner(EnumerativeVerifier.T)
 
 let main filename () =
   Log.enable ~msg:"DSInfer" (Some "_log") ;

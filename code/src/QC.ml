@@ -63,11 +63,17 @@ let map
   (Option.map ~f) % g
 
 let size_seq
-  ()
-  : int Sequence.t =
-  Sequence.map
+  : int Sequence.t ref =
+  ref (Sequence.map
     ~f:(( * ) 5)
-    (Quickcheck.random_sequence Quickcheck.Generator.size)
+    (Quickcheck.random_sequence Quickcheck.Generator.small_positive_int))
+
+let next_size
+    ()
+  : int =
+  let (s,ss) = Option.value_exn (Sequence.next !size_seq) in
+  size_seq := ss;
+  s
 
 let of_list
     (type a)
@@ -80,12 +86,11 @@ let of_list
 let g_to_seq
     (g:'a g)
   : 'a Sequence.t =
-  let size_seq = size_seq () in
   Sequence.unfold_step
-    ~init:size_seq
-    ~f:(fun size_seq ->
-        let (size,size_seq) = Option.value_exn (Sequence.next size_seq) in
+    ~init:()
+    ~f:(fun () ->
+        let size = next_size () in
         begin match g size with
-          | None -> Skip size_seq
-          | Some v -> Yield (v,size_seq)
+          | None -> Skip ()
+          | Some v -> Yield (v,())
         end)

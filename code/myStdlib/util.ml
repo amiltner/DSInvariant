@@ -620,6 +620,53 @@ let range (i:int) (j:int) : int list =
   in
   aux (j-1) []
 
+let pair_partition
+    (n:int)
+  : (int * int) list =
+  List.map
+    ~f:(fun k -> (k,n-k))
+    (range 1 n)
+
+let rec partition
+    (n:int)
+    (buckets:int)
+  : int list list =
+  if buckets = 0 then
+    [[]]
+  else if buckets = 1 then
+    [[n]]
+  else
+    let initial_partition = pair_partition n in
+    List.concat_map
+      ~f:(fun (p1,rest) ->
+          let rest_partitioned = partition rest (buckets - 1) in
+          List.map ~f:(fun part -> p1::part) rest_partitioned)
+      initial_partition
+
+let combinations
+    (type a)
+    (l:a list list)
+  : a list list =
+  let rec combinations_internal
+      (l:a list list)
+      (continuation:a list list -> a list list)
+    : a list list =
+    (begin match l with
+       | [] -> continuation [[]]
+       | [x] -> continuation (List.rev_map ~f:(fun n -> [n]) x)
+       | x :: l ->
+         combinations_internal
+           l
+           (fun c ->
+              continuation
+                (List.fold_left
+                   ~f:(fun res n -> List.rev_append (List.rev_map ~f:(fun l -> n::l) c) res)
+                   ~init:[]
+                   x))
+     end)
+  in
+  combinations_internal l (fun x -> x)
+
 let make_some
     (x:'a)
   : 'a option =
@@ -712,6 +759,34 @@ let split_by_first_last_exn (l:'a list) : 'a * 'a list * 'a =
   let (h,t) = split_by_first_exn l in
   let (m,e) = split_by_last_exn t in
   (h,m,e)
+
+let split_by_condition
+    (xs:'a list)
+    ~(f:'a -> bool)
+  : ('a list) * ('a list) =
+  let rec split_by_condition_rec
+      (xs:'a list)
+      (sats:'a list)
+      (unsats:'a list)
+    : ('a list) * ('a list) =
+    begin match xs with
+      | [] -> (sats,unsats)
+      | h::t ->
+        if f h then
+          split_by_condition_rec
+            t
+            (h::sats)
+            unsats
+        else
+          split_by_condition_rec
+            t
+            sats
+            (h::unsats)
+    end
+  in
+  let (sats,unsats) = split_by_condition_rec xs [] [] in
+  (List.rev sats, List.rev unsats)
+
 
 let rec remove_at
     (l:'a list)
@@ -873,7 +948,9 @@ let primes_between (n:int) (m:int) : int list =
   (range n m)
 
 let rec partitions (n:int) (k:int) : int list list =
-  if n <= 0 || k <= 0 then
+  if n = 0 && k = 0 then
+    [[]]
+  else if n <= 0 || k <= 0 then
     []
   else if k = 1 then
     [[n]]

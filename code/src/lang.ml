@@ -171,6 +171,19 @@ struct
   let mk_t_var : t = mk_var "t"
 
   let mk_bool_var : t = mk_var "bool"
+
+  let size
+    : t -> int =
+    fold
+      ~base_f:(fun _ -> 1)
+      ~arr_f:(fun x y -> x+y+1)
+      ~tuple_f:(fun ss -> List.fold ~f:(+) ~init:1 ss)
+      ~mu_f:(fun _ s -> s+1)
+      ~variant_f:(fun bs ->
+          List.fold
+            ~f:(fun acc (_,i) -> i+acc)
+            ~init:1
+            bs)
 end
 
 module Arg =
@@ -613,6 +626,22 @@ struct
       (e2:t)
     : t =
     mk_app (mk_func (i,t) e2) e1
+
+  let size
+    : t -> int =
+    fold
+      ~var_f:(fun _ -> 1)
+      ~app_f:(fun x y -> x+y+1)
+      ~func_f:(fun (_,t) i -> 1 + (Type.size t) + i)
+      ~ctor_f:(fun _ s -> s+1)
+      ~match_f:(fun s _ bs ->
+          List.fold
+            ~f:(fun acc (_,s) -> s+acc)
+            ~init:(s+1)
+            bs)
+      ~fix_f:(fun _ t s -> 1 + (Type.size t) + s)
+      ~tuple_f:(fun is -> List.fold ~f:(+) ~init:1 is)
+      ~proj_f:(fun _ i -> i+2)
 end
 
 module Context(D : Data) =
@@ -755,6 +784,8 @@ struct
     Option.value_exn (destruct_tuple v)
 
   let mk_true : t = mk_ctor "True" (mk_tuple [])
+
+  let mk_false : t = mk_ctor "False" (mk_tuple [])
 
   let rec fold
       ~(func_f:Arg.t -> Expr.t -> 'a)

@@ -177,4 +177,41 @@ let gen_var_base (t:typ) : id =
   | TRcd _      -> "r"
   | TUnit       -> "u"
 
+let rec contains
+    (e1:exp)
+    (e2:exp)
+  : bool =
+  let contains_rec = fun e -> contains e e2 in
+  if e1 = e2 then
+    true
+  else
+    begin match e1 with
+      | EApp (e1,e2) -> contains_rec e1 || contains_rec e2
+      | EFun (_,e) -> contains_rec e
+      | ELet (_,_,_,_,e1,e2) -> contains_rec e1 || contains_rec e2
+      | ECtor (_,e) -> contains_rec e
+      | EMatch (e,bs) ->
+        contains_rec e ||
+        List.exists
+          ~f:(fun (_,e) -> contains_rec e)
+          bs
+      | EPFun eps ->
+        List.exists
+          ~f:(fun (e1,e2) -> contains_rec e1 || contains_rec e2)
+          eps
+      | EFix (_,_,_,e) -> contains_rec e
+      | ETuple es ->
+        List.exists
+          ~f:contains_rec
+          es
+      | EProj (_,e) -> contains_rec e
+      | ERcd rs ->
+        List.exists
+          ~f:(fun (_,e) -> contains_rec e)
+          rs
+      | ERcdProj (_,e) -> contains_rec e
+      | EUnit
+      | EVar _ -> false
+    end
+
 (***** }}} *****)

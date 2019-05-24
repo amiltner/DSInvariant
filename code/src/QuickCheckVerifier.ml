@@ -2,37 +2,7 @@ open MyStdlib
 open Utils
 open Lang
 
-module type Verifier =
-sig
-  val equiv_false :
-    problem:problem ->
-    cond:Expr.t ->
-    bool
-
-  val implication_counter_example :
-    problem:problem ->
-    pre:Expr.t ->
-    eval:Expr.t ->
-    eval_t:Type.t ->
-    post:UniversalFormula.t ->
-    (Value.t list) option
-
-  val true_on_examples :
-    problem:problem ->
-    examples:Value.t list ->
-    eval:Expr.t ->
-    eval_t:Type.t ->
-    post:UniversalFormula.t ->
-    Value.t option
-
-  val synth :
-    problem:problem ->
-    testbed:TestBed.t ->
-    Expr.t option
-end
-
-
-module QuickCheckVerifier =
+module T : Verifier.t =
 struct
 
   let _NUM_CHECKS_ = 4096
@@ -261,7 +231,10 @@ struct
          ~f:(fun (_,t) -> is_equal @$ Type.compare t desired_t)
          post_quants
     then
-      None
+      begin
+        print_endline "SKIP OUT FAST";
+        None
+      end
     else
       let num_checks = _NUM_CHECKS_ in
       let (_,result_t) = extract_args eval_t in
@@ -386,7 +359,7 @@ struct
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
-    : Value.t option =
+    : Value.t list option =
     let num_checks = _NUM_CHECKS_ in
     let desired_t = Type.mk_var "t" in
     let (args_t,result_t) = extract_args eval_t in
@@ -481,7 +454,6 @@ struct
                   Right (Some relevant))
           (uf_types_seqs,0)
       in
-      Option.map ~f:List.hd_exn @$
       Option.map
         ~f:(List.map ~f:Value.from_exp_exn)
         ce_option
@@ -655,32 +627,27 @@ struct
           (Type.mk_var "bool")
       in
       let correct_check =
-        fun e ->
-              let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
-              let [@warning "-3"] corrects =
-                List.map
-                  ~f:(fun (e1,e2) ->
-                      try
-                        let ans =
-                          Myth_folds.Eval.eval
-                            env
-                            (Myth_folds.Lang.EProj
-                               (1
-                               ,Myth_folds.Lang.EApp(evaler,e1)))
-                        in
-                        if ans = Myth_folds.Eval.eval env e2 then
-                          1
-                        else
-                          0
-                      with
-                      | Myth_folds.Eval.Eval_error _ -> 0
-                      | Not_found -> print_endline @$ Myth_folds.Pp.pp_exp e; failwith "ah")
-                  myth_examples
-              in
-              let total_correct = List.fold_left ~f:(+) ~init:0 corrects in
-              let total = List.length corrects in
-              (*print_endline (Float.to_string ((Float.of_int total_correct) /. (Float.of_int total)));*)
-              (Float.of_int total_correct) /. (Float.of_int total)
+        List.map
+          ~f:(fun (e1,e2) ->
+              (e1,fun e ->
+                let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
+                try
+                   let ans =
+                     Myth_folds.Eval.eval
+                       env
+                       (Myth_folds.Lang.EProj
+                          (1
+                          ,Myth_folds.Lang.EApp(evaler,e1)))
+                   in
+                   ans = Myth_folds.Eval.eval env e2
+                 with
+                 | Myth_folds.Eval.Eval_error _ -> false
+            ))
+              myth_examples
+              (*let total_correct = List.fold_left ~f:(+) ~init:0 corrects in
+                let total = List.length corrects in*)
+              (*print_endline (Float.to_string ((Float.of_int total_correct) /. (Float.of_int total)));
+                (Float.of_int total_correct) /. (Float.of_int total)*)
       in
       let to_outputs =
         fun e ->
@@ -718,5 +685,3 @@ struct
            correct_check
            to_outputs)
 end
-
-let quickcheck_verifier = (module QuickCheckVerifier : Verifier)

@@ -1,8 +1,7 @@
 open MyStdlib
-open Verifiers
 open Lang
 
-module MIGLearner(V : Verifier) = struct
+module MIGLearner(V : Verifier.t) = struct
   module VPIE = VPIE.Make(V)
 
   let push_boundary
@@ -14,12 +13,14 @@ module MIGLearner(V : Verifier) = struct
     : Value.t option =
     Log.info
       (lazy ("Checking boundary for: " ^ Expr.show eval));
-    V.true_on_examples
-      ~problem
-      ~examples:positives
-      ~eval
-      ~eval_t
-      ~post
+    Option.map
+      ~f:(List.hd_exn)
+      (V.true_on_examples
+         ~problem
+         ~examples:positives
+         ~eval
+         ~eval_t
+         ~post)
 
   let satisfyTransAll
       ~problem:(problem : problem)

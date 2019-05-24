@@ -1,8 +1,7 @@
 open MyStdlib
-open Verifiers
 open Lang
 
-module Make(V : Verifier) =
+module Make(V : Verifier.t) =
 struct
   let learnVPreCondAll
       ~(problem : problem)
@@ -18,7 +17,7 @@ struct
       (Log.info (lazy ("VPIE Attempt "
                        ^ (Int.to_string attempt)
                        ^ "."));
-       (*let pos_examples = List.map ~f:(fun (v,_) -> v) testbed.pos_tests in
+       let pos_examples = List.map ~f:(fun (v,_) -> v) testbed.pos_tests in
        let neg_examples = List.map ~f:(fun (v,_) -> v) testbed.neg_tests in
        let subvalues =
          List.concat_map
@@ -34,7 +33,7 @@ struct
                  (Typecheck.typecheck_exp problem.ec problem.tc problem.vc (Value.to_exp e)))
            subvalues
        in
-       let testbed_temp =
+       let testbed =
          List.fold_left
            ~f:(fun tb e ->
                if Option.is_some
@@ -50,8 +49,9 @@ struct
              )
            ~init:testbed
            all_inside_examples
-         in*)
-       let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed:testbed) in
+         in
+         print_endline (TestBed.show testbed);
+         let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed:testbed) in
        Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
        let full_pre = Expr.and_predicates pre synthed_pre in
        let model_o =

@@ -1,5 +1,5 @@
 module MyRope = Rope
-open Core
+open MyStdlib
 open Consts
 open Printf
 open Lang
@@ -10,24 +10,87 @@ open Util
 
 (***** Type definitions {{{ *****)
 type output = (value option) list
+type tests = (exp * (exp -> bool)) list
 let output_comparer = List.compare (Option.compare Myth_folds.Lang.compare_val)
 let pp_output = List.to_string ~f:(MyStdlib.string_of_option Pp.pp_value)
+
+let split_by_minimal
+    (type a)
+    ~(compare:a -> a -> bool)
+    (xs:a list)
+  : (a list) * (a list) =
+  let rec split_by_minimal_internal
+      (xs:a list)
+      (smalls:a list)
+      (others:a list)
+    : (a list) * (a list) =
+    begin match xs with
+      | [] -> (smalls,others)
+      | h::t ->
+        let contains =
+          List.exists
+            ~f:(fun e -> compare h e)
+            smalls
+        in
+        if contains then
+          split_by_minimal_internal
+            t
+            smalls
+            (h::others)
+        else
+          let smalls =
+            List.filter
+              ~f:(fun s -> not (compare s h))
+              smalls
+          in
+          split_by_minimal_internal
+            t
+            (h::smalls)
+            others
+    end
+  in
+  split_by_minimal_internal xs [] []
+
 
 let deduper
     (type a)
     (to_output:a -> output)
+    (to_size:a -> int)
     (xs:a list)
   : a list =
   let es_outputs =
     List.map
-      ~f:(fun x -> (x,to_output x))
+      ~f:(fun x -> (x, to_size x, to_output x))
       xs
   in
+  let sorted_parititioned_i =
+    sort_and_partition_with_indices
+      (fun (_,_,e1) (_,_,e2) -> output_comparer e1 e2)
+      es_outputs
+  in
   List.map
-    ~f:fst
-    (List.dedup_and_sort
-       ~compare:(fun (_,e1) (_,e2) -> output_comparer e1 e2)
-       es_outputs)
+    ~f:(fun esl ->
+        let ordered_by_size =
+          List.sort
+            ~compare:(fun ((_,s1,_),_) ((_,s2,_),_) -> Int.compare s1 s2)
+            esl
+        in
+        let ((a,_,_),_) = List.hd_exn ordered_by_size in
+        a)
+    sorted_parititioned_i
+
+let test_performance_to_ranking
+    (tp:bool list)
+  : Float.t =
+  let success_count =
+    List.length @$
+    List.filter
+      ~f:ident
+      tp
+  in
+  let total_count = List.length tp in
+  (Float.of_int success_count) /. (Float.of_int total_count)
+
 
 (* output: partial program outputs *)
 
@@ -457,37 +520,38 @@ and reset_timeouts_refinements (n:rnode) =
 let select_tops
     (es:'a list)
     (ranking:'a -> Float.t)
+    (to_size:'a -> Int.t)
   : ('a list * Float.t) option =
-  let e_rank = List.map ~f:(fun e -> (e,ranking e)) es in
-  let sorted_e_rank = List.sort ~compare:(fun (_,f1) (_,f2) -> Float.compare f2 f1) e_rank in
+  let e_rank_size = List.map ~f:(fun e -> (e,(ranking e,-1 * to_size e))) es in
+  let sorted_e_rank = List.sort ~compare:(fun (_,f1) (_,f2) -> (pair_compare Float.compare Int.compare) f2 f1) e_rank_size in
   begin match sorted_e_rank with
     | [] -> None
-    | (e,r)::t ->
+    | (e,(r,_))::t ->
       if r = 1. then
         Some ([e],1.)
       else
         Some (e::
               (List.map
                  ~f:fst
-                 (List.take_while ~f:(fun (_,r') -> r = r') t)),r)
+                 (List.take_while ~f:(fun (_,(r',_)) -> r = r') t)),r)
   end
 
-let retrieve_max_and_index
+let retrieve_maxes_and_indices
     (l:'a list)
     (cmp:'a -> 'a -> int)
-  : 'a * int =
+  : ('a * int) list =
   let open MyStdlib in
   begin match l with
     | [] -> failwith "cannot"
     | h::t ->
-      List.foldi
+      [List.foldi
         ~f:(fun i (accv,acci) x ->
             if cmp accv x < 0 then
               (x,i+1)
             else
               (accv,acci))
         ~init:(h,0)
-        t
+        t]
   end
 
 type pnode =
@@ -562,26 +626,26 @@ let rec integrate_path
 
 let rec propogate_exps ?short_circuit:(sc = true)
     (exp_to_output:exp -> output)
-    (condition:exp -> Float.t)
+    (tests:tests)
     (t:rtree) : exp list =
   if sc && List.length t.es > 0 then
     t.es
   else
     (* NOTE: Prioritize lambdas, matches, and then constructors, in that order. *)
     let es = t.es
-             @ propogate_exps_matches ~short_circuit:sc exp_to_output condition t
-             @ List.concat_map ~f:(propogate_exps_node ~short_circuit:sc exp_to_output condition) t.refinements
+             @ propogate_exps_matches ~short_circuit:sc exp_to_output tests t
+             @ List.concat_map ~f:(propogate_exps_node ~short_circuit:sc exp_to_output tests) t.refinements
     in
     (*t.es <- es;*)
     es
 
 and propogate_exps_matches ?short_circuit:(sc = true)
     (exp_to_output:exp -> output)
-    (condition:exp -> Float.t)
+    (tests:tests)
     (t:rtree)
   : exp list =
   if t.forced_match then
-    propagate_enforced_matches ~short_circuit:sc exp_to_output condition t
+    propagate_enforced_matches ~short_circuit:sc exp_to_output tests t
   else
     match t.matches with
     | None -> []
@@ -590,18 +654,18 @@ and propogate_exps_matches ?short_circuit:(sc = true)
         ~f:(propogate_exps_rmatch
               ~short_circuit:sc
               exp_to_output
-              condition)
+              tests)
         ms
 
 and propogate_exps_rmatch ?short_circuit:(sc = true)
     (exp_to_output:exp -> output)
-    (condition:exp -> Float.t)
+    (tests:tests)
     (m:rmatch)
   : exp list =
   let open MyStdlib in
   let (e, bs)  = m in
-  let is_desired = e = EApp ((EApp (EVar "compare", EVar "n1")), EVar "n3") in
-  if is_desired then print_endline "ITS HAPPENING";
+  (*let is_desired = e = EApp ((EApp (EVar "compare", EVar "n1")), EVar "n3") in*)
+  (*if is_desired then print_endline "ITS HAPPENING";*)
   (*let (ps, ts) = List.unzip bs in*)
   (*print_endline (Pp.pp_exp e);
     print_endline (List.to_string ~f:(fun (p,r) -> "(" ^ Pp.pp_pat p ^ "," ^ pp_rtree r ^ ")") bs);*)
@@ -616,8 +680,9 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
               exp_to_output (EMatch (e,[(p,e')]))
           in
           let new_condition =
-            fun e ->
-              condition (make_match e)
+            List.map
+              ~f:(fun (v,run) -> (v,run % make_match))
+              tests
           in
           let es = propogate_exps ~short_circuit:sc exp_to_output new_condition t in
           List.map ~f:(fun e -> (p,e)) es)
@@ -638,31 +703,46 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
                       pes
                       established_branches
                   in
-                  select_tops
-                    full_bes
-                    (condition % make_match))
+                  Option.map
+                    ~f:(fun (b,v) -> (pes,b,v))
+                    (select_tops
+                       full_bes
+                       (fun bs ->
+                          test_performance_to_ranking
+                            (List.map
+                               ~f:(fun (_,run) -> run (make_match bs))
+                               tests))
+                       (size % make_match)))
               bs
           in
           let integrations_rank_bs_o = distribute_option integrations_rank_bos in
           begin match integrations_rank_bs_o with
             | None -> Right []
             | Some integrations_ranks ->
-              let ((established_branches,_),i) =
-                retrieve_max_and_index
+              let maxes_indices =
+                retrieve_maxes_and_indices
                   integrations_ranks
-                  (fun (_,f1) (_,f2) -> Float.compare f1 f2)
+                  (fun (_,_,f1) (_,_,f2) -> Float.compare f1 f2)
               in
-              let pns =
-                deduper
-                  (exp_to_output % make_match)
-                  established_branches
-              in
-              let (_,bs) = remove_at_index_exn bs i in
-              Left (pns,bs)
+              if List.length maxes_indices = 0 then
+                failwith "unexpected"
+              else if List.length maxes_indices = 1 then
+                let ((_,established_branches,_),i) = List.hd_exn maxes_indices in
+                (*let ((established_branches,_),i) =*)
+                let pns =
+                  deduper
+                    (exp_to_output % make_match)
+                    (size % make_match)
+                    established_branches
+                in
+                let (_,bs) = remove_at_index_exn bs i in
+                Left (pns,bs)
+              else
+                failwith "TODO"
           end)
     ([[]],bs)
   in
-  if is_desired then print_endline "it happened";
+  (*if is_desired then print_endline "it happened";*)
   ans
   (*let branches_o =
     List.fold_left
@@ -710,7 +790,7 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
 and propogate_exps_node
     ?short_circuit:(sc = true)
     (exp_to_output:exp -> output)
-    (condition:exp -> Float.t)
+    (tests:tests)
     (n:rnode)
   : exp list =
   match n with
@@ -719,26 +799,32 @@ and propogate_exps_node
   | SAbs (f, x, ty, t) ->
     let e_transformer = fun e -> EFix (f, x, ty, e) in
     let above_adder = fun e -> (exp_to_output (e_transformer e)) in
-    List.map ~f:e_transformer (propogate_exps ~short_circuit:sc above_adder (fun e -> (condition (e_transformer e))) t)
+    List.map
+      ~f:e_transformer
+      (propogate_exps
+         ~short_circuit:sc
+         above_adder
+         (List.map ~f:(fun (v,run) -> (v,run % e_transformer)) tests)
+         t)
 
   | SCtor (c, t) ->
-    propogate_exps ~short_circuit:sc exp_to_output condition t |> List.map ~f:(fun e -> ECtor (c, e))
+    propogate_exps ~short_circuit:sc exp_to_output tests t |> List.map ~f:(fun e -> ECtor (c, e))
 
   | STuple ts ->
-    List.map ~f:(propogate_exps ~short_circuit:sc exp_to_output condition) ts
+    List.map ~f:(propogate_exps ~short_circuit:sc exp_to_output tests) ts
         |> Util.combinations
         |> List.map ~f:(fun es -> ETuple es)
 
   | SRcd ts ->
       List.map ~f:(fun (l,t) ->
-        List.map ~f:(fun e -> (l,e)) (propogate_exps ~short_circuit:sc exp_to_output condition t)) ts
+        List.map ~f:(fun e -> (l,e)) (propogate_exps ~short_circuit:sc exp_to_output tests t)) ts
         |> Util.combinations
         |> List.map ~f:(fun es -> ERcd es)
 
 and propagate_enforced_matches
     ?short_circuit:(sc = true)
     (exp_to_output:exp -> output)
-    (condition:exp -> Float.t)
+    (tests:tests)
     (t:rtree)
   : exp list =
   let open MyStdlib in
@@ -774,13 +860,22 @@ and propagate_enforced_matches
                                exp_to_output
                                  (make_match pn e))
                            pns)
-                      (fun e ->
+                      (List.concat_map
+                         ~f:(fun (v,run) ->
+                             List.map
+                               ~f:(fun pn -> (v,run % (make_match pn)))
+                               pns)
+                         tests)
+                      (*(fun e ->
+                         snd @$
                          Option.value_exn
                            (List.max_elt
-                              ~compare:Float.compare
+                              ~compare:(pair_compare Float.compare (fun _ _ -> 0))
                               (List.map
-                                 ~f:(fun pn -> condition (make_match pn e))
-                                 pns)))
+                                 ~f:(fun pn ->
+                                     let ts = tests (make_match pn e) in
+                                     (test_performance_to_ranking ts,ts))
+                                 pns)))*)
                       t
                   in
                   let pns =
@@ -789,29 +884,60 @@ and propagate_enforced_matches
                       pns
                       es
                   in
-                  select_tops
-                    pns
-                    (condition % pnode_to_exp))
+                  Option.map
+                    ~f:(fun (pn,f) -> (es,pn,f))
+                    (select_tops
+                       pns
+                       (fun e ->
+                          test_performance_to_ranking
+                            (List.map ~f:(fun (_,run) -> run (pnode_to_exp e)) tests))
+                       (*(test_performance_to_ranking % tests % pnode_to_exp)*)
+                       (size % pnode_to_exp)))
               bs
           in
           let integrations_ranks_o = distribute_option integrations_rank_os in
           begin match integrations_ranks_o with
             | None -> Right []
             | Some integrations_ranks ->
-              let ((pns,f),i) =
-                retrieve_max_and_index
+              let maxes_indices =
+                retrieve_maxes_and_indices
                   integrations_ranks
-                  (fun (_,f1) (_,f2) -> Float.compare f1 f2)
+                  (fun (_,_,f1) (_,_,f2) -> Float.compare f1 f2)
               in
-              print_endline (Float.to_string f);
-              let pns =
-                deduper
-                  (exp_to_output % pnode_to_exp)
-                  pns
-              in
-              print_endline (string_of_int (List.length pns));
-              let (_,bs) = remove_at_index_exn bs i in
-              Left (pns,bs)
+              if List.length maxes_indices = 0 then
+                failwith "cannot happen no"
+              else if List.length maxes_indices = 1 then
+                let ((_,pns,f),i) = List.hd_exn maxes_indices in
+                print_endline (Float.to_string f);
+                let pns =
+                  deduper
+                    (exp_to_output % pnode_to_exp)
+                    (size % pnode_to_exp)
+                    pns
+                in
+                List.iter
+                  ~f:(fun pn -> print_endline (Pp.pp_exp (pnode_to_exp pn)))
+                  pns;
+                List.iter
+                  ~f:(fun pn -> print_endline (List.to_string ~f:(string_of_pair Pp.pp_exp Bool.to_string) (List.map ~f:(fun (v,run) -> (v,run (pnode_to_exp pn))) tests)))
+                  pns;
+                print_endline (string_of_int (List.length pns));
+                let (_,bs) = remove_at_index_exn bs i in
+                let tests =
+                  List.filter
+                    ~f:(fun (_,run) ->
+                        List.exists
+                          ~f:(fun pn -> not (run (pnode_to_exp pn)))
+                          pns)
+                    tests
+                in
+                List.iter
+                  ~f:(fun pn -> print_endline (List.to_string ~f:(string_of_pair Pp.pp_exp Bool.to_string) (List.map ~f:(fun (v,run) -> (v,run (pnode_to_exp pn))) tests)))
+                  pns;
+                print_endline "next";
+                Left (pns,bs)
+              else
+                failwith "TODO"
           end)
     ([Node (retrieve_match_exp_exn t,[])], ppaths)
 

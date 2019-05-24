@@ -12,6 +12,15 @@ let assert_expr_equal
     expected
     actual
 
+let assert_expr_list_equal
+    (expected:Expr.t list)
+    (actual:Expr.t list) =
+  assert_equal
+    ~printer:(string_of_list Expr.show)
+    ~cmp:(compare_list ~cmp:Expr.compare)
+    expected
+    actual
+
 let assert_type_equal
     (expected:Type.t)
     (actual:Type.t) =
