@@ -8,6 +8,7 @@ open Lang
 open Printf
 
 exception Eval_error of string
+exception Extr_error of value
 let raise_eval_error s = raise (Eval_error s)
 
 (***** Helpers {{{ *****)
@@ -23,19 +24,16 @@ let rec extract_values_from_pattern (v:value) (p:pattern) : (id * value) list =
   | (PVar x,    _) -> [(x, v)]
   | (PTuple ps, VTuple vs) ->
     if List.length ps <> List.length vs then
-      failwith (sprintf "extract_values_from_pattern: pattern %s does not match value %s"
-                (Pp.pp_pattern p) (Pp.pp_value v))
+      raise (Extr_error v)
     else
       List.concat_map ~f:(fun (v, p) -> extract_values_from_pattern v p) (List.zip_exn vs ps)
   | (PRcd ps, VRcd vs) ->
     begin try List.concat_map ~f:(fun (p, v) -> extract_values_from_pattern v p) (Util.zip_without_keys ps vs)
     with Invalid_argument _ ->
-      failwith (sprintf "extract_values_from pattern: pattern %s does not match value %s"
-                (Pp.pp_pattern p) (Pp.pp_value v))
-    end
+      raise (Extr_error v)
+  end
   | (_, _) -> 
-      failwith (sprintf "extract_values_from_pattern: pattern %s does not match value %s"
-                (Pp.pp_pattern p) (Pp.pp_value v))
+    raise (Extr_error v)
 
 (***** }}} *****)
 
@@ -73,8 +71,8 @@ let find_in_table tbl key =
 
 (* Evaluates e to a value under env *)
 let rec eval (env:env) (e:exp) : value =
-  (*let key = GTS.make_key env e in*)
-  match None (*find_in_table memo_eval_tbl key*) with
+  let key = GTS.make_key env e in
+  match find_in_table memo_eval_tbl key with
   | Some ans -> ans
   | None ->
       let ans = begin match e with

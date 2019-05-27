@@ -626,7 +626,7 @@ struct
           (Type.mk_var "t")
           (Type.mk_var "bool")
       in
-      let correct_check =
+      (*let correct_check =
         List.map
           ~f:(fun (e1,e2) ->
               (e1,fun e ->
@@ -648,21 +648,66 @@ struct
                 let total = List.length corrects in*)
               (*print_endline (Float.to_string ((Float.of_int total_correct) /. (Float.of_int total)));
                 (Float.of_int total_correct) /. (Float.of_int total)*)
-      in
-      let to_outputs =
-        fun e ->
-          let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
-          List.map
-            ~f:(fun (input,_) ->
-                try
-                  Some
-                    (Myth_folds.Eval.eval
+        in*)
+      let tests_outputs : Myth_folds.Lang.exp Myth_folds.Rtree.tests_outputs =
+        List.map
+          ~f:(fun (input,expected_output) ->
+              (input
+              ,(fun e ->
+                 Some (let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
+                 try
+                   let ans =
+                     Myth_folds.Eval.eval
                        env
-                       (Myth_folds.Lang.EApp(evaler,input)))
-                with
-                  Myth_folds.Eval.Eval_error _ -> None)
-            myth_examples
+                       (Myth_folds.Lang.EProj
+                          (1
+                          ,Myth_folds.Lang.EApp(evaler,input)))
+                   in
+                   ans = Myth_folds.Eval.eval env expected_output
+                 with
+                 | Myth_folds.Eval.Eval_error _ -> false))
+              ,fun e ->
+                Some (let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
+                      try
+                        Some
+                          (Myth_folds.Eval.eval
+                             env
+                             (Myth_folds.Lang.EApp(evaler,input)))
+                      with
+                        Myth_folds.Eval.Eval_error _ -> None
+                      | Myth_folds.Eval.Extr_error v -> Some v)))
+          myth_examples
       in
+          (*[
+            (List.map
+               ~f:(fun (input,expected_output) ->
+                   (input
+                    , Some
+                     (fun e ->
+                       let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
+                       let (real_output,output) =
+                         try
+                             (true
+                             ,Some (Myth_folds.Eval.eval
+                                 env
+                                 (Myth_folds.Lang.EApp(evaler,input))))
+                         with
+                           Myth_folds.Eval.Eval_error _ -> (true,None)
+                         | Myth_folds.Eval.Extr_error v -> (false, Some v)
+                       in
+                       let correct =
+                         real_output &&
+                         begin match output with
+                           | Some (Myth_folds.Lang.VTuple vs) ->
+                             List.hd_exn vs = Myth_folds.Eval.eval env expected_output
+                           | None -> false
+                           | _ -> failwith "unexpected"
+                         end
+                       in
+                       (output,correct)
+                     ))
+                  )
+             myth_examples)]*)
       Option.map
         ~f:(fun me ->
             let e = MythToDS.convert_expr me in
@@ -682,6 +727,5 @@ struct
               (TArr (t,end_type_myth))
               0
               true)
-           correct_check
-           to_outputs)
+           tests_outputs)
 end

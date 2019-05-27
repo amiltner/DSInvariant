@@ -72,8 +72,7 @@ let execute_synth_step
     (env:env)
     (t:rtree)
     (st:synth_step)
-    (tests:tests)
-    (exp_to_output:exp -> output)
+    (tests_outputs:exp tests_outputs)
   : exp option =
   reset_timeouts t;
   begin match st with
@@ -101,9 +100,9 @@ let execute_synth_step
   let es =
     Timing.record
       ~label:"synth::propogate_exps"
-      ~action:(fun _ -> propogate_exps ~short_circuit:false exp_to_output tests t)
+      ~action:(fun _ -> propogate_exps ~short_circuit:false tests_outputs t)
   in
-  let es = List.filter ~f:(fun e -> List.for_all ~f:(fun (_,run) -> run e) tests) es in
+  let es = List.filter ~f:(fun e -> List.for_all ~f:(ident) (tests_outputs_to_tests_full_retriever tests_outputs e)) es in
   let es_s =
     List.map
       ~f:(fun e -> (e,size e))
@@ -124,23 +123,21 @@ let rec execute_synth_plan
     (env:env)
     (t:rtree)
     (plan:synth_plan)
-    (tests:tests)
-    (exp_to_output:exp -> output)
+    (tests_outputs:exp tests_outputs)
   : exp option =
   match plan with
   | [] -> None
   | st :: plan ->
-    begin match execute_synth_step s env t st tests exp_to_output with
+    begin match execute_synth_step s env t st tests_outputs with
       | Some e -> Some e
-      | None -> execute_synth_plan s env t plan tests exp_to_output
+      | None -> execute_synth_plan s env t plan tests_outputs
     end
 
 let synthesize
     (s:Sigma.t)
     (env:env)
     (t:rtree)
-    (tests:tests)
-    (exp_to_output:exp -> output)
+    (tests_outputs:exp tests_outputs)
   : exp option =
   verbose_mode := false;
-  execute_synth_plan s env t standard_synth_plan tests exp_to_output
+  execute_synth_plan s env t standard_synth_plan tests_outputs

@@ -1005,8 +1005,10 @@ let rec sort_and_partition ~cmp:(cmp:'a -> 'a -> comparison) (l:'a list) : 'a li
       merge_sorted_partitions sorted_partitioned_l1 sorted_partitioned_l2
   end
 
-let sort_and_partition_with_indices (f:'a -> 'a -> comparison)
-                        (l:'a list) : ('a * int) list list =
+let sort_and_partition_with_indices
+    (f:'a -> 'a -> comparison)
+    (l:'a list)
+  : ('a * int) list list =
   (*let rec merge_sorted_partitions (l1:('a * int) list list)
                 (l2:('a * int) list list) : ('a * int) list list =
     begin match (l1,l2) with

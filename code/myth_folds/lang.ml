@@ -35,15 +35,21 @@ module Ctor = struct
   [@@deriving ord, show, hash]
 end
 
+let hash_fold_ref =
+  fun _ _ _ -> failwith "ah"
+
 type pattern =
   | PWildcard
   | PVar of id
   | PTuple of pattern list
   | PRcd of pattern record
+[@@deriving ord, show, hash]
 
 type pat = id * (pattern option)   (* (id of constructor, pattern). *)
+[@@deriving ord, show, hash]
 
 type arg = id * typ
+[@@deriving ord, show, hash]
 
 type env = (id * value) list
 
@@ -75,6 +81,7 @@ and value =
   | VTuple of value list (* Invariant: List must always have two members. *)
   | VRcd of value record
   | VUnit
+[@@deriving ord, show, hash]
 
 module Type = struct
   type t = typ
@@ -86,9 +93,6 @@ let compare_val (v1:value) (v2:value) : int =
 
 let compare_exp (e1:exp) (e2:exp) : int =
   compare e1 e2
-
-let compare_decl (d1:decl) (d2:decl) : int =
-  compare d1 d2
 
 type synth_problem = id * typ * exp list
 

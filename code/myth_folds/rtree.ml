@@ -9,8 +9,76 @@ module Rope = MyRope
 open Util
 
 (***** Type definitions {{{ *****)
-type output = (value option) list
-type tests = (exp * (exp -> bool)) list
+
+(*module Output =
+struct
+  type t_node = ((value option) list option) list
+  [@@deriving ord, show, hash]
+
+  type t = t_node hash_consed
+
+  let compare o1 o2 = Int.compare o1.tag o2.tag
+
+  let table = HashConsTable.create 100000
+  let hashcons = HashConsTable.hashcons hash_t_node compare_t_node table
+
+  let create x = hashcons x
+  end*)
+
+(*type output = Output.t*)
+
+type output = (value option option) list
+[@@deriving ord, show, hash]
+
+type 'a test_output_retriever = exp * exp * ('a -> bool option) * ('a -> value option option)
+type 'a test = 'a -> bool list
+
+type 'a tests_outputs = (('a test_output_retriever)) list
+
+
+type output_tree =
+  | InternalNode of output_tree list
+  | ExistantLeaf of bool * value option
+  | NonexistantLeaf of unit
+
+type 'a tests_outputsprime =
+  exp * exp * 'a -> output_tree
+
+let tests_outputs_update
+    (type a)
+    (type b)
+    (f:a -> b)
+    (tests_outputs:b tests_outputs)
+  : a tests_outputs =
+  List.map
+    ~f:(fun (e1,e2,t,v) ->
+        (e1,e2, t % f, v % f))
+    tests_outputs
+
+
+let tests_outputs_to_output_full_retriever
+    (type a)
+    (tests_outputs:a tests_outputs)
+    (e:a)
+  : output =
+  List.map
+    ~f:(fun (_,_,_,v) -> v e)
+    tests_outputs
+
+let tests_outputs_to_tests_full_retriever
+    (type a)
+    (tests_outputs:a tests_outputs)
+    (e:a)
+  : bool list =
+  List.map
+    ~f:(fun (_,_,t,_) ->
+        begin match t e with
+          | None -> false
+          | Some b -> b
+        end)
+    tests_outputs
+
+
 let output_comparer = List.compare (Option.compare Myth_folds.Lang.compare_val)
 let pp_output = List.to_string ~f:(MyStdlib.string_of_option Pp.pp_value)
 
@@ -38,19 +106,49 @@ let split_by_minimal
             smalls
             (h::others)
         else
-          let smalls =
-            List.filter
+          let (smalls,new_large) =
+            split_by_condition
               ~f:(fun s -> not (compare s h))
               smalls
           in
           split_by_minimal_internal
             t
             (h::smalls)
-            others
+            (new_large@others)
     end
   in
   split_by_minimal_internal xs [] []
 
+let split_into_minimal_partitions
+    (type a)
+    ~(compare:a -> a -> bool)
+    ~(total_order:a -> a -> int)
+    (xs:a list)
+  : ((a list) * (a list)) list =
+  let rec split_into_minimal_partitions_internal
+      (remaining_bigs:a list)
+      (most_recent_addition:a list)
+      (partition_acc:((a list) * (a list)) list)
+    : ((a list) * (a list)) list =
+    if List.is_empty remaining_bigs then
+      partition_acc
+    else
+      let (littles,bigs) = split_by_minimal ~compare remaining_bigs in
+      let most_recent_addition = most_recent_addition @ littles in
+      split_into_minimal_partitions_internal
+        bigs
+        most_recent_addition
+        ((most_recent_addition,bigs)::partition_acc)
+  in
+  let partitions =
+    split_into_minimal_partitions_internal
+      xs
+      []
+      []
+  in
+  List.map
+    ~f:(fun (p1,p2) -> (List.sort ~compare:total_order p1, p2))
+    partitions
 
 let deduper
     (type a)
@@ -65,7 +163,7 @@ let deduper
   in
   let sorted_parititioned_i =
     sort_and_partition_with_indices
-      (fun (_,_,e1) (_,_,e2) -> output_comparer e1 e2)
+      (fun (_,_,e1) (_,_,e2) -> compare_output e1 e2)
       es_outputs
   in
   List.map
@@ -536,6 +634,18 @@ let select_tops
                  (List.take_while ~f:(fun (_,(r',_)) -> r = r') t)),r)
   end
 
+let select_any_improve
+    (es:'a list)
+    (runs:('a -> bool list))
+  : 'a list =
+  List.filter
+    ~f:(fun e ->
+        List.exists
+          ~f:(ident)
+          (runs e))
+    es
+
+
 let retrieve_maxes_and_indices
     (l:'a list)
     (cmp:'a -> 'a -> int)
@@ -601,65 +711,176 @@ let rec retrieve_force_match_ppaths
       prts
   else
     [[],t]
-    (*[([],exp_finder exp_to_output condition t)]*)
+(*[([],exp_finder exp_to_output condition t)]*)
 
-let rec integrate_path
+let rec contains_path
+    (pn:pnode)
+    (pp:ppath)
+  : bool =
+  begin match (pn,pp) with
+    | (_, []) -> true
+    | (Leaf _, _) -> false
+    | (Node (e,ppns), (e',p')::t) ->
+      if e = e' then
+        List.exists
+          ~f:(fun (p,pn) ->
+              p = p' &&
+              contains_path pn t)
+          ppns
+      else
+        false
+  end
+
+
+let integrate_path
     (pp:ppath)
     (pn:pnode)
     (e_base:exp)
-  : pnode =
-  begin match (pn,pp) with
-    | (Node (e,ppns), (_,p)::t) ->
-      let p_update =
-        fun (p',pn') ->
-          if p = p' then
-            Some (p',integrate_path t pn' e_base)
-          else
-            None
-      in
-      begin match update_first ~f:p_update ppns with
-        | None -> Node (e,(p,ppath_to_pnode t e_base)::ppns)
-        | Some ppns -> Node (e,ppns)
-      end
-    | _ -> failwith "shouldn't happen"
+  : pnode option =
+  let rec integrate_path_internal
+      (pp:ppath)
+      (pn:pnode)
+    : pnode =
+    begin match (pn,pp) with
+      | (Node (e,ppns), (_,p)::t) ->
+        let p_update =
+          fun (p',pn') ->
+            if p = p' then
+              Some (p',integrate_path_internal t pn')
+            else
+              None
+        in
+        begin match update_first ~f:p_update ppns with
+          | None -> Node (e,(p,ppath_to_pnode t e_base)::ppns)
+          | Some ppns -> Node (e,ppns)
+        end
+      | _ -> failwith "shouldn't happen"
+    end
+  in
+  if contains_path pn pp then
+    None
+  else
+    Some (integrate_path_internal pp pn)
+
+type partition_solution_cache_key = rtree * (exp * exp) list
+type partition_solution_cache_value = pnode list
+type partition_solution_cache =
+  (partition_solution_cache_key * partition_solution_cache_value) list
+
+let rec rtree_equal r1 r2 : bool =
+  r1.t = r2.t
+  && r1.sz = r2.sz
+  && Gamma.hash r1.g = Gamma.hash r2.g
+  && r1.es = r2.es
+  && List.equal ~equal:rnode_equal r1.refinements r2.refinements
+  && Option.equal (List.equal ~equal:rmatch_equal) r1.matches r2.matches
+  && r1.scrutinee_size = r2.scrutinee_size
+  && r1.forced_match = r2.forced_match
+  && r1.matches_permitted = r2.matches_permitted
+
+and rnode_equal r1 r2 : bool =
+  begin match (r1,r2) with
+    | (SAbs (i1,a1,t1,rt1), SAbs (i2,a2,t2,rt2)) ->
+      is_equal @$ compare_id i1 i2
+      && is_equal @$ compare_arg a1 a2
+      && is_equal @$ compare_typ t1 t2
+      && rtree_equal rt1 rt2
+    | (SCtor (i1,rt1), SCtor (i2,rt2)) ->
+      is_equal @$ compare_id i1 i2
+      && rtree_equal rt1 rt2
+    | (STuple rts1, STuple rts2) ->
+      List.equal ~equal:rtree_equal rts1 rts2
+    | (SRcd _, SRcd _) -> failwith "todo"
+    | (SUnit, SUnit) -> true
+    | _ -> false
   end
 
+and rmatch_equal (e1,branches1) (e2,branches2) : bool =
+  is_equal @$ compare_exp e1 e2
+  &&
+  List.equal
+    ~equal:((fun (pat1,rt1) (pat2,rt2) ->
+        is_equal @$ compare_pat pat1 pat2
+        && rtree_equal rt1 rt2))
+    branches1
+    branches2
+
+let solution_cache : partition_solution_cache ref = ref []
+
+let lookup_in_solution_cache
+    (t:rtree)
+    (tests_outputs:exp tests_outputs)
+  : (partition_solution_cache_value * exp tests_outputs) option =
+  let minimal_partitions_tests_outputs =
+    split_into_minimal_partitions
+      ~compare:(fun (e1,_,_,_) (e2,_,_,_) -> contains e1 e2)
+      ~total_order:(fun (e1,_,_,_) (e2,_,_,_) -> compare_exp e1 e2)
+      tests_outputs
+  in
+  List.fold_left
+    ~f:(fun acc_o ((t',e12s),v) ->
+        begin match acc_o with
+          | Some _ -> acc_o
+          | None ->
+            if rtree_equal t' t then
+              let fst_sat_o =
+                List.find
+                  ~f:(fun (tests_outputs,_) ->
+                      is_equal
+                        (compare_list_as_multisets
+                           ~cmp:(pair_compare compare_exp compare_exp)
+                           (List.map ~f:(fun (e1,e2,_,_) -> (e1,e2)) tests_outputs)
+                           e12s))
+                  minimal_partitions_tests_outputs
+              in
+              Option.map ~f:(fun (_,remaining) -> (v,remaining)) fst_sat_o
+            else
+              None
+        end)
+    ~init:None
+    (!solution_cache)
+
 let rec propogate_exps ?short_circuit:(sc = true)
-    (exp_to_output:exp -> output)
-    (tests:tests)
+    (tests_outputs:exp tests_outputs)
     (t:rtree) : exp list =
   if sc && List.length t.es > 0 then
     t.es
   else
     (* NOTE: Prioritize lambdas, matches, and then constructors, in that order. *)
     let es = t.es
-             @ propogate_exps_matches ~short_circuit:sc exp_to_output tests t
-             @ List.concat_map ~f:(propogate_exps_node ~short_circuit:sc exp_to_output tests) t.refinements
+             @ propogate_exps_matches ~short_circuit:sc tests_outputs t
+             @ List.concat_map
+               ~f:(propogate_exps_node ~short_circuit:sc tests_outputs) t.refinements
     in
     (*t.es <- es;*)
     es
 
 and propogate_exps_matches ?short_circuit:(sc = true)
-    (exp_to_output:exp -> output)
-    (tests:tests)
+    (tests_outputs:exp tests_outputs)
     (t:rtree)
   : exp list =
   if t.forced_match then
-    propagate_enforced_matches ~short_circuit:sc exp_to_output tests t
+    propagate_enforced_matches ~short_circuit:sc tests_outputs t
   else
     match t.matches with
     | None -> []
     | Some ms ->
+      let ms =
+        deduper
+          ((tests_outputs_to_output_full_retriever tests_outputs) % fst)
+          (size % fst)
+          ms
+      in
+      print_endline "tag";
+      print_endline (string_of_int (List.length ms));
       List.concat_map
         ~f:(propogate_exps_rmatch
               ~short_circuit:sc
-              exp_to_output
-              tests)
+              tests_outputs)
         ms
 
 and propogate_exps_rmatch ?short_circuit:(sc = true)
-    (exp_to_output:exp -> output)
-    (tests:tests)
+    (tests_outputs:exp tests_outputs)
     (m:rmatch)
   : exp list =
   let open MyStdlib in
@@ -674,23 +895,44 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
   let bs =
     List.map
       ~f:(fun (p,t) ->
+          (*print_endline "this is slow why?";*)
           let make_match e' = EMatch(e,[(p,e')]) in
-          let exp_to_output =
-            fun e' ->
-              exp_to_output (EMatch (e,[(p,e')]))
+          let tests_outputs = tests_outputs_update make_match tests_outputs in
+          let es = propogate_exps ~short_circuit:sc tests_outputs t in
+          (*print_endline "1";*)
+          (*print_endline @$ string_of_int (List.length es);*)
+          let es =
+            List.filter
+              ~f:(fun e ->
+                  List.exists
+                    ~f:ident
+                    (tests_outputs_to_tests_full_retriever tests_outputs e))
+              es
           in
-          let new_condition =
-            List.map
-              ~f:(fun (v,run) -> (v,run % make_match))
-              tests
+          (*print_endline "2mytag";*)
+          print_endline @$ string_of_int (List.length es);
+          let es =
+            deduper
+              (tests_outputs_to_output_full_retriever tests_outputs)
+              (size)
+              es
           in
-          let es = propogate_exps ~short_circuit:sc exp_to_output new_condition t in
+          (*print_endline "abs";
+          print_endline @$ string_of_int (List.length es);
+            print_endline "3";*)
           List.map ~f:(fun e -> (p,e)) es)
       bs
   in
-  let ans = fold_until_completion
+  let brancheses = combinations bs in
+  print_endline "HERE IS A TAG";
+  print_endline (string_of_int (List.length brancheses));
+  let ans = List.map ~f:(fun bs -> EMatch(e,bs)) brancheses in
+
+  (*let ans =
+    ([[]],bs)
+    fold_until_completion
     ~f:(fun (established_branches,bs) ->
-        let make_match bs = EMatch(e,bs) in
+         let make_match bs = EMatch(e,bs) in
         if bs = [] then
           Right (List.map ~f:make_match established_branches)
         else
@@ -729,6 +971,8 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
               else if List.length maxes_indices = 1 then
                 let ((_,established_branches,_),i) = List.hd_exn maxes_indices in
                 (*let ((established_branches,_),i) =*)
+                print_endline "BEGINIT";
+                print_endline @$ string_of_int (List.length established_branches);
                 let pns =
                   deduper
                     (exp_to_output % make_match)
@@ -741,7 +985,7 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
                 failwith "TODO"
           end)
     ([[]],bs)
-  in
+    in*)
   (*if is_desired then print_endline "it happened";*)
   ans
   (*let branches_o =
@@ -789,8 +1033,7 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
 
 and propogate_exps_node
     ?short_circuit:(sc = true)
-    (exp_to_output:exp -> output)
-    (tests:tests)
+    (tests_outputs:exp tests_outputs)
     (n:rnode)
   : exp list =
   match n with
@@ -798,33 +1041,31 @@ and propogate_exps_node
 
   | SAbs (f, x, ty, t) ->
     let e_transformer = fun e -> EFix (f, x, ty, e) in
-    let above_adder = fun e -> (exp_to_output (e_transformer e)) in
+    let tests_outputs = tests_outputs_update e_transformer tests_outputs in
     List.map
       ~f:e_transformer
       (propogate_exps
          ~short_circuit:sc
-         above_adder
-         (List.map ~f:(fun (v,run) -> (v,run % e_transformer)) tests)
+         tests_outputs
          t)
 
   | SCtor (c, t) ->
-    propogate_exps ~short_circuit:sc exp_to_output tests t |> List.map ~f:(fun e -> ECtor (c, e))
+    propogate_exps ~short_circuit:sc tests_outputs t |> List.map ~f:(fun e -> ECtor (c, e))
 
   | STuple ts ->
-    List.map ~f:(propogate_exps ~short_circuit:sc exp_to_output tests) ts
-        |> Util.combinations
-        |> List.map ~f:(fun es -> ETuple es)
+    List.map ~f:(propogate_exps ~short_circuit:sc tests_outputs) ts
+    |> Util.combinations
+    |> List.map ~f:(fun es -> ETuple es)
 
   | SRcd ts ->
-      List.map ~f:(fun (l,t) ->
-        List.map ~f:(fun e -> (l,e)) (propogate_exps ~short_circuit:sc exp_to_output tests t)) ts
-        |> Util.combinations
-        |> List.map ~f:(fun es -> ERcd es)
+    List.map ~f:(fun (l,t) ->
+        List.map ~f:(fun e -> (l,e)) (propogate_exps ~short_circuit:sc tests_outputs t)) ts
+    |> Util.combinations
+    |> List.map ~f:(fun es -> ERcd es)
 
 and propagate_enforced_matches
     ?short_circuit:(sc = true)
-    (exp_to_output:exp -> output)
-    (tests:tests)
+    (tests_outputs:exp tests_outputs)
     (t:rtree)
   : exp list =
   let open MyStdlib in
@@ -837,35 +1078,86 @@ and propagate_enforced_matches
            above_adder
            condition)*)
   in
+  let initial_pns_tests : pnode list * exp tests_outputs =
+    begin match lookup_in_solution_cache t tests_outputs with
+      | None -> ([Node (retrieve_match_exp_exn t,[])], tests_outputs)
+      | Some v -> print_endline "cache hit!"; v
+    end
+  in
+  let pns =
   fold_until_completion
-    ~f:(fun (pns,bs) ->
-        if bs = [] then
-          Right (List.map ~f:pnode_to_exp pns)
+    ~f:(fun (pns,tests_outputs) ->
+        if List.length tests_outputs = 0 then
+          Right pns
         else
-          let integrations_rank_os =
-            List.map
+          let passing =
+              List.filter
+                ~f:(fun pn ->
+                    List.for_all
+                      ~f:ident
+                      (tests_outputs_to_tests_full_retriever (tests_outputs_update pnode_to_exp tests_outputs) pn))
+                pns
+          in
+          if not (List.is_empty passing) then
+            Right passing
+          else
+          let (relevant_tests_outputs,next_tests_outputs) =
+            split_by_minimal
+              ~compare:(fun (e1,_,_,_) (e2,_,_,_) -> contains e1 e2)
+              tests_outputs
+          in
+          print_endline "relevant";
+          print_endline (List.to_string ~f:(fun (e,_,_,_) -> Pp.pp_exp e) relevant_tests_outputs);
+          print_endline "next";
+          print_endline (List.to_string ~f:(fun (e,_,_,_) -> Pp.pp_exp e) next_tests_outputs);
+          print_endline "test end";
+          print_endline (string_of_int (List.length pns));
+          print_endline (string_of_int (List.length ppaths));
+          let possible_branches =
+            List.concat_map
               ~f:(fun (p,t) ->
-                  let make_match pn e = pnode_to_exp
+                  print_endline "heres one";
+                  let make_match pn e =
+                    Option.map
+                      ~f:(fun pn -> pnode_to_exp pn)
                       (integrate_path
                          p
                          pn
                          e)
                   in
+                  let lower_tests_outputs =
+                    (List.concat_map
+                       ~f:(fun (e1,e2,t,v) ->
+                           List.map
+                             ~f:(fun pn ->
+                                 (e1
+                                 ,e2
+                                 ,(fun e ->
+                                   begin match make_match pn e with
+                                     | None -> None
+                                     | Some e -> t e
+                                   end)
+                                 ,(fun e ->
+                                   begin match make_match pn e with
+                                     | None -> None
+                                     | Some e -> v e
+                                   end)))
+                             pns)
+                       relevant_tests_outputs)
+                  in
                   let es =
                     propogate_exps
                       ~short_circuit:sc
-                      (fun e ->
-                         List.concat_map
+                      (*(fun e ->
+                         Output.create
+                           (List.concat_map
                            ~f:(fun pn ->
-                               exp_to_output
-                                 (make_match pn e))
-                           pns)
-                      (List.concat_map
-                         ~f:(fun (v,run) ->
-                             List.map
-                               ~f:(fun pn -> (v,run % (make_match pn)))
-                               pns)
-                         tests)
+                               begin match make_match pn e with
+                                 | None -> [None]
+                                 | Some e -> (exp_to_output e).node
+                               end)
+                           pns))*)
+                      lower_tests_outputs
                       (*(fun e ->
                          snd @$
                          Option.value_exn
@@ -878,25 +1170,189 @@ and propagate_enforced_matches
                                  pns)))*)
                       t
                   in
-                  let pns =
+                  let es =
+                    select_any_improve
+                      es
+                      (tests_outputs_to_tests_full_retriever lower_tests_outputs)
+                  in
+                  print_endline (string_of_int (List.length es));
+                  let es =
+                    deduper
+                      (tests_outputs_to_output_full_retriever lower_tests_outputs)
+                      size
+                      es
+                  in
+                  print_endline "after dedup";
+                  print_endline (string_of_int (List.length es));
+                  List.map
+                    ~f:(fun e -> (p,e))
+                    es
+                  (*let pppns =
                     cartesian_map
-                      ~f:(integrate_path p)
+                      ~f:(fun pn e -> (p,pn,e))
                       pns
                       es
                   in
-                  Option.map
-                    ~f:(fun (pn,f) -> (es,pn,f))
-                    (select_tops
-                       pns
-                       (fun e ->
-                          test_performance_to_ranking
-                            (List.map ~f:(fun (_,run) -> run (pnode_to_exp e)) tests))
-                       (*(test_performance_to_ranking % tests % pnode_to_exp)*)
-                       (size % pnode_to_exp)))
-              bs
+                  let pppns =
+                    select_any_improve
+                      pppns
+                      (List.map
+                         ~f:(fun (_,run) ->
+                             fun (p,e,pn) ->
+                               begin match (integrate_path p e pn) with
+                                 | None -> false
+                                 | Some e -> run (pnode_to_exp e)
+                               end)
+                         relevant_tests)
+                  in
+                  let pppns =
+                    deduper
+                      (fun (p,pn,e) ->
+                         begin match integrate_path p pn e with
+                           | None -> List.map ~f:(fun _ -> None) (exp_to_output e)
+                           | Some pn -> exp_to_output (pnode_to_exp pn)
+                         end)
+                      (fun (p,pn,e) ->
+                         begin match integrate_path p pn e with
+                           | None -> Int.max_value
+                           | Some pn ->
+                             size (pnode_to_exp pn)
+                         end)
+                      pppns
+                  in
+                    ((p,t),pppns)*))
+              (*(fun (p,e,pn) ->
+                       List.map
+                         ~f:(fun (_,run) -> run (pnode_to_exp (integrate_path p e pn))))*)
+              (*Option.map
+                ~f:(fun (pn,f) -> (es,pn,f))
+                (select_tops
+                   pns
+                   (fun e ->
+                      test_performance_to_ranking
+                        (List.map ~f:(fun (_,run) -> run (pnode_to_exp e)) tests))
+                   (*(test_performance_to_ranking % tests % pnode_to_exp)*)
+                   (size % pnode_to_exp)))*)
+              ppaths
           in
-          let integrations_ranks_o = distribute_option integrations_rank_os in
-          begin match integrations_ranks_o with
+          print_endline "branches found";
+          let pn_to_pnt (ts:exp tests_outputs) pn =
+          (pn
+          ,List.filter
+              ~f:(fun (_,_,t,_) ->
+                  not (begin match t (pnode_to_exp pn) with
+                    | None -> false
+                    | Some b -> b
+                    end))
+              ts)
+        in
+        let pns =
+          fold_until_completion
+            ~f:(fun (incompleted_pnts,completed_pns) ->
+                let (newly_completed_pnts,incompleted_pnts) =
+                  split_by_condition
+                    ~f:(fun (_,ts) -> List.length ts = 0)
+                    incompleted_pnts
+                in
+                let newly_completed_pns =
+                  List.map
+                    ~f:fst
+                    newly_completed_pnts
+                in
+                let completed_pns = newly_completed_pns@completed_pns in
+                if List.length incompleted_pnts = 0 then
+                  Right completed_pns
+                else
+                  let incompleted_pnts =
+                    cartesian_filter_map
+                      ~f:(fun (p,e) (pn,ts) ->
+                          option_bind
+                            ~f:(fun pn ->
+                                let (pn,ts') = pn_to_pnt ts pn in
+                                if List.length ts = List.length ts' then
+                                  None
+                                else
+                                  Some (pn,ts'))
+                            (integrate_path p pn e))
+                      possible_branches
+                      incompleted_pnts
+                  in
+                  let incompleted_pnts =
+                    deduper
+                      (tests_outputs_to_output_full_retriever
+                         (tests_outputs_update (pnode_to_exp % fst) relevant_tests_outputs))
+                      (size % pnode_to_exp % fst)
+                      incompleted_pnts
+                  in
+                  Left (incompleted_pnts,completed_pns)
+              )
+            (List.map ~f:(pn_to_pnt relevant_tests_outputs) pns,[])
+        in
+        let pns =
+          deduper
+            (tests_outputs_to_output_full_retriever
+               (tests_outputs_update pnode_to_exp relevant_tests_outputs))
+            (size % pnode_to_exp)
+            pns
+        in
+        (*let (progressed_branches,remaining_branches) =
+          split_by_condition
+            ~f:(fun (_,xs) -> not (List.is_empty xs))
+            integrations_rank_os
+        in
+        let progressed_branches_nodes =
+            List.map
+              ~f:snd
+              progressed_branches
+          in
+          let remaining_branches =
+            List.map
+              ~f:fst
+              remaining_branches
+          in
+          print_endline (string_of_int (List.length progressed_branches_nodes));
+          (*let integrations_ranks_o = distribute_option integrations_rank_os in*)
+          print_endline "NOOO";
+          let all_combos = combinations progressed_branches_nodes in
+          print_endline (List.to_string ~f:(fun (e,_) -> Pp.pp_exp e) relevant_tests);
+          print_endline "ooon";
+          let filtered_combos =
+            List.filter_map
+              ~f:(fun combo ->
+                  begin match combo with
+                    | (p,pn,e)::t ->
+                      snd @$
+                      List.fold_left
+                        ~f:(fun (pn,pno) (p,pn',e) ->
+                            begin match pno with
+                              | None -> (pn,None)
+                              | Some pn'' ->
+                                if pn = pn' then
+                                  (pn,integrate_path p pn'' e)
+                                else
+                                  (pn,None)
+                            end)
+                        ~init:(pn,integrate_path p pn e)
+                        t
+                    | _ -> failwith "pleaseno"
+                  end)
+              all_combos
+          in
+          print_endline (string_of_int (List.length filtered_combos));
+          print_endline "hi";
+          let final_pns =
+            List.filter
+              ~f:(fun pn ->
+                  List.for_all
+                    ~f:(fun (_,run) -> run (pnode_to_exp pn))
+                    relevant_tests)
+              filtered_combos
+          in*)
+          if List.is_empty pns then
+            (print_endline "bad happen"; Right [])
+          else
+            Left (pns,next_tests_outputs)
+          (*begin match integrations_ranks_o with
             | None -> Right []
             | Some integrations_ranks ->
               let maxes_indices =
@@ -935,11 +1391,50 @@ and propagate_enforced_matches
                   ~f:(fun pn -> print_endline (List.to_string ~f:(string_of_pair Pp.pp_exp Bool.to_string) (List.map ~f:(fun (v,run) -> (v,run (pnode_to_exp pn))) tests)))
                   pns;
                 print_endline "next";
-                Left (pns,bs)
+                Left (pns,bs,tests)
               else
                 failwith "TODO"
-          end)
-    ([Node (retrieve_match_exp_exn t,[])], ppaths)
+            end*))
+    initial_pns_tests
+  in
+  let ppes =
+    List.map
+      ~f:(fun (pp,rt) ->
+          let es =
+            propogate_exps
+              ~short_circuit:true
+              []
+              rt
+          in
+          let es_sized =
+            List.map
+              ~f:(fun e -> (e,size e))
+              es
+          in
+          let sorted_sized_es =
+            List.sort
+              ~compare:(fun (_,s1) (_,s2) -> Int.compare s1 s2)
+              es_sized
+          in
+          let (e,_) =
+            List.hd_exn
+              sorted_sized_es
+          in
+          (pp,e))
+      ppaths
+  in
+  (List.map
+     ~f:(fun pn ->
+         pnode_to_exp
+           (List.fold_left
+              ~f:(fun pn (pp,e) ->
+                  begin match integrate_path pp pn e with
+                    | Some pn -> pn
+                    | None -> pn
+                  end)
+              ~init:pn
+              ppes))
+     pns)
 
 (***** }}} *****)
 
