@@ -810,7 +810,7 @@ let solution_cache : partition_solution_cache ref = ref []
 let lookup_in_solution_cache
     (t:rtree)
     (tests_outputs:exp tests_outputs)
-  : (partition_solution_cache_value * exp tests_outputs) option =
+  : (partition_solution_cache_value * exp tests_outputs * exp tests_outputs) option =
   let minimal_partitions_tests_outputs =
     split_into_minimal_partitions
       ~compare:(fun (e1,_,_,_) (e2,_,_,_) -> contains e1 e2)
@@ -833,7 +833,7 @@ let lookup_in_solution_cache
                            e12s))
                   minimal_partitions_tests_outputs
               in
-              Option.map ~f:(fun (_,remaining) -> (v,remaining)) fst_sat_o
+              Option.map ~f:(fun (prior,remaining) -> (v,remaining,prior)) fst_sat_o
             else
               None
         end)
@@ -1078,15 +1078,15 @@ and propagate_enforced_matches
            above_adder
            condition)*)
   in
-  let initial_pns_tests : pnode list * exp tests_outputs =
+  let initial_pns_tests : pnode list * exp tests_outputs * exp tests_outputs =
     begin match lookup_in_solution_cache t tests_outputs with
-      | None -> ([Node (retrieve_match_exp_exn t,[])], tests_outputs)
-      | Some v -> print_endline "cache hit!"; v
+      | None -> ([Node (retrieve_match_exp_exn t,[])], tests_outputs, [])
+      | Some v -> v
     end
   in
   let pns =
   fold_until_completion
-    ~f:(fun (pns,tests_outputs) ->
+    ~f:(fun (pns,tests_outputs,prior_tests) ->
         if List.length tests_outputs = 0 then
           Right pns
         else
@@ -1116,7 +1116,6 @@ and propagate_enforced_matches
           let possible_branches =
             List.concat_map
               ~f:(fun (p,t) ->
-                  print_endline "heres one";
                   let make_match pn e =
                     Option.map
                       ~f:(fun pn -> pnode_to_exp pn)
@@ -1351,7 +1350,11 @@ and propagate_enforced_matches
           if List.is_empty pns then
             (print_endline "bad happen"; Right [])
           else
-            Left (pns,next_tests_outputs)
+            let prior_tests_outputs = prior_tests@relevant_tests_outputs in
+            (solution_cache :=
+               ((t,List.map ~f:(fun (i,o,_,_) -> (i,o)) prior_tests_outputs), pns)
+               ::!solution_cache;
+              Left (pns,next_tests_outputs,prior_tests_outputs))
           (*begin match integrations_ranks_o with
             | None -> Right []
             | Some integrations_ranks ->

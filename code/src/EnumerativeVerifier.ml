@@ -853,6 +853,7 @@ struct
         List.map
           ~f:(fun (input,expected_output) ->
               (input
+               ,expected_output
               ,(fun e ->
                  Some (let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
                  try
