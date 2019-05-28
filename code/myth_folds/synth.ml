@@ -100,9 +100,13 @@ let execute_synth_step
   let es =
     Timing.record
       ~label:"synth::propogate_exps"
-      ~action:(fun _ -> propogate_exps ~short_circuit:false tests_outputs t)
+      ~action:(fun _ -> propogate_exps ~short_circuit:false tests_outputs ~search_matches:true t)
   in
-  let es = List.filter ~f:(fun e -> List.for_all ~f:(ident) (tests_outputs_to_tests_full_retriever tests_outputs e)) es in
+  let es =
+    List.filter
+      ~f:(has_passing_capabilities tests_outputs)
+      es
+  in
   let es_s =
     List.map
       ~f:(fun e -> (e,size e))

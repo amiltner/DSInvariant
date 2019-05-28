@@ -853,33 +853,35 @@ struct
         List.map
           ~f:(fun (input,expected_output) ->
               (input
-               ,expected_output
+              ,expected_output
               ,(fun e ->
-                 Some (let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
-                 try
-                   let ans =
-                     Myth_folds.Eval.eval
-                       env
-                       (Myth_folds.Lang.EProj
-                          (1
-                          ,Myth_folds.Lang.EApp(evaler,input)))
-                   in
-                   ans = Myth_folds.Eval.eval env expected_output
-                 with
-                 | Myth_folds.Eval.Eval_error _ -> false))
-              ,fun e ->
-                Some (let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
-                      try
-                        Some
-                          (Myth_folds.Eval.eval
-                             env
-                             (Myth_folds.Lang.EApp(evaler,input)))
-                      with
-                        Myth_folds.Eval.Eval_error _ -> None
-                      | Myth_folds.Eval.Extr_error v -> Some v)))
+                 let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
+                 let (output,is_real) =
+                   try
+                     let ans =
+                       Myth_folds.Eval.eval
+                         env
+                         (Myth_folds.Lang.EApp(evaler,input))
+                     in
+                     (Some ans,true)
+                   with
+                   | Myth_folds.Eval.Eval_error _ -> (None,true)
+                   | Myth_folds.Eval.Extr_error v -> (Some v,false)
+                 in
+                 let correct =
+                   is_real &&
+                   begin match output with
+                     | None -> false
+                     | Some (Myth_folds.Lang.VTuple vs) ->
+                       let ans = Myth_folds.Eval.eval env expected_output in
+                       ans = List.hd_exn vs
+                     | _ -> false
+                   end
+                 in
+                 Myth_folds.Rtree.ExistantLeaf (correct, output))))
           myth_examples
       in
-                (*Some [(
+      (*Some [(
                      let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
                      let (real_output,output) =
                        try
