@@ -195,7 +195,7 @@ let tests_outputs_to_tests_full_retriever
     tests_outputs*)
 
 
-let output_comparer = List.compare (Option.compare Myth_folds.Lang.compare_val)
+let output_comparer = List.compare (Option.compare Lang.compare_val)
 let pp_output = List.to_string ~f:(MyStdlib.string_of_option Pp.pp_value)
 
 let split_by_minimal
