@@ -1015,15 +1015,12 @@ and propogate_exps_matches ?short_circuit:(sc = true)
     | Some ms ->
       if search_matches then
         begin
-          print_endline "begin";
           let ms =
             deduper
               (tests_outputs_update fst tests_outputs)
               (size % fst)
               ms
           in
-          print_endline "tag";
-          print_endline (string_of_int (List.length ms));
           List.concat_map
             ~f:(propogate_exps_rmatch
                   ~short_circuit:sc
@@ -1061,7 +1058,6 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
               initial_es
               tests_outputs
           in
-          print_endline @$ string_of_int (List.length es);
           let nonproductive = List.length es = 0 in
           let es =
             if nonproductive then
@@ -1083,8 +1079,6 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
     []
   else
     let brancheses = combinations bs in
-    print_endline "HERE IS A TAG";
-    print_endline (string_of_int (List.length brancheses));
     let ans = List.map ~f:(fun bs -> EMatch(e,bs)) brancheses in
 
   (*let ans =
@@ -1242,7 +1236,7 @@ and propagate_enforced_matches
   let initial_pns_tests : pnode list * exp tests_outputs * exp tests_outputs =
     begin match lookup_in_solution_cache t tests_outputs with
       | None -> ([Node (retrieve_match_exp_exn t,[])], tests_outputs, [])
-      | Some v -> print_endline "cache hit"; v
+      | Some v -> v
     end
   in
   let pns =
@@ -1265,13 +1259,6 @@ and propagate_enforced_matches
                   ~compare:(fun (e1,_,_) (e2,_,_) -> contains e1 e2)
                   tests_outputs
               in
-              print_endline "relevant";
-              print_endline (List.to_string ~f:(fun (e,_,_) -> Pp.pp_exp e) relevant_tests_outputs);
-              print_endline "next";
-              print_endline (List.to_string ~f:(fun (e,_,_) -> Pp.pp_exp e) next_tests_outputs);
-              print_endline "test end";
-              print_endline (string_of_int (List.length pns));
-              print_endline (string_of_int (List.length ppaths));
               let possible_branches =
                 List.concat_map
                   ~f:(fun (p,t) ->
@@ -1323,15 +1310,12 @@ and propagate_enforced_matches
                                      pns)))*)
                           t
                       in
-                      print_endline (string_of_int (List.length es));
                       let es =
                         minimize
                           size
                           es
                           lower_tests_outputs
                       in
-                      print_endline "after dedup";
-                      print_endline (string_of_int (List.length es));
                       List.map
                         ~f:(fun e -> (p,e))
                         es
@@ -1383,7 +1367,6 @@ and propagate_enforced_matches
                        (size % pnode_to_exp)))*)
                   ppaths
               in
-              print_endline "branches found";
               let pn_to_pnt (ts:exp tests_outputs) pn =
                 (pn
                 ,List.filter
@@ -1492,7 +1475,7 @@ and propagate_enforced_matches
                     filtered_combos
                 in*)
               if List.is_empty pns then
-                (print_endline "bad happen"; Right [])
+                Right []
               else
                 let prior_tests_outputs = prior_tests@relevant_tests_outputs in
                 (solution_cache :=
@@ -1507,7 +1490,6 @@ and propagate_enforced_matches
             standard_calc ()
           else
             begin
-              print_endline "theres a nonforced match, try this first";
               let possible_branches =
                 List.concat_map
                   ~f:(fun (p,t) ->
@@ -1559,15 +1541,12 @@ and propagate_enforced_matches
                                      pns)))*)
                           t
                       in
-                      print_endline (string_of_int (List.length es));
                       let es =
                         minimize
                           size
                           es
                           lower_tests_outputs
                       in
-                      print_endline "after dedup";
-                      print_endline (string_of_int (List.length es));
                       List.map
                         ~f:(fun e -> (p,e))
                         es
@@ -1619,7 +1598,6 @@ and propagate_enforced_matches
                        (size % pnode_to_exp)))*)
                   ppaths
               in
-              print_endline "branches found";
               let pn_to_pnt (ts:exp tests_outputs) pn =
                 (pn
                 ,List.filter
@@ -1730,7 +1708,7 @@ and propagate_enforced_matches
               if not (List.is_empty pns) then
                 Right pns
               else
-                (print_endline "ok it didn't work, standard now"; standard_calc ())
+                standard_calc ()
                 (*begin match integrations_ranks_o with
                   | None -> Right []
                   | Some integrations_ranks ->

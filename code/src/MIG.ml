@@ -191,13 +191,24 @@ module MIGLearner(V : Verifier.t) = struct
       ~unprocessed_problem:(unprocessed_problem : unprocessed_problem)
     : string =
     let problem = ProcessFile.process_full_problem unprocessed_problem in
-    let (a,modi,c,d,e) = problem.unprocessed
-     in let problem' = { problem with
-                        unprocessed = (a,modi,c,d,e) }
-    in DSToMyth.to_pretty_myth_string
-                  ~problem:problem'
-                  (learnInvariant_internal
-                    ~problem
-                    ~positives:[]
-                    ~attempt:0)
+    let (a,modi,c,d,e) = problem.unprocessed in
+    let inv =
+       learnInvariant_internal
+         ~problem
+         ~positives:[]
+         ~attempt:0
+    in
+    let full_ret =
+      match problem.accumulator with
+      | None -> Type.mk_bool_var
+      | Some acc -> Type.mk_tuple [Type.mk_bool_var;acc]
+    in
+    let t' = get_foldable_t problem.tc full_ret in
+    let modi = modi@[Declaration.TypeDeclaration (Id.mk_prime "t", t')] in
+    let problem' = { problem with
+                     unprocessed = (a,modi,c,d,e) }
+    in
+    DSToMyth.to_pretty_myth_string
+      ~problem:problem'
+      inv
 end
