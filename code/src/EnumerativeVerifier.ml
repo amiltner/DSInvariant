@@ -682,11 +682,12 @@ struct
           ~f:(List.map ~f:Value.from_exp_exn)
           ce_option*)
 
-  let synth
+  let synth_core
       ~(problem:problem)
       ~(testbed:TestBed.t)
+      ~(accumulator:Type.t)
     : Expr.t option =
-    let end_type = Type.mk_tuple [Type.mk_bool_var;problem.accumulator] in
+    let end_type = Type.mk_tuple [Type.mk_bool_var ; accumulator] in
     let pos_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_true_exp)) testbed.pos_tests in
     let neg_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_false_exp)) testbed.neg_tests in
     let examples = pos_examples@neg_examples in
@@ -711,8 +712,8 @@ struct
     let (ds,mi,ms,uf,acc) = problem.unprocessed in
     let unprocessed =
       (ds
-      ,mi@[Declaration.type_dec (Id.mk_prime "t") foldable_t
-          ;Declaration.expr_dec "convert" fold_creater]
+      ,mi @ [ Declaration.type_dec (Id.mk_prime "t") foldable_t
+            ; Declaration.expr_dec "convert" fold_creater ]
       ,ms
       ,uf
       ,acc)
@@ -861,4 +862,12 @@ struct
               0
               true)
            tests_outputs)
+
+  let synth
+      ~(problem:problem)
+      ~(testbed:TestBed.t)
+    : Expr.t option =
+    match problem.accumulator with
+    | Some accumulator -> synth_core ~problem ~testbed ~accumulator
+    | None -> raise (Exceptions.Internal_Exn "TODO")
 end

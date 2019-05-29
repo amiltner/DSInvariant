@@ -179,14 +179,15 @@ let process_full_problem
          (VariantContext.value_list full_vc))
       @ i_e
     in
-    make_problem
-      ~module_type:type_instantiation
-      ~ec:full_ec
-      ~tc:full_tc
-      ~vc:full_vc
-      ~mod_vals:module_vals
-      ~post:uf
-      ~eval_context
-      ~unprocessed
-      ~accumulator
-      ()
+    let partial_problem = make_problem
+                            ~module_type:type_instantiation
+                            ~ec:full_ec
+                            ~tc:full_tc
+                            ~vc:full_vc
+                            ~mod_vals:module_vals
+                            ~post:uf
+                            ~eval_context
+                            ~unprocessed
+     in match accumulator with
+        | None -> partial_problem ()
+        | Some acc -> partial_problem ~accumulator:acc ()

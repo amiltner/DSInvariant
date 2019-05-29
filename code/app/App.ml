@@ -32,8 +32,6 @@ let main filename () =
    in Stdio.In_channel.close file_chan
     ; let problem = Parser.unprocessed_problem
           Lexer.token (Lexing.from_string problem_string)
-
-
       in
       print_endline @$ QCMIG.learnInvariant ~unprocessed_problem:problem
 

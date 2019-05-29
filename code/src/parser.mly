@@ -58,9 +58,9 @@ unprocessed_problem:
 
 accumulating:
   | ACCUMULATING t=typ
-    { t }
+    { Some t }
   |
-    { Type.mk_unit }
+    { None }
 
 module_implementation:
   | STRUCT ds=decl_list END

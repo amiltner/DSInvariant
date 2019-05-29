@@ -850,7 +850,7 @@ struct
     List.tl_exn (subvalues e)
 end
 
-type unprocessed_problem = Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t * Type.t
+type unprocessed_problem = Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t * Type.t option
 [@@deriving ord, show, hash]
 
 type problem =
@@ -863,7 +863,7 @@ type problem =
     post         : UniversalFormula.t     ;
     eval_context : (Id.t * Expr.t) list   ;
     unprocessed  : unprocessed_problem    ;
-    accumulator  : Type.t                 ;
+    accumulator  : Type.t option          ;
   }
 [@@deriving ord, show, hash, make]
 
