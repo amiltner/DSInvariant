@@ -162,7 +162,7 @@ let to_myth_exp_with_problem
     ~(problem:problem)
     (e:Expr.t)
   : MythLang.exp =
-  let (decls,modi,_,_) = problem.unprocessed in
+  let (decls,modi,_,_,_) = problem.unprocessed in
   let (_,tt) = convert_decl_list_to_myth problem.ec (decls@modi) in
   to_myth_exp tt e
 
@@ -181,7 +181,7 @@ let convert_problem_examples_type_to_myth
              * (MythLang.exp * MythLang.exp) list
              * MythLang.typ
              * MythLang.typ =
-  let (decls,modi,_,_) = p.unprocessed in
+  let (decls,modi,_,_,_) = p.unprocessed in
   let (ds,tt) = convert_decl_list_to_myth p.ec (decls@modi) in
   let examples =
     List.map

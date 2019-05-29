@@ -24,6 +24,7 @@ let reserved_words : (string * Parser.token) list =
   ; ("binding", BINDING)
   ; ("mu", MU)
   ; ("fix", FIX)
+  ; ("accumulating", ACCUMULATING)
   ]
 
 let symbols : (string * Parser.token) list =

@@ -2,9 +2,16 @@ type nat = mu nat .
   | O
   | S of nat
 
+let zero = O;;
+let succ = fun (x:nat) -> S x;;
+
 type natoption =
   | None
   | Some of nat
+
+let none = None ;;
+
+let some = fun (x:nat) -> Some x;;
 
 type cmp =
   | LT
@@ -122,5 +129,3 @@ forall (s : t) .
         (not (lookup (delete s i) i))
         (implies (lookup (delete s i) j)
                  (lookup s j)))
-
-accumulating natoption

@@ -28,11 +28,14 @@ module QCMIG = MIG.MIGLearner(EnumerativeVerifier.T)
 let main filename () =
   Log.enable ~msg:"DSInfer" (Some "_log") ;
   let file_chan = Utils.get_in_channel filename in
-  let problem_string = Stdio.In_channel.input_all file_chan
+  let problem_string = Prelude.prelude_string ^ (Stdio.In_channel.input_all file_chan)
    in Stdio.In_channel.close file_chan
     ; let problem = Parser.unprocessed_problem
-                      Lexer.token (Lexing.from_string problem_string)
-       in print_endline @$ QCMIG.learnInvariant ~unprocessed_problem:problem
+          Lexer.token (Lexing.from_string problem_string)
+
+
+      in
+      print_endline @$ QCMIG.learnInvariant ~unprocessed_problem:problem
 
 let spec =
   let open Command.Spec in (

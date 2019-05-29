@@ -36,6 +36,7 @@ let rec appify (e:Expr.t) (es:Expr.t list) : Expr.t =
 %token BINDING
 %token MU
 %token FIX
+%token ACCUMULATING
 %token SEMI
 %token STAR
 %token PIPE
@@ -52,8 +53,14 @@ let rec appify (e:Expr.t) (es:Expr.t list) : Expr.t =
 %%
 
 unprocessed_problem:
-    | ds=decl_list mi=module_implementation COLON ms=module_spec MAINTAINS f=formula EOF
-                                                       { (ds,mi,ms,f) }
+    | ds=decl_list mi=module_implementation COLON ms=module_spec MAINTAINS f=formula a=accumulating EOF
+                                                       { (ds,mi,ms,f,a) }
+
+accumulating:
+  | ACCUMULATING t=typ
+    { t }
+  |
+    { Type.mk_unit }
 
 module_implementation:
   | STRUCT ds=decl_list END

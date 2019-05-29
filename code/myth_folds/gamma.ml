@@ -46,6 +46,8 @@ module type Gamma_Sig = sig
     val fresh_id        : id -> t -> id
     val hash            : t -> int
     val pp              : t -> string
+
+    val add_ctors       : t -> Sigma.t -> t
 end
 
 module Gamma_Struct (Dict : Dictionary) : Gamma_Sig = struct
@@ -362,7 +364,30 @@ module Gamma_Struct (Dict : Dictionary) : Gamma_Sig = struct
             (hash_typ t) lxor (hash_exp e) lxor (Int.hash i) lxor ans)
         ~init:102397
         g.recent
-end
+
+    let add_ctors (g:t) (s:Sigma.t) : t =
+      let ts = Sigma.types s in
+      let tis =
+        List.map
+          ~f:(function (TBase i) -> i | _ -> failwith "not happen")
+          ts
+      in
+      List.fold_left
+        ~f:(fun g ti ->
+            let ctors =
+              Sigma.ctors
+                ti
+                s
+            in
+            List.fold_left
+              ~f:(fun g (s,(t,_)) ->
+                  insert s (TArr (t,TBase ti)) false g
+                )
+              ~init:g
+              ctors)
+        ~init:g
+        tis
+  end
 
 module Gamma = Gamma_Struct(ListDictionary)
 

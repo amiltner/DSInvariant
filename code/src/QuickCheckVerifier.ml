@@ -596,13 +596,14 @@ struct
         problem.tc
         end_type
     in
-    let (ds,mi,ms,uf) = problem.unprocessed in
+    let (ds,mi,ms,uf,acc) = problem.unprocessed in
     let unprocessed =
       (ds
       ,mi@[Declaration.type_dec (Id.mk_prime "t") foldable_t
           ;Declaration.expr_dec "convert" fold_creater]
       ,ms
-      ,uf)
+      ,uf
+      ,acc)
     in
     let problem = ProcessFile.process_full_problem unprocessed in
     if (List.length examples = 0) then

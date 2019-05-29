@@ -97,7 +97,7 @@ let validate_module_satisfies_spec
 let process_full_problem
     (unprocessed:unprocessed_problem)
   : problem =
-  let (decs,modi,mods,uf) = unprocessed in
+  let (decs,modi,mods,uf,accumulator) = unprocessed in
   let (ec,tc,vc,i_e) =
     process_decl_list
       ExprContext.empty
@@ -170,6 +170,15 @@ let process_full_problem
         full_tc
         (fst mods)
     in
+    let eval_context =
+      (List.concat_map
+         ~f:(fun cts ->
+             List.map
+               ~f:(fun (c,t) -> (c, Expr.mk_func ("i",t) (Expr.Ctor (c, Expr.mk_var "i"))))
+               cts)
+         (VariantContext.value_list full_vc))
+      @ i_e
+    in
     make_problem
       ~module_type:type_instantiation
       ~ec:full_ec
@@ -177,6 +186,7 @@ let process_full_problem
       ~vc:full_vc
       ~mod_vals:module_vals
       ~post:uf
-      ~eval_context:i_e
+      ~eval_context
       ~unprocessed
+      ~accumulator
       ()

@@ -70,8 +70,8 @@ module MIGLearner(V : Verifier.t) = struct
               ~positives:positives
           in
           Log.debug (lazy ("IND Delta: " ^ (Expr.show pre_inv))) ;
-          if is_equal @$ Expr.compare pre_inv invariant then
-            Left invariant
+          if is_equal @$ Expr.compare pre_inv (Expr.mk_constant_true_func Type.mk_t_var) then
+            Left (Expr.and_predicates pre_inv invariant)
           else
             helper pre_inv
       end
@@ -190,9 +190,16 @@ module MIGLearner(V : Verifier.t) = struct
   let learnInvariant
       ~unprocessed_problem:(unprocessed_problem : unprocessed_problem)
     : string =
-    let problem = ProcessFile.process_full_problem unprocessed_problem
-     in DSToMyth.to_pretty_myth_string
-          ~problem
+    let problem = ProcessFile.process_full_problem unprocessed_problem in
+    let t' = get_foldable_t problem.tc (Type.mk_tuple [Type.mk_bool_var;problem.accumulator]) in
+    let (a,modi,c,d,e) = problem.unprocessed in
+    let modi = modi@[Declaration.TypeDeclaration (Id.mk_prime "t", t')] in
+    let problem' =
+      { problem with
+        unprocessed = (a,modi,c,d,e) }
+    in
+    DSToMyth.to_pretty_myth_string
+          ~problem:problem'
           (learnInvariant_internal
              ~problem
              ~positives:[]

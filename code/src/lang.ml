@@ -850,7 +850,7 @@ struct
     List.tl_exn (subvalues e)
 end
 
-type unprocessed_problem = Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t
+type unprocessed_problem = Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t * Type.t
 [@@deriving ord, show, hash]
 
 type problem =
@@ -863,5 +863,116 @@ type problem =
     post         : UniversalFormula.t     ;
     eval_context : (Id.t * Expr.t) list   ;
     unprocessed  : unprocessed_problem    ;
+    accumulator  : Type.t                 ;
   }
 [@@deriving ord, show, hash, make]
+
+let get_foldable_t
+    (tc:TypeContext.t)
+    (fold_completion:Type.t)
+  : Type.t =
+  let rec type_to_folded_type_internal
+      (i:Id.t)
+      (t:Type.t)
+    : Type.t =
+    begin match t with
+      | Var i' ->
+        if is_equal @$ Id.compare i i' then
+          fold_completion
+        else
+          t
+      | Tuple ts ->
+        Tuple (List.map ~f:(type_to_folded_type_internal i) ts)
+      | Variant branches ->
+        Variant
+          (List.map
+             ~f:(fun (b,t) ->
+                 (Id.mk_prime b
+                 ,type_to_folded_type_internal i t))
+             branches)
+      | Arr _ | Mu _ -> t
+    end
+  in
+  let t = TypeContext.lookup_exn tc "t" in
+  let tv = Type.destruct_id_exn t in
+  let t = TypeContext.lookup_exn tc tv in
+  let ito = Type.destruct_mu t in
+  begin match ito with
+    | None -> t
+    | Some (i,t) ->
+      type_to_folded_type_internal i t
+  end
+
+  let convert_foldable_to_full
+      (tc:TypeContext.t)
+      (fold_completion:Type.t)
+    : Expr.t =
+    let convert_internal_id = "convert'" in
+    let convert_internal_exp = Expr.mk_var convert_internal_id in
+    let rec convert_foldable_internal
+        (i:Id.t)
+        (t:Type.t)
+        (incoming_exp:Expr.t)
+      : Expr.t =
+      begin match t with
+        | Var i' ->
+          if is_equal @$ Id.compare i i' then
+            Expr.mk_app
+              convert_internal_exp
+              incoming_exp
+          else
+            incoming_exp
+        | Tuple ts ->
+          Expr.mk_tuple
+            (List.mapi
+               ~f:(fun num t ->
+                   convert_foldable_internal
+                     i
+                     t
+                     (Expr.mk_proj num incoming_exp))
+               ts)
+        | Variant branches ->
+          Expr.mk_match
+            incoming_exp
+            "x"
+            (List.map
+               ~f:(fun (b,t) ->
+                   (b,Expr.mk_ctor
+                      (Id.mk_prime b)
+                      (convert_foldable_internal
+                         i
+                         t
+                         (Expr.mk_var "x"))))
+               branches)
+        | Mu _
+        | Arr _ ->
+          incoming_exp
+      end
+    in
+    let t = TypeContext.lookup_exn tc "t" in
+    let tv = Type.destruct_id_exn t in
+    let t = TypeContext.lookup_exn tc tv in
+    let ito = Type.destruct_mu t in
+    let t' = Type.mk_var (Id.mk_prime "t") in
+    begin match ito with
+      | None ->
+        Expr.mk_func
+          ("x",Type.mk_arr t' t')
+          (Expr.mk_var "x")
+      | Some (i,t_internal) ->
+        Expr.mk_func
+          ("f",Type.mk_arr
+             t'
+             fold_completion)
+          (Expr.mk_fix
+             convert_internal_id
+             (Type.mk_arr Type.mk_t_var fold_completion)
+             (Expr.mk_func
+                ("x",Type.mk_t_var)
+                (Expr.mk_app
+                   (Expr.mk_var "f")
+                   (convert_foldable_internal
+                      i
+                      t_internal
+                      (Expr.mk_var "x")))))
+    end

@@ -682,122 +682,11 @@ struct
           ~f:(List.map ~f:Value.from_exp_exn)
           ce_option*)
 
-  let convert_foldable_to_full
-      (tc:TypeContext.t)
-      (fold_completion:Type.t)
-    : Expr.t =
-    let convert_internal_id = "convert'" in
-    let convert_internal_exp = Expr.mk_var convert_internal_id in
-    let rec convert_foldable_internal
-        (i:Id.t)
-        (t:Type.t)
-        (incoming_exp:Expr.t)
-      : Expr.t =
-      begin match t with
-        | Var i' ->
-          if is_equal @$ Id.compare i i' then
-            Expr.mk_app
-              convert_internal_exp
-              incoming_exp
-          else
-            incoming_exp
-        | Tuple ts ->
-          Expr.mk_tuple
-            (List.mapi
-               ~f:(fun num t ->
-                   convert_foldable_internal
-                     i
-                     t
-                     (Expr.mk_proj num incoming_exp))
-               ts)
-        | Variant branches ->
-          Expr.mk_match
-            incoming_exp
-            "x"
-            (List.map
-               ~f:(fun (b,t) ->
-                   (b,Expr.mk_ctor
-                      (Id.mk_prime b)
-                      (convert_foldable_internal
-                         i
-                         t
-                         (Expr.mk_var "x"))))
-               branches)
-        | Mu _
-        | Arr _ ->
-          incoming_exp
-      end
-    in
-    let t = TypeContext.lookup_exn tc "t" in
-    let tv = Type.destruct_id_exn t in
-    let t = TypeContext.lookup_exn tc tv in
-    let ito = Type.destruct_mu t in
-    let t' = Type.mk_var (Id.mk_prime "t") in
-    begin match ito with
-      | None ->
-        Expr.mk_func
-          ("x",Type.mk_arr t' t')
-          (Expr.mk_var "x")
-      | Some (i,t_internal) ->
-        Expr.mk_func
-          ("f",Type.mk_arr
-             t'
-             fold_completion)
-          (Expr.mk_fix
-             convert_internal_id
-             (Type.mk_arr Type.mk_t_var fold_completion)
-             (Expr.mk_func
-                ("x",Type.mk_t_var)
-                (Expr.mk_app
-                   (Expr.mk_var "f")
-                   (convert_foldable_internal
-                      i
-                      t_internal
-                      (Expr.mk_var "x")))))
-    end
-
-  let get_foldable_t
-      (tc:TypeContext.t)
-      (fold_completion:Type.t)
-    : Type.t =
-    let rec type_to_folded_type_internal
-        (i:Id.t)
-        (t:Type.t)
-      : Type.t =
-      begin match t with
-        | Var i' ->
-          if is_equal @$ Id.compare i i' then
-            fold_completion
-          else
-            t
-        | Tuple ts ->
-          Tuple (List.map ~f:(type_to_folded_type_internal i) ts)
-        | Variant branches ->
-          Variant
-            (List.map
-               ~f:(fun (b,t) ->
-                   (Id.mk_prime b
-                   ,type_to_folded_type_internal i t))
-               branches)
-        | Arr _ | Mu _ -> t
-      end
-    in
-    let t = TypeContext.lookup_exn tc "t" in
-    let tv = Type.destruct_id_exn t in
-    let t = TypeContext.lookup_exn tc tv in
-    let ito = Type.destruct_mu t in
-    begin match ito with
-      | None -> t
-      | Some (i,t) ->
-        type_to_folded_type_internal i t
-    end
-
   let synth
       ~(problem:problem)
       ~(testbed:TestBed.t)
     : Expr.t option =
-    let acc_type = Type.mk_var "natoption" in
-    let end_type = Type.mk_tuple [Type.mk_bool_var;acc_type] in
+    let end_type = Type.mk_tuple [Type.mk_bool_var;problem.accumulator] in
     let pos_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_true_exp)) testbed.pos_tests in
     let neg_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_false_exp)) testbed.neg_tests in
     let examples = pos_examples@neg_examples in
@@ -819,13 +708,14 @@ struct
         problem.tc
         end_type
     in
-    let (ds,mi,ms,uf) = problem.unprocessed in
+    let (ds,mi,ms,uf,acc) = problem.unprocessed in
     let unprocessed =
       (ds
       ,mi@[Declaration.type_dec (Id.mk_prime "t") foldable_t
           ;Declaration.expr_dec "convert" fold_creater]
       ,ms
-      ,uf)
+      ,uf
+      ,acc)
     in
     let problem = ProcessFile.process_full_problem unprocessed in
     if (List.length examples = 0) then
@@ -844,6 +734,8 @@ struct
           decls
       in
       let env = Myth_folds.Eval.gen_init_env decls in
+      let env = Myth_folds.Sigma.Sigma.add_ctors_env env sigma in
+      let gamma = Myth_folds.Gamma.Gamma.add_ctors gamma sigma in
       let desired_t =
         Type.mk_arr
           (Type.mk_var "t")
