@@ -1,8 +1,7 @@
 open MyStdlib
 open Lang
 
-module Make(V : Verifier.t) =
-struct
+module Make (V : Verifier.t) (S : Synthesizer.t) = struct
   let learnVPreCondAll
       ~(problem : problem)
       ~(pre : Expr.t)
@@ -70,7 +69,7 @@ struct
              all_inside_examples
          in
          print_endline (TestBed.show testbed);
-         let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed:testbed) in
+         let synthed_pre = Expr.simplify @$ Option.value_exn (S.synth ~problem ~testbed:testbed) in
          Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
          let full_pre = Expr.and_predicates pre synthed_pre in
          let model_o =
@@ -177,7 +176,7 @@ struct
            all_inside_examples
        in
        print_endline (TestBed.show testbed);
-       let synthed_pre = Expr.simplify @$ Option.value_exn (V.synth ~problem ~testbed:testbed) in
+       let synthed_pre = Expr.simplify @$ Option.value_exn (S.synth ~problem ~testbed:testbed) in
        Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
        let full_pre = Expr.and_predicates pre synthed_pre in
        let model_o =

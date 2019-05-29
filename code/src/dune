@@ -28,6 +28,6 @@
 (library
     (name DSInvGen)
     (public_name DSInvGen)
-    (libraries core qcheck core_extended MyStdlib Myth_folds)
+    (libraries async_parallel core qcheck core_extended MyStdlib Myth_folds)
     (preprocessor_deps (file config.h))
     (preprocess (pps ppx_hash ppx_deriving.std ppx_optcomp ppx_compare ppx_sexp_conv)))

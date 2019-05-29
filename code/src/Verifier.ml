@@ -1,7 +1,6 @@
 open Lang
 
-module type t =
-sig
+module type t = sig
   val equiv_false :
     problem:problem ->
     cond:Expr.t ->
@@ -22,9 +21,4 @@ sig
     eval_t:Type.t ->
     post:UniversalFormula.t ->
     (Value.t list) option
-
-  val synth :
-    problem:problem ->
-    testbed:TestBed.t ->
-    Expr.t option
 end

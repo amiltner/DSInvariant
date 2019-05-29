@@ -1,8 +1,8 @@
 open MyStdlib
 open Lang
 
-module MIGLearner(V : Verifier.t) = struct
-  module VPIE = VPIE.Make(V)
+module MIGLearner(V : Verifier.t) (S : Synthesizer.t) = struct
+  module VPIE = VPIE.Make(V)(S)
 
   let push_boundary
       ~(problem : problem)
