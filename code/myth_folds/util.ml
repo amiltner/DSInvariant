@@ -1,3 +1,9 @@
+let (%)
+    (f:'b -> 'c)
+    (g:'a -> 'b)
+  : 'a -> 'c =
+  Core.Fn.compose f g
+
 let rec update (m:('a * ('b list)) list)
                ((k, v):'a * 'b) : ('a * ('b list)) list =
   match m with
@@ -267,3 +273,50 @@ let rec update_first
         | Some h' -> Some (h'::t)
       end
   end
+
+module List = struct
+  open Core
+  include Core.List
+
+  let compare_as_multisets (l1 : 'a t) (l2 : 'a t) ~(cmp : 'a -> 'a -> int) : int =
+    List.compare cmp
+                 (List.sort ~compare:cmp l1)
+                 (List.sort ~compare:cmp l2)
+
+  let rec fold_until_completion ~f:(f: 'a -> ('a,'b) either) (acc:'a) : 'b =
+    begin match f acc with
+    | Left acc' -> fold_until_completion ~f:f acc'
+    | Right answer -> answer
+    end
+
+  let cartesian_filter_map ~(f : 'a -> 'b -> 'c option)
+                           (l1 : 'a list)
+                           (l2 : 'b list)
+                           : 'c list =
+    List.(rev (fold l1 ~init:[]
+                    ~f:(fun acc a -> fold l2 ~init:acc
+                                          ~f:(fun acc b -> match f a b with
+                                                           | None -> acc
+                                                           | Some c -> c :: acc))))
+
+let sort_and_partition_with_indices ~(cmp : 'a -> 'a -> int)
+                                    (l:'a list)
+                                    : ('a * int) list list =
+  let rec merge_grouped_things (remaining:('a * int) list)
+                               (currentacc:('a*int) list)
+                               (accacc:('a*int) list list)
+                               : ('a*int) list list =
+    begin match remaining with
+    | [] -> currentacc :: accacc
+    | (h,i)::t -> let currenthd = fst (List.hd_exn currentacc)
+                   in match cmp h currenthd with
+                      | 0 -> merge_grouped_things t ((h,i)::currentacc) accacc
+                      | _ -> merge_grouped_things t [(h,i)] (currentacc::accacc)
+    end
+  in let sorted = List.sort ~compare:(fun (x,_) (y,_) -> (cmp x y))
+                            (List.mapi ~f:(fun i x -> (x,i)) l)
+  in begin match sorted with
+       | [] -> []
+       | h::t -> merge_grouped_things t [h] []
+     end
+end
