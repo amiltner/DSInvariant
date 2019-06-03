@@ -4,13 +4,13 @@ open Printf
 (**** Language {{{ *****)
 
 type id = string
-[@@deriving ord, show, hash]
+[@@deriving eq, hash, ord, show]
 
 type label = string
-[@@deriving ord, show, hash]
+[@@deriving eq, hash, ord, show]
 
 type 'a record = (label * 'a) list
-[@@deriving ord, show, hash]
+[@@deriving eq, hash, ord, show]
 
 type typ =
   | TBase of id
@@ -18,7 +18,7 @@ type typ =
   | TTuple of typ list (* Invariant: List must always have two members. *)
   | TRcd of typ record
   | TUnit
-[@@deriving ord, show, hash]
+[@@deriving eq, hash, ord, show]
 
 let get_base_exn (t:typ)
   : string =
@@ -28,11 +28,11 @@ let get_base_exn (t:typ)
   end
 
 type ctor = id * typ
-[@@deriving ord, show, hash]
+[@@deriving eq, hash, ord, show]
 
 module Ctor = struct
   type t = ctor
-  [@@deriving ord, show, hash]
+  [@@deriving eq, hash, ord, show]
 end
 
 let hash_fold_ref =
@@ -43,13 +43,13 @@ type pattern =
   | PVar of id
   | PTuple of pattern list
   | PRcd of pattern record
-[@@deriving ord, show, hash]
+[@@deriving eq, hash, ord, show]
 
 type pat = id * (pattern option)   (* (id of constructor, pattern). *)
-[@@deriving ord, show, hash]
+[@@deriving eq, hash, ord, show]
 
 type arg = id * typ
-[@@deriving ord, show, hash]
+[@@deriving eq, hash, ord, show]
 
 type env = (id * value) list
 
@@ -81,11 +81,11 @@ and value =
   | VTuple of value list (* Invariant: List must always have two members. *)
   | VRcd of value record
   | VUnit
-[@@deriving ord, show, hash]
+[@@deriving eq, hash, ord, show]
 
 module Type = struct
   type t = typ
-  [@@deriving ord, show, hash]
+  [@@deriving eq, hash, ord, show]
 end
 
 let compare_val (v1:value) (v2:value) : int =

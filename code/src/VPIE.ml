@@ -35,12 +35,10 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
         (Log.info (lazy ("VPIE Attempt "
                          ^ (Int.to_string attempt)
                          ^ "."));
-         let pos_examples = List.map ~f:(fun (v,_) -> v) testbed.pos_tests in
-         let neg_examples = List.map ~f:(fun (v,_) -> v) testbed.neg_tests in
          let subvalues =
            List.concat_map
              ~f:Value.strict_subvalues
-             (pos_examples@neg_examples)
+             (testbed.pos_tests @ testbed.neg_tests)
          in
          let all_inside_examples =
            List.filter
@@ -61,9 +59,9 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                         ~eval:(Expr.mk_identity_func (Type.mk_var "t"))
                         ~eval_t:(Type.mk_arr (Type.mk_var "t") (Type.mk_var "t"))
                         ~post:post) then
-                   TestBed.add_neg_test_allow_dups ~testbed:tb e
+                   TestBed.add_neg_test ~testbed:tb e
                  else
-                   TestBed.add_pos_test_allow_dups ~testbed:tb e
+                   TestBed.add_pos_test ~testbed:tb e
                )
              ~init:testbed
              all_inside_examples
@@ -98,11 +96,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
              else
                let new_neg_example = List.hd_exn model in
                Log.info (lazy ("Add negative example: " ^ (Value.show new_neg_example)));
-               helper
-                 (attempt+1)
-                 (TestBed.add_neg_test_disallow_dups
-                    ~testbed
-                    new_neg_example)
+               helper (attempt+1) (TestBed.add_neg_test ~testbed new_neg_example)
          end)
       in
       helper 0 testbed
@@ -142,12 +136,10 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
       (Log.info (lazy ("VPIE Attempt "
                        ^ (Int.to_string attempt)
                        ^ "."));
-       let pos_examples = List.map ~f:(fun (v,_) -> v) testbed.pos_tests in
-       let neg_examples = List.map ~f:(fun (v,_) -> v) testbed.neg_tests in
        let subvalues =
          List.concat_map
            ~f:Value.strict_subvalues
-           (pos_examples@neg_examples)
+           (testbed.pos_tests @ testbed.neg_tests)
        in
        let all_inside_examples =
          List.filter
@@ -168,9 +160,9 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                       ~eval:(Expr.mk_identity_func (Type.mk_var "t"))
                       ~eval_t:(Type.mk_arr (Type.mk_var "t") (Type.mk_var "t"))
                       ~post:post) then
-                 TestBed.add_neg_test_allow_dups ~testbed:tb e
+                 TestBed.add_neg_test ~testbed:tb e
                else
-                 TestBed.add_pos_test_allow_dups ~testbed:tb e
+                 TestBed.add_pos_test ~testbed:tb e
              )
            ~init:testbed
            all_inside_examples
@@ -197,11 +189,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
            else
              let new_neg_example = List.hd_exn model in
              Log.info (lazy ("Add negative example: " ^ (Value.show new_neg_example)));
-             helper
-               (attempt+1)
-               (TestBed.add_neg_test_disallow_dups
-                  ~testbed
-                  new_neg_example)
+             helper (attempt+1) (TestBed.add_neg_test ~testbed new_neg_example)
        end)
     in
     helper 0 testbed

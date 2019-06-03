@@ -23,7 +23,8 @@ open DSInvGen
     | Some anses -> print_endline (string_of_list Value.show anses)
   end*)
 
-module QCMIG = MIG.MIGLearner (EnumerativeVerifier.T) (ParSynthesizer.T)
+module EMIG = MIG.MIGLearner (EnumerativeVerifier.T) (ParSynthesizer.T)
+module QCMIG = MIG.MIGLearner (QuickCheckVerifier.T) (ParSynthesizer.T)
 
 let main (* nworkers *) filename () =
   Log.enable ~msg:"DSInfer" (Some "_log") ;
@@ -32,7 +33,7 @@ let main (* nworkers *) filename () =
    in Stdio.In_channel.close file_chan
     ; let problem = Parser.unprocessed_problem
           Lexer.token (Lexing.from_string problem_string)
-      in print_endline (QCMIG.learnInvariant ~unprocessed_problem:problem)
+      in print_endline (EMIG.learnInvariant ~unprocessed_problem:problem)
        ; Deferred.unit
 
 let spec =

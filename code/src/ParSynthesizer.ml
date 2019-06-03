@@ -9,9 +9,9 @@ module T : Synthesizer.t = struct
       ~(accumulator:Type.t)
     : Expr.t option =
     let end_type = Type.mk_tuple [Type.mk_bool_var ; accumulator] in
-    let pos_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_true_exp)) testbed.pos_tests in
-    let neg_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_false_exp)) testbed.neg_tests in
-    let examples = pos_examples@neg_examples in
+    let pos_examples = List.map ~f:(fun v -> (Value.to_exp v, Expr.mk_true_exp)) testbed.pos_tests in
+    let neg_examples = List.map ~f:(fun v -> (Value.to_exp v, Expr.mk_false_exp)) testbed.neg_tests in
+    let examples = pos_examples @ neg_examples in
     let (decls,_,_,_) =
       DSToMyth.convert_problem_examples_type_to_myth
         problem
