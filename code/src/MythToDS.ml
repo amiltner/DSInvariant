@@ -1,7 +1,5 @@
 open Core
 
-open Lang
-
 let rec explode (binder: Expr.t) : Myth_folds.Lang.pattern list -> (Expr.t * Id.t) list =
   let rec helper i acc = 
     function
@@ -21,7 +19,7 @@ let rec convert_type : Myth_folds.Lang.typ -> Type.t =
   | TTuple (typlist)  -> Type.Tuple (List.map ~f:convert_type typlist)
   | TUnit             -> Type.mk_unit
 
-let convert_arg ((id, typ) : Myth_folds.Lang.arg) : Arg.t =
+let convert_arg ((id, typ) : Myth_folds.Lang.arg) : Param.t =
   (id, convert_type typ)
 
 let _FRESH_VAR_COUNTER = ref 0

@@ -1,7 +1,5 @@
 open Core
 
-open Lang
-
 let rec evaluate (e : Expr.t) : Value.t =
   match e with
     | Var i
