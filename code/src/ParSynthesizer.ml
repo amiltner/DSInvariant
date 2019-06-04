@@ -1,6 +1,49 @@
-open MyStdlib
+(* open Async *)
+open Core
+
 open Utils
 open Lang
+
+(* module Worker = struct
+  module T = struct
+    type w_input = problem * TestBed.t * Type.t [@@deriving bin_io]
+    type w_output = Expr.t option [@@deriving bin_io]
+
+    type 'worker functions = {
+      synth : ('worker, w_input, w_output) Rpc_parallel.Function.t
+    }
+
+    module Worker_state = struct
+      type init_arg = unit [@@deriving bin_io]
+      type t = unit
+    end
+
+    module Connection_state = struct
+      type init_arg = unit [@@deriving bin_io]
+      type t = unit
+    end
+
+    module Functions (C : Rpc_parallel.Creator
+                          with type worker_state := Worker_state.t
+                          and type connection_state := Connection_state.t) =
+    struct
+      let print_impl ~worker_state:() ~conn_state:() string =
+        printf "%s\n" string;
+        return ()
+      ;;
+
+      let print =
+        C.create_rpc ~f:print_impl ~bin_input:String.bin_t ~bin_output:Unit.bin_t ()
+      ;;
+
+      let functions = { print }
+      let init_worker_state () = Deferred.unit
+      let init_connection_state ~connection:_ ~worker_state:_ = return
+    end
+  end
+
+  include Rpc_parallel.Make (T)
+end *)
 
 module T : Synthesizer.t = struct
   let synth_core
@@ -190,5 +233,14 @@ module T : Synthesizer.t = struct
     : Expr.t option =
     match problem.accumulator with
     | Some accumulator -> synth_core ~problem ~testbed ~accumulator
-    | None -> raise (Exceptions.Internal_Exn "TODO")
+    | None -> begin
+      let config =
+          Rpc_parallel.Map_reduce.Config.create
+            ~local:4
+            ~redirect_stderr:`Dev_null
+            ~redirect_stdout:`Dev_null
+            ()
+       in ignore config
+        ; raise (Exceptions.Internal_Exn "TODO")
+    end
 end

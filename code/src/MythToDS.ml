@@ -1,4 +1,5 @@
 open Core
+
 open Lang
 
 let rec explode (binder: Expr.t) : Myth_folds.Lang.pattern list -> (Expr.t * Id.t) list =

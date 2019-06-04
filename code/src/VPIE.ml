@@ -1,4 +1,5 @@
-open MyStdlib
+open Core
+
 open Lang
 
 module Make (V : Verifier.t) (S : Synthesizer.t) = struct
@@ -67,7 +68,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
              all_inside_examples
          in
          print_endline (TestBed.show testbed);
-         let synthed_pre = Expr.simplify @$ Option.value_exn (S.synth ~problem ~testbed:testbed) in
+         let synthed_pre = Expr.simplify (Option.value_exn (S.synth ~problem ~testbed:testbed)) in
          Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
          let full_pre = Expr.and_predicates pre synthed_pre in
          let model_o =
@@ -92,11 +93,13 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
              full_pre
            | Some model ->
              if (List.length model <> 1) then
-               failwith ("cannot do such functions yet: " ^ (string_of_list Value.show model))
+               failwith ("cannot do such functions yet: " ^ (List.to_string ~f:Value.show model))
              else
                let new_neg_example = List.hd_exn model in
                Log.info (lazy ("Add negative example: " ^ (Value.show new_neg_example)));
-               helper (attempt+1) (TestBed.add_neg_test ~testbed new_neg_example)
+               helper
+                 (attempt+1)
+                 (TestBed.add_neg_test ~testbed new_neg_example)
          end)
       in
       helper 0 testbed
@@ -168,7 +171,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
            all_inside_examples
        in
        print_endline (TestBed.show testbed);
-       let synthed_pre = Expr.simplify @$ Option.value_exn (S.synth ~problem ~testbed:testbed) in
+       let synthed_pre = Expr.simplify (Option.value_exn (S.synth ~problem ~testbed:testbed)) in
        Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
        let full_pre = Expr.and_predicates pre synthed_pre in
        let model_o =
@@ -185,11 +188,13 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
            full_pre
          | Some model ->
            if (List.length model <> 1) then
-             failwith ("cannot do such functions yet: " ^ (string_of_list Value.show model))
+             failwith ("cannot do such functions yet: " ^ (List.to_string ~f:Value.show model))
            else
              let new_neg_example = List.hd_exn model in
              Log.info (lazy ("Add negative example: " ^ (Value.show new_neg_example)));
-             helper (attempt+1) (TestBed.add_neg_test ~testbed new_neg_example)
+             helper
+               (attempt+1)
+               (TestBed.add_neg_test ~testbed new_neg_example)
        end)
     in
     helper 0 testbed

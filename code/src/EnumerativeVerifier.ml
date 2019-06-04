@@ -1,4 +1,5 @@
-open MyStdlib
+open Core
+
 open Utils
 open Lang
 
@@ -54,11 +55,11 @@ module T : Verifier.t = struct
       let elements_simple = elements_of_type_and_size tc in
       begin match t with
         | Var i ->
-          elements_simple (TypeContext.lookup_exn tc i) s
+          elements_simple (Context.find_exn tc i) s
         | Arr _ ->
           failwith "Will do if necessary..."
         | Tuple ts ->
-          let parts = partitions (s-1) (List.length ts) in
+          let parts = List.partitions (s-1) (List.length ts) in
           let components =
             List.concat_map
               ~f:(fun part ->
@@ -68,12 +69,12 @@ module T : Verifier.t = struct
                       ts
                       part
                   in
-                  combinations components)
+                  List.combinations components)
               parts
           in
           List.map ~f:Expr.mk_tuple components
         | Mu (v,t) ->
-          let tc = TypeContext.insert tc v t in
+          let tc = Context.set tc ~key:v ~data:t in
           elements_of_type_and_size tc t s
         | Variant options ->
           List.concat_map
@@ -92,7 +93,7 @@ module T : Verifier.t = struct
     : Expr.t list =
     List.concat_map
       ~f:(fun s -> elements_of_type_and_size tc t s)
-      (range 1 (max_size+1))
+      (List.range 1 (max_size+1))
 
 
   let elements_of_type_to_size_unit
@@ -104,7 +105,7 @@ module T : Verifier.t = struct
       ~f:(fun r -> ((),r))
       (elements_of_type_to_size tc t max_size)
 
-  module TypeSet = SetOf(Type)
+  module TypeSet = Set.Make(Type)
 
   let contains_any
       (tc:TypeContext.t)
@@ -117,16 +118,16 @@ module T : Verifier.t = struct
         (checked:TypeSet.t)
         (t:Type.t)
       : bool =
-      if TypeSet.member checked t then
+      if TypeSet.mem checked t then
         false
-      else if is_equal (Type.compare t desired_t) then
+      else if Type.equal t desired_t then
         true
       else
-        let checked = TypeSet.insert t checked in
+        let checked = TypeSet.add checked t in
         let contains_any_simple = contains_any tc desired_t checked in
         begin match t with
           | Var v ->
-            begin match TypeContext.lookup tc v with
+            begin match Context.find tc v with
               | Some t -> contains_any_simple t
               | None -> false
             end
@@ -135,7 +136,7 @@ module T : Verifier.t = struct
           | Tuple ts ->
             List.exists ~f:contains_any_simple ts
           | Mu (i,t) ->
-            let tc = TypeContext.insert tc i t in
+            let tc = Context.set tc ~key:i ~data:t in
             contains_any tc desired_t checked t
           | Variant branches ->
             List.exists ~f:contains_any_simple (List.map ~f:snd branches)
@@ -150,7 +151,7 @@ module T : Verifier.t = struct
       (v:Value.t)
     : Value.t list =
     let extract_typed_subcomponents_simple = extract_typed_subcomponents tc desired_t in
-    if is_equal (Type.compare t desired_t) then
+    if Type.equal t desired_t then
       [v]
     else
       begin match (t,v) with
@@ -160,19 +161,16 @@ module T : Verifier.t = struct
             (List.zip_exn ts vs)
         | (Variant branches, Ctor (c,v)) ->
           let t =
-            List.Assoc.find_exn
-              ~equal:(is_equal %% String.compare)
-              branches
-              c
+            List.Assoc.find_exn ~equal:String.equal branches c
           in
           extract_typed_subcomponents_simple t v
         | (Var i, _) ->
-          begin match TypeContext.lookup tc i with
+          begin match Context.find tc i with
             | None -> []
             | Some t -> extract_typed_subcomponents_simple t v
           end
         | (Mu (i,t), _) ->
-          let tc = TypeContext.insert tc i t in
+          let tc = Context.set tc ~key:i ~data:t in
           extract_typed_subcomponents tc desired_t t v
         | (Arr _, _) -> failwith "arrows not currently supported"
         | _ -> failwith "Something went wrong"
@@ -205,10 +203,10 @@ module T : Verifier.t = struct
               (generator t size))
         args
     in
-    let all_args = combinations args_possibilities in
+    let all_args = List.combinations args_possibilities in
     let args_sized =
       List.map
-        ~f:(fun args -> (args,(List.fold ~f:(+) ~init:0 (List.map ~f:(Expr.size % snd3) args))))
+        ~f:(fun args -> (args,(List.fold_left ~f:(+) ~init:0 (List.map ~f:(Expr.size % snd3) args))))
         all_args
     in
     let all_args_sized_ordered =
@@ -267,7 +265,7 @@ module T : Verifier.t = struct
               ~eval:cond
               ~eval_t:cond_t)
            ~init:true
-           ~f:(fun _ (_,res) -> if is_equal @$ Value.compare res Value.mk_true
+           ~f:(fun _ (_,res) -> if Value.equal res Value.mk_true
                 then true else raise Caml.Exit)
      with Caml.Exit -> false
   (* fold_until_completion
@@ -312,9 +310,9 @@ module T : Verifier.t = struct
     in
     List.find_map
       ~f:(fun (e,v) ->
-          if is_equal @$ Value.compare v Value.mk_true then
+          if Value.equal v Value.mk_true then
             None
-          else if is_equal @$ Value.compare v Value.mk_false then
+          else if Value.equal v Value.mk_false then
             Some e
           else
             failwith "bad uf")
@@ -330,7 +328,7 @@ module T : Verifier.t = struct
     let desired_t = Type.mk_var "t" in
     let (args_t,result_t) = extract_args eval_t in
     if (List.length examples = 0
-        && List.mem ~equal:(is_equal %% Type.compare) args_t desired_t)
+        && List.mem ~equal:Type.equal args_t desired_t)
     || not (contains_any problem.tc desired_t result_t) then
       None
     else
@@ -345,7 +343,7 @@ module T : Verifier.t = struct
           (t:Type.t)
           (size:int)
         : (unit * Expr.t) list =
-        if is_equal @$ Type.compare t desired_t then
+        if Type.equal t desired_t then
           List.filter_map
             ~f:(fun (x,s) -> if s <= size then Some ((),x) else None)
             sized_exs
@@ -380,7 +378,7 @@ module T : Verifier.t = struct
           (t:Type.t)
           (size:int)
         : (((Expr.t * Type.t) list * Value.t) option * Expr.t) list =
-        if is_equal @$ Type.compare t desired_t then
+        if Type.equal t desired_t then
           List.filter_map
             ~f:(fun (etv,e,s) -> if s <= size then Some (Some etv,e) else None)
             split_sized_results
@@ -398,7 +396,7 @@ module T : Verifier.t = struct
         ~f:(fun negative_example ->
             List.filter_map
               ~f:(fun (et_o,_,t) ->
-                  if is_equal @$ Type.compare t desired_t then
+                  if Type.equal t desired_t then
                     Some (Option.value_exn et_o)
                   else
                     None)
@@ -458,7 +456,7 @@ module T : Verifier.t = struct
                   let relevant =
                     List.filter_map
                       ~f:(fun (e,t) ->
-                          if is_equal @$ Type.compare desired_t t then
+                          if Type.equal desired_t t then
                             Some e
                           else
                             None)
@@ -506,15 +504,9 @@ module T : Verifier.t = struct
                 e
             in
             let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
-            if is_equal
-                (Value.compare
-                   v
-                   Value.mk_true) then
+            if Value.equal v Value.mk_true then
               Some (Value.from_exp_exn e)
-            else if is_equal
-                (Value.compare
-                   v
-                   Value.mk_false) then
+            else if Value.equal v Value.mk_false then
               None
             else
               failwith "incorrect evaluation")
@@ -533,7 +525,7 @@ module T : Verifier.t = struct
             ~f:(fun (ets,_) ->
                 List.filter_map
                   ~f:(fun (e,t) ->
-                      if is_equal @$ Type.compare t desired_t then
+                      if Type.equal t desired_t then
                         Some (Value.from_exp_exn e)
                       else
                         None)
@@ -668,7 +660,7 @@ module T : Verifier.t = struct
                     let relevant =
                       List.filter_map
                         ~f:(fun (e,t) ->
-                            if is_equal @$ Type.compare desired_t t then
+                            if Type.equal desired_t t then
                               Some e
                             else
                               None)

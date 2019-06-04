@@ -7,7 +7,7 @@ open Utils
 type t = {
   neg_tests : Value.t list ;
   pos_tests : Value.t list ;
-} [@@deriving show]
+} [@@deriving bin_io, show]
 
 let create_positive pos_tests : t =
   { pos_tests = List.dedup_and_sort ~compare:Value.compare pos_tests

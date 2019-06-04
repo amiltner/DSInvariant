@@ -1,9 +1,9 @@
-open MyStdlib
+open Core
 
 module Id =
 struct
   type t = string
-  [@@deriving ord, show, hash]
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
 
   let mk_prime (x:t) : t = x ^ "'"
 end
@@ -16,7 +16,7 @@ struct
     | Tuple of t list
     | Mu of Id.t * t
     | Variant of (Id.t * t) list
-  [@@deriving ord, show, hash]
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
 
   let mk_var
       (i:Id.t)
@@ -33,7 +33,7 @@ struct
       (i:Id.t)
       (t:t)
     : t =
-    if (is_equal @$ compare t (mk_var i)) then
+    if equal t (mk_var i) then
       failwith "cannot do infinite loop";
     Mu (i,t)
 
@@ -177,7 +177,7 @@ struct
     fold
       ~base_f:(fun _ -> 1)
       ~arr_f:(fun x y -> x+y+1)
-      ~tuple_f:(fun ss -> List.fold ~f:(+) ~init:1 ss)
+      ~tuple_f:(fun ss -> List.fold_left~f:(+) ~init:1 ss)
       ~mu_f:(fun _ s -> s+1)
       ~variant_f:(fun bs ->
           List.fold
@@ -189,7 +189,7 @@ end
 module Arg =
 struct
   type t = Id.t * Type.t
-  [@@deriving ord, show, hash]
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
 end
 
 module Expr =
@@ -203,7 +203,7 @@ struct
     | Fix  of Id.t * Type.t * t
     | Tuple of t list
     | Proj of int * t
-  [@@deriving ord, show, hash]
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
 
   let mk_var
       (i:Id.t)
@@ -263,7 +263,7 @@ struct
       (e:t)
     : a option =
     begin match e with
-      | App (e1,e2) -> Option.some @$ f e1 e2
+      | App (e1,e2) -> Some (f e1 e2)
       | _ -> None
     end
 
@@ -288,7 +288,7 @@ struct
       (e:t)
     : a option =
     begin match e with
-      | Func (a,e2) -> Option.some @$ f a e2
+      | Func (a,e2) -> Some (f a e2)
       | _ -> None
     end
 
@@ -313,7 +313,7 @@ struct
       (e:t)
     : a option =
     begin match e with
-      | Ctor (i,e2) -> Option.some @$ f i e2
+      | Ctor (i,e2) -> Some (f i e2)
       | _ -> None
     end
 
@@ -337,7 +337,7 @@ struct
       (e:t)
     : a option =
     begin match e with
-      | Tuple es -> Option.some @$ f es
+      | Tuple es -> Some (f es)
       | _ -> None
     end
 
@@ -362,7 +362,7 @@ struct
       (e:t)
     : a option =
     begin match e with
-      | Proj (i,e2) -> Option.some @$ f i e2
+      | Proj (i,e2) -> Some (f i e2)
       | _ -> None
     end
 
@@ -388,7 +388,7 @@ struct
       (e:t)
     : a option =
     begin match e with
-      | Match (e,i,branches) -> Option.some @$ f e i branches
+      | Match (e,i,branches) -> Some (f e i branches)
       | _ -> None
     end
 
@@ -414,7 +414,7 @@ struct
       (e:t)
     : a option =
     begin match e with
-      | Fix (i,t,e) -> Option.some @$ f i t e
+      | Fix (i,t,e) -> Some (f i t e)
       | _ -> None
     end
 
@@ -435,14 +435,14 @@ struct
     let replace_simple = replace i e_with in
     begin match e with
       | Var i' ->
-        if is_equal (String.compare i i') then
+        if String.equal i i' then
           e_with
         else
           e
       | App (e1,e2) ->
         App (replace_simple e1, replace_simple e2)
       | Func ((i',t),e') ->
-        if is_equal (String.compare i i') then
+        if String.equal i i' then
           e
         else
           Func ((i',t),replace_simple e')
@@ -450,7 +450,7 @@ struct
         Ctor (i, replace_simple e)
       | Match (e,i',branches) ->
         let branches =
-          if is_equal @$ Id.compare i i' then
+          if Id.equal i i' then
             branches
           else
             List.map
@@ -459,7 +459,7 @@ struct
         in
         Match (replace_simple e, i', branches)
       | Fix (i',t,e') ->
-        if is_equal @$ Id.compare i i' then
+        if Id.equal i i' then
           e
         else
           Fix (i',t,replace_simple e')
@@ -518,24 +518,24 @@ struct
     : bool =
     let contains_var_simple = contains_var v in
     begin match e with
-      | Var i -> is_equal @$ Id.compare i v
+      | Var i -> Id.equal i v
       | App (e1,e2) -> contains_var_simple e1 || contains_var_simple e2
       | Func ((i,_),e) ->
-        if is_equal @$ Id.compare i v then
+        if Id.equal i v then
           false
         else
           contains_var_simple e
       | Ctor (_,e) -> contains_var_simple e
       | Match (e,i,branches) ->
         contains_var_simple e ||
-        (if is_equal @$ Id.compare i v then
+        (if Id.equal i v then
            false
          else
            List.exists
              ~f:(fun (_,e) -> contains_var_simple e)
              branches)
       | Fix (i,_,e) ->
-        if is_equal @$ Id.compare i v then
+        if Id.equal i v then
           false
         else
           contains_var_simple e
@@ -580,14 +580,11 @@ struct
       (e:t)
     : bool =
     begin match e with
-      | Func (_,e) -> is_equal @$ compare e func_internals
+      | Func (_,e) -> equal e func_internals
       | _ -> false
     end
 
-  let and_predicates
-      (e1:t)
-      (e2:t)
-    : t =
+  let and_predicates (e1:t) (e2:t) : t =
     let is_true_func = is_func ~func_internals:mk_true_exp in
     let is_false_func = is_func ~func_internals:mk_false_exp in
     if is_true_func e1 then
@@ -605,58 +602,55 @@ struct
         (var,Type.mk_var "t")
         (and_exps apped_e1 apped_e2)
 
-  (*let ((arg1,_),internal1) = destruct_func_exn e1 in
-  let ((arg2,t2),internal2) = destruct_func_exn e2 in
-  let replaced_internal1 =
-    replace
-      arg1
-      (mk_var arg2)
-      internal1
-  in
-  mk_func
-    (arg2,t2)
-    (and_exps
-       replaced_internal1
-       internal2)*)
-
-  let mk_let_in
-      (i:Id.t)
-      (t:Type.t)
-      (e1:t)
-      (e2:t)
-    : t =
+  let mk_let_in (i:Id.t) (t:Type.t) (e1:t) (e2:t) : t =
     mk_app (mk_func (i,t) e2) e1
 
-  let size
-    : t -> int =
-    fold
-      ~var_f:(fun _ -> 1)
-      ~app_f:(fun x y -> x+y+1)
-      ~func_f:(fun (_,t) i -> 1 + (Type.size t) + i)
-      ~ctor_f:(fun _ s -> s+1)
-      ~match_f:(fun s _ bs ->
-          List.fold
-            ~f:(fun acc (_,s) -> s+acc)
-            ~init:(s+1)
-            bs)
-      ~fix_f:(fun _ t s -> 1 + (Type.size t) + s)
-      ~tuple_f:(fun is -> List.fold ~f:(+) ~init:1 is)
-      ~proj_f:(fun _ i -> i+2)
+  let size : t -> int =
+    fold ~var_f:(fun _ -> 1)
+         ~app_f:(fun x y -> x+y+1)
+         ~func_f:(fun (_,t) i -> 1 + (Type.size t) + i)
+         ~ctor_f:(fun _ s -> s+1)
+         ~match_f:(fun s _ bs -> List.fold_left bs ~init:(s+1)
+                                                ~f:(fun acc (_,s) -> s+acc))
+         ~fix_f:(fun _ t s -> 1 + (Type.size t) + s)
+         ~tuple_f:(List.fold_left~f:(+) ~init:1)
+         ~proj_f:(fun _ i -> i+2)
 end
 
-module Context(D : Data) =
-struct
-  include DictOf(Id)(D)
+module Context = struct
+  include Map.Make(Id)
+  include Provide_bin_io(Id)
+  include Provide_hash(Id)
 end
 
-module ExprContext = Context(Type)
-module TypeContext = Context(Type)
-module VariantContext = Context(ListOf(PairOf(Id)(Type)))
+module ExprContext = struct
+  type key = Context.Key.t
+  type value = Type.t
+
+  type t = Type.t Context.t
+  [@@deriving bin_io, eq, hash, ord, sexp]
+end
+
+module TypeContext = struct
+  type key = Context.Key.t
+  type value = Type.t
+
+  type t = Type.t Context.t
+  [@@deriving bin_io, eq, hash, ord, sexp]
+end
+
+module VariantContext = struct
+  type key = Context.Key.t
+  type value = (Id.t * Type.t) list
+
+  type t = (Id.t * Type.t) list Context.t
+  [@@deriving bin_io, eq, hash, ord, sexp]
+end
 
 module ModuleSpec =
 struct
   type t = Id.t * (Id.t * Type.t) list
-  [@@deriving ord, show, hash]
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
 end
 
 module Declaration =
@@ -664,7 +658,7 @@ struct
   type t =
     | TypeDeclaration of Id.t * Type.t
     | ExprDeclaration of Id.t * Expr.t
-  [@@deriving ord, show, hash]
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
 
   let fold
       (type a)
@@ -692,13 +686,13 @@ end
 module ModuleImplementation =
 struct
   type t = Declaration.t list
-  [@@deriving ord, show, hash]
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
 end
 
 module UniversalFormula =
 struct
   type t = Arg.t list * Expr.t
-  [@@deriving ord, show, hash]
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
 end
 
 module Value =
@@ -707,7 +701,7 @@ struct
     | Func of Arg.t * Expr.t
     | Ctor of Id.t * t
     | Tuple of t list
-  [@@deriving ord, show, hash]
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
 
   let mk_func
       (a:Arg.t)
@@ -721,7 +715,7 @@ struct
       (v:t)
     : a option =
     begin match v with
-      | Func (a,e2) -> Option.some @$ f a e2
+      | Func (a,e2) -> Some (f a e2)
       | _ -> None
     end
 
@@ -746,7 +740,7 @@ struct
       (v:t)
     : a option =
     begin match v with
-      | Ctor (i,v) -> Option.some @$ f i v
+      | Ctor (i,v) -> Some (f i v)
       | _ -> None
     end
 
@@ -770,7 +764,7 @@ struct
       (v:t)
     : a option =
     begin match v with
-      | Tuple vs -> Option.some @$ f vs
+      | Tuple vs -> Some (f vs)
       | _ -> None
     end
 
@@ -811,17 +805,12 @@ struct
     (e:Expr.t)
     : t option =
     begin match e with
-      | Func (a,e) ->
-        Some (mk_func a e)
-      | Ctor (i,e) ->
-        Option.map
-          ~f:(mk_ctor i)
-          (from_exp e)
-      | Tuple es ->
-        Option.map
-          ~f:mk_tuple
-          (distribute_option
-             (List.map ~f:from_exp es))
+      | Func (a,e)
+        -> Some (mk_func a e)
+      | Ctor (i,e)
+        -> Option.map ~f:(mk_ctor i) (from_exp e)
+      | Tuple es
+        -> Option.map ~f:mk_tuple (Some (List.filter_map es ~f:from_exp))
       | Var _
       | App _
       | Proj _
@@ -829,29 +818,23 @@ struct
       | Fix _ -> None
     end
 
-  let from_exp_exn
-      (e:Expr.t)
-    : t =
+  let from_exp_exn (e:Expr.t) : t =
     Option.value_exn (from_exp e)
 
-  let rec subvalues
-      (v:t)
-    : t list =
-    v::
-    begin match v with
-      | Func _ -> []
-      | Ctor (_,v) -> subvalues v
-      | Tuple vs -> List.concat_map ~f:subvalues vs
-    end
+  let rec subvalues (v:t) : t list =
+    v :: begin match v with
+           | Func _ -> []
+           | Ctor (_,v) -> subvalues v
+           | Tuple vs -> List.concat_map ~f:subvalues vs
+         end
 
-  let strict_subvalues
-      (e:t)
-    : t list =
+  let strict_subvalues (e:t) : t list =
     List.tl_exn (subvalues e)
 end
 
-type unprocessed_problem = Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t * Type.t option
-[@@deriving ord, show, hash]
+type unprocessed_problem =
+  Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t * Type.t option
+[@@deriving bin_io, eq, hash, ord, sexp]
 
 type problem =
   {
@@ -865,7 +848,7 @@ type problem =
     unprocessed  : unprocessed_problem    ;
     accumulator  : Type.t option          ;
   }
-[@@deriving ord, show, hash, make]
+[@@deriving bin_io, eq, hash, make, ord, sexp]
 
 let get_foldable_t
     (tc:TypeContext.t)
@@ -877,7 +860,7 @@ let get_foldable_t
     : Type.t =
     begin match t with
       | Var i' ->
-        if is_equal @$ Id.compare i i' then
+        if Id.equal i i' then
           fold_completion
         else
           t
@@ -893,9 +876,9 @@ let get_foldable_t
       | Arr _ | Mu _ -> t
     end
   in
-  let t = TypeContext.lookup_exn tc "t" in
+  let t = Context.find_exn tc "t" in
   let tv = Type.destruct_id_exn t in
-  let t = TypeContext.lookup_exn tc tv in
+  let t = Context.find_exn tc tv in
   let ito = Type.destruct_mu t in
   begin match ito with
     | None -> t
@@ -916,7 +899,7 @@ let get_foldable_t
       : Expr.t =
       begin match t with
         | Var i' ->
-          if is_equal @$ Id.compare i i' then
+          if Id.equal i i' then
             Expr.mk_app
               convert_internal_exp
               incoming_exp
@@ -949,9 +932,9 @@ let get_foldable_t
           incoming_exp
       end
     in
-    let t = TypeContext.lookup_exn tc "t" in
+    let t = Context.find_exn tc "t" in
     let tv = Type.destruct_id_exn t in
-    let t = TypeContext.lookup_exn tc tv in
+    let t = Context.find_exn tc tv in
     let ito = Type.destruct_mu t in
     let t' = Type.mk_var (Id.mk_prime "t") in
     begin match ito with

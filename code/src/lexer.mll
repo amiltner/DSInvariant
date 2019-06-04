@@ -1,7 +1,7 @@
 {
+open Core
 open Lexing
 open Parser
-open MyStdlib
 
 exception Lexer_error of string
 

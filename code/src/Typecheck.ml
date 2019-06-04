@@ -1,4 +1,5 @@
-open MyStdlib
+open Core
+
 open Lang
 
 let type_equiv
@@ -16,12 +17,12 @@ let type_equiv
         (tc:TypeContext.t)
         (v:Id.t)
       : Type.t =
-      TypeContext.lookup_exn tc v
+      Context.find_exn tc v
     in
     let type_equiv_simple = type_equiv_internal tc1 tc2 in
     begin match (t1,t2) with
       | (Var i1, Var i2) ->
-        if is_equal @$ Id.compare i1 i2 then
+        if Id.equal i1 i2 then
           true
         else
           let t1 = replace_with_definition tc1 i1 in
@@ -34,12 +35,12 @@ let type_equiv
         let t2 = replace_with_definition tc2 i2 in
         type_equiv_simple t1 t2
       | (Mu _, Mu _) ->
-        (is_equal @$ Type.compare t1 t2)
+        Type.equal t1 t2
       | (Mu (i1,t1'), _) ->
-        let tc1 = TypeContext.insert tc1 i1 t1 in
+        let tc1 = Context.set tc1 ~key:i1 ~data:t1 in
         type_equiv_internal tc1 tc2 t1' t2
       | (_, Mu (i2,t2')) ->
-        let tc2 = TypeContext.insert tc2 i2 t2 in
+        let tc2 = Context.set tc2 ~key:i2 ~data:t2 in
         type_equiv_internal tc1 tc2 t1 t2'
       | (Arr (t11,t12), Arr (t21,t22)) ->
         let t1_equiv = type_equiv_simple t11 t21 in
@@ -67,7 +68,7 @@ let type_equiv
                 ~f:(fun acc_b ((id1,t1),(id2,t2)) ->
                     acc_b
                     && type_equiv_simple t1 t2
-                    && is_equal (Id.compare id1 id2))
+                    && Id.equal id1 id2)
                 ~init:(true)
                 t1t2s)
           (List.zip idts1 idts2)
@@ -81,9 +82,9 @@ let rec concretify
   : Type.t =
   begin match t with
     | Var i ->
-      concretify tc (TypeContext.lookup_exn tc i)
+      concretify tc (Context.find_exn tc i)
     | Mu (i, t') ->
-      let tc = TypeContext.insert tc i t in
+      let tc = Context.set tc ~key:i ~data:t in
       concretify tc t'
     | _ -> t
   end
@@ -97,7 +98,7 @@ let rec typecheck_exp
   let typecheck_simple = typecheck_exp ec tc vc in
   begin match e with
     | Var v ->
-      ExprContext.lookup_exn ec v
+      Context.find_exn ec v
     | App (e1,e2) ->
       let t1 = concretify tc (typecheck_simple e1) in
       let (t11,t12) = Type.destruct_arr_exn t1 in
@@ -110,7 +111,7 @@ let rec typecheck_exp
                   ^ " instead of "
                   ^ (Type.show t11))
     | Func ((i,t),e) ->
-      let ec = ExprContext.insert ec i t in
+      let ec = Context.set ec ~key:i ~data:t in
       Type.mk_arr
         t
         (typecheck_exp
@@ -120,12 +121,9 @@ let rec typecheck_exp
            e)
     | Ctor (i,e) ->
       let t = typecheck_simple e in
-      let its = VariantContext.lookup_exn vc i in
+      let its = Context.find_exn vc i in
       let t_defined =
-        List.Assoc.find_exn
-          ~equal:(is_equal %% Id.compare)
-          its
-          i
+        List.Assoc.find_exn ~equal:Id.equal its i
       in
       if type_equiv tc t_defined t then
         Type.mk_variant its
@@ -150,27 +148,20 @@ let rec typecheck_exp
       Option.value_exn
         (List.fold_left
            ~f:(fun acc_o ((i_actual,e),(i_expected,t_arg)) ->
-               if is_equal @$ Id.compare i_actual i_expected then
-                 let ec = ExprContext.insert ec i t_arg in
-                 let t =
-                   typecheck_exp
-                     ec
-                     tc
-                     vc
-                     e
-                 in
-                 begin match acc_o with
-                   | None -> Some t
-                   | Some acc ->
-                     if (type_equiv tc acc t) then
-                       Some acc
-                     else
-                       failwith
-                         ("inconsistent return types: "
-                          ^ (Type.show acc)
-                          ^ " and "
-                          ^ (Type.show t))
-                 end
+               if Id.equal i_actual i_expected then
+                 let ec = Context.set ec ~key:i ~data:t_arg in
+                 let t = typecheck_exp ec tc vc e
+                  in begin match acc_o with
+                       | None -> Some t
+                       | Some acc
+                         -> if (type_equiv tc acc t) then
+                              Some acc
+                            else failwith
+                                   ("inconsistent return types: "
+                                   ^ (Type.show acc)
+                                   ^ " and "
+                                   ^ (Type.show t))
+                     end
                else
                  failwith
                    ("Variant mismatch with "
@@ -180,7 +171,7 @@ let rec typecheck_exp
            ~init:None
            merged_ordered_actual_expected)
     | Fix (i,t,e) ->
-      let ec = ExprContext.insert ec i t in
+      let ec = Context.set ec ~key:i ~data:t in
       typecheck_exp ec tc vc e
     | Tuple es ->
       Type.mk_tuple
@@ -202,7 +193,7 @@ let typecheck_formula
   let (ec,ts) =
     List.fold_left
       ~f:(fun (ec,ts) (i,t) ->
-          (ExprContext.insert ec i t,t::ts))
+          (Context.set ec ~key:i ~data:t, t::ts))
       ~init:(ec,[])
       foralls
   in
