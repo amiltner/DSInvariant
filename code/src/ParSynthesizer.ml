@@ -47,7 +47,7 @@ end *)
 
 module T : Synthesizer.t = struct
   let synth_core
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(testbed:TestBed.t)
       ~(accumulator:Type.t)
     : Expr.t option =
@@ -228,7 +228,7 @@ module T : Synthesizer.t = struct
            tests_outputs)
 
   let synth
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(testbed:TestBed.t)
     : Expr.t option =
     match problem.accumulator with

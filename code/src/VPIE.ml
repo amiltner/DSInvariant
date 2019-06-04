@@ -4,7 +4,7 @@ open Lang
 
 module Make (V : Verifier.t) (S : Synthesizer.t) = struct
   let learnVPreCondAll
-      ~(problem : problem)
+      ~(problem : Problem.t)
       ~(pre : Expr.t)
       ~(post : UniversalFormula.t)
       ~(positives : Value.t list)
@@ -105,7 +105,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
       helper 0 testbed
 
   let learnVPreCond
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(pre:Expr.t)
       ~(eval : Expr.t)
       ~(eval_t : Type.t)

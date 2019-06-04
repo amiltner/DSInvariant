@@ -155,7 +155,7 @@ module T : Verifier.t = struct
     end
 
   let make_random_evaluator
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
       ~(gen:TypeToGeneratorDict.t)
@@ -179,7 +179,7 @@ module T : Verifier.t = struct
     ,d)
 
   let equiv_false
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~cond:(cond:Expr.t)
     : bool =
     let num_checks = _NUM_CHECKS_ in
@@ -211,7 +211,7 @@ module T : Verifier.t = struct
 
 
   let implication_counter_example
-      ~problem:(problem:problem)
+      ~problem:(problem:Problem.t)
       ~pre:(pre:Expr.t)
       ~eval:(eval:Expr.t)
       ~(eval_t:Type.t)
@@ -341,7 +341,7 @@ module T : Verifier.t = struct
           ce_option)
 
   let true_on_examples
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(examples:Value.t list)
       ~(eval:Expr.t)
       ~(eval_t:Type.t)

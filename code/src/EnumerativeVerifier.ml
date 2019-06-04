@@ -190,7 +190,7 @@ module T : Verifier.t = struct
       (type a)
       ~(size:int)
       ~(generator:Type.t -> int -> (a * Expr.t) list)
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(eval:Expr.t)
       ~(args:Type.t list)
     : ((a * Expr.t * Type.t) list * Value.t) list =
@@ -232,7 +232,7 @@ module T : Verifier.t = struct
       (type a)
       ~(size:int)
       ~(generator:Type.t -> int -> (a * Expr.t) list)
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
     : ((a * Expr.t * Type.t) list * Value.t) list =
@@ -246,7 +246,7 @@ module T : Verifier.t = struct
       ~args
 
   let equiv_false
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~cond:(cond:Expr.t)
     : bool =
     let cond_t = Type.mk_arr Type.mk_t_var Type.mk_bool_var in
@@ -290,7 +290,7 @@ module T : Verifier.t = struct
       (type a)
       ~(size:int)
       ~(generator:Type.t -> int -> (a * Expr.t) list)
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
     : (a * Expr.t * Type.t) list option =
     let args = List.map ~f:snd post_quants in
@@ -319,7 +319,7 @@ module T : Verifier.t = struct
       evaled
 
   let true_on_examples_full
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(examples:Value.t list)
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
@@ -471,7 +471,7 @@ module T : Verifier.t = struct
         ce_option*)
 
   let true_on_examples
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(examples:Value.t list)
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
@@ -487,7 +487,7 @@ module T : Verifier.t = struct
          ~post)
 
   let implication_counter_example
-      ~problem:(problem:problem)
+      ~problem:(problem:Problem.t)
       ~pre:(pre:Expr.t)
       ~eval:(eval:Expr.t)
       ~(eval_t:Type.t)

@@ -1,8 +1,6 @@
-open Lang
-
 module type t = sig
   val synth :
-    problem:problem ->
+    problem:Problem.t ->
     testbed:TestBed.t ->
     Expr.t option
 end

@@ -6,7 +6,7 @@ module MIGLearner(V : Verifier.t) (S : Synthesizer.t) = struct
   module VPIE = VPIE.Make(V)(S)
 
   let push_boundary
-      ~(problem : problem)
+      ~(problem : Problem.t)
       ~eval:(eval : Expr.t)
       ~(eval_t : Type.t)
       ~post:(post : UniversalFormula.t)
@@ -24,7 +24,7 @@ module MIGLearner(V : Verifier.t) (S : Synthesizer.t) = struct
          ~post)
 
   let satisfyTransAll
-      ~problem:(problem : problem)
+      ~problem:(problem : Problem.t)
       ~invariant:(invariant : Expr.t)
       ~positives:(positives : Value.t list)
     : ((Expr.t,Value.t) Either.t) =
@@ -80,7 +80,7 @@ module MIGLearner(V : Verifier.t) (S : Synthesizer.t) = struct
     helper invariant
 
   let satisfyTrans
-      ~problem:(problem : problem)
+      ~problem:(problem : Problem.t)
       ~invariant:(invariant : Expr.t)
       ~eval:(eval : Expr.t)
       ~eval_t:(eval_t : Type.t)
@@ -135,7 +135,7 @@ module MIGLearner(V : Verifier.t) (S : Synthesizer.t) = struct
     helper invariant
 
   let rec learnInvariant_internal
-      ~problem:(problem : problem)
+      ~problem:(problem : Problem.t)
       ~positives:(positives : Value.t list)
       ~attempt:(attempt:int)
     : Expr.t =
@@ -189,7 +189,7 @@ module MIGLearner(V : Verifier.t) (S : Synthesizer.t) = struct
     end
 
   let learnInvariant
-      ~unprocessed_problem:(unprocessed_problem : unprocessed_problem)
+      ~unprocessed_problem:(unprocessed_problem : Problem.t_unprocessed)
     : string =
     let problem = ProcessFile.process_full_problem unprocessed_problem in
     let (a,modi,c,d,e) = problem.unprocessed in

@@ -78,24 +78,6 @@ struct
   [@@deriving bin_io, eq, hash, ord, sexp, show]
 end
 
-type unprocessed_problem =
-  Declaration.t list * ModuleImplementation.t * ModuleSpec.t * UniversalFormula.t * Type.t option
-[@@deriving bin_io, eq, hash, ord, sexp]
-
-type problem =
-  {
-    module_type  : Type.t                 ;
-    ec           : ExprContext.t          ;
-    tc           : TypeContext.t          ;
-    vc           : VariantContext.t       ;
-    mod_vals     : (Expr.t * Type.t) list ;
-    post         : UniversalFormula.t     ;
-    eval_context : (Id.t * Expr.t) list   ;
-    unprocessed  : unprocessed_problem    ;
-    accumulator  : Type.t option          ;
-  }
-[@@deriving bin_io, eq, hash, make, ord, sexp]
-
 let get_foldable_t
     (tc:TypeContext.t)
     (fold_completion:Type.t)
@@ -182,26 +164,25 @@ let get_foldable_t
     let tv = Type.destruct_id_exn t in
     let t = Context.find_exn tc tv in
     let ito = Type.destruct_mu t in
-    let t' = Type.mk_var (Id.mk_prime "t") in
-    begin match ito with
-      | None ->
-        Expr.mk_func
-          ("x",Type.mk_arr t' t')
-          (Expr.mk_var "x")
-      | Some (i,t_internal) ->
-        Expr.mk_func
-          ("f",Type.mk_arr
-             t'
-             fold_completion)
-          (Expr.mk_fix
-             convert_internal_id
-             (Type.mk_arr Type.mk_t_var fold_completion)
-             (Expr.mk_func
-                ("x",Type.mk_t_var)
-                (Expr.mk_app
-                   (Expr.mk_var "f")
-                   (convert_foldable_internal
-                      i
-                      t_internal
-                      (Expr.mk_var "x")))))
-    end
+    let t' = Type.mk_var (Id.mk_prime "t")
+     in match ito with
+        | None ->
+          Expr.mk_func
+            ("x",Type.mk_arr t' t')
+            (Expr.mk_var "x")
+        | Some (i,t_internal) ->
+          Expr.mk_func
+            ("f",Type.mk_arr
+              t'
+              fold_completion)
+            (Expr.mk_fix
+              convert_internal_id
+              (Type.mk_arr Type.mk_t_var fold_completion)
+              (Expr.mk_func
+                  ("x",Type.mk_t_var)
+                  (Expr.mk_app
+                    (Expr.mk_var "f")
+                    (convert_foldable_internal
+                        i
+                        t_internal
+                        (Expr.mk_var "x")))))

@@ -90,9 +90,7 @@ let validate_module_satisfies_spec
     ~init:(Option.is_some (Context.find tc i))
     es
 
-let process_full_problem
-    (unprocessed:unprocessed_problem)
-  : problem =
+let process_full_problem (unprocessed : Problem.t_unprocessed) : Problem.t =
   let (decs,modi,mods,uf,accumulator) = unprocessed in
   let (ec,tc,vc,i_e) =
     process_decl_list
@@ -141,7 +139,7 @@ let process_full_problem
          (Context.data full_vc))
       @ i_e
     in
-    let partial_problem = make_problem
+    let partial_problem = Problem.make
                             ~module_type:type_instantiation
                             ~ec:full_ec
                             ~tc:full_tc
