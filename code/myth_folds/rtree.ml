@@ -1249,16 +1249,13 @@ and propagate_enforced_matches
   in
   let initial_pns_tests : pnode list * exp tests_outputs * exp tests_outputs =
     begin match lookup_in_solution_cache t tests_outputs with
-      | None -> print_endline "cache no hit"; ([Node (retrieve_match_exp_exn t,[])], tests_outputs, [])
-      | Some v -> print_endline "cache hit"; (v,[],[])
+      | None -> ([Node (retrieve_match_exp_exn t,[])], tests_outputs, [])
+      | Some v -> (v,[],[])
     end
   in
-  print_endline "here maybe";
   let pns =
   fold_until_completion
     ~f:(fun (pns,tests_outputs,prior_tests) ->
-        print_endline "waddup";
-        print_endline (string_of_int (List.length pns));
         if List.length tests_outputs = 0 then
           Right pns
         else
@@ -1283,12 +1280,9 @@ and propagate_enforced_matches
                    ~f:(fun (_,e,r,t) -> (false,e,r,t))
                    next_tests_outputs)
               in
-              print_endline (List.to_string ~f:(fun (_,e1,e2,_) -> string_of_pair Pp.pp_exp Pp.pp_exp (e1,e2)) relevant_tests_outputs);
               let possible_branches =
                 List.concat_map
                   ~f:(fun (p,t) ->
-                      print_endline (string_of_int (List.length pns));
-                      print_endline "hiya";
                       let make_match pn e =
                         Option.map
                           ~f:(fun pn -> pnode_to_exp pn)
@@ -1395,7 +1389,6 @@ and propagate_enforced_matches
                        (size % pnode_to_exp)))*)
                   ppaths
               in
-              print_endline "yo";
               let pn_to_pnt (ts:exp tests_outputs) pn =
                 (pn
                 ,List.filter
@@ -1504,10 +1497,9 @@ and propagate_enforced_matches
                     filtered_combos
                 in*)
               if List.is_empty pns then
-                (print_endline "continues"; Right [])
+                Right []
               else
                 let prior_tests_outputs = prior_tests@relevant_tests_outputs in
-                print_endline "didnt continue";
                 (solution_cache :=
                    ((t,List.map ~f:(fun (_,i,o,_) -> (i,o)) prior_tests_outputs), pns)
                    ::!solution_cache;
@@ -1828,7 +1820,6 @@ and propagate_enforced_matches
   begin match ppes_o with
     | None -> []
     | Some ppes ->
-      print_endline "here";
   (List.concat_map
      ~f:(fun pn ->
          List.map

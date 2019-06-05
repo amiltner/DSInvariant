@@ -96,7 +96,6 @@ let execute_synth_step
     end
   end;
   (*do_if_verbose (fun _ -> printf "%s\n%!" (Rtree.pp_rtree t));*)
-  print_endline "propogate";
   let es =
     Timing.record
       ~label:"synth::propogate_exps"
@@ -144,5 +143,5 @@ let synthesize
     (t:rtree)
     (tests_outputs:exp tests_outputs)
   : exp list =
-  verbose_mode := true;
+  verbose_mode := false;
   execute_synth_plan s env t standard_synth_plan tests_outputs

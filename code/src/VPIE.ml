@@ -14,13 +14,11 @@ struct
     let negatives = List.map ~f:fst tb.neg_tests in
     List.for_all
       ~f:(fun p ->
-          print_endline "pos";
           let ans =
             Eval.evaluate_with_holes
               ~eval_context:problem.eval_context
               (Expr.mk_app e (Value.to_exp p))
           in
-          print_endline (Value.show ans);
           is_equal @$
           Value.compare
             ans
@@ -29,13 +27,11 @@ struct
       &&
       List.for_all
         ~f:(fun p ->
-            print_endline "neg";
             let ans =
               Eval.evaluate_with_holes
                 ~eval_context:problem.eval_context
                 (Expr.mk_app e (Value.to_exp p))
             in
-            print_endline (Value.show ans);
             is_equal @$
             Value.compare
               ans
@@ -59,7 +55,6 @@ struct
        let pres =
          begin match List.filter ~f:(satisfies_testbed ~problem testbed) pres with
            | [] ->
-             Log.info (lazy ("new synthesis"));
              let pos_examples = List.map ~f:(fun (v,_) -> v) testbed.pos_tests in
              let neg_examples = List.map ~f:(fun (v,_) -> v) testbed.neg_tests in
              let subvalues =
@@ -93,10 +88,8 @@ struct
                  ~init:testbed
                  all_inside_examples
              in
-             print_endline (TestBed.show testbed);
              List.map ~f:Expr.simplify (V.synth ~problem ~testbed:testbed)
            | pres ->
-             Log.info (lazy ("repeated synthesis"));
              pres
          end
        in
@@ -156,7 +149,6 @@ struct
        let pres =
          begin match List.filter ~f:(satisfies_testbed ~problem testbed) pres with
            | [] ->
-             Log.info (lazy ("new synthesis"));
              let pos_examples = List.map ~f:(fun (v,_) -> v) testbed.pos_tests in
              let neg_examples = List.map ~f:(fun (v,_) -> v) testbed.neg_tests in
              let subvalues =
@@ -190,10 +182,8 @@ struct
                  ~init:testbed
                  all_inside_examples
              in
-             print_endline (TestBed.show testbed);
              List.map ~f:Expr.simplify (V.synth ~problem ~testbed:testbed)
            | pres ->
-             Log.info (lazy ("repeated synthesis"));
              pres
          end
        in
