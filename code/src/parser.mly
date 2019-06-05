@@ -48,7 +48,7 @@ let rec appify (e:Expr.t) (es:Expr.t list) : Expr.t =
 %token EOF
 
 %start unprocessed_problem
-%type <Lang.unprocessed_problem> unprocessed_problem
+%type <Problem.t_unprocessed> unprocessed_problem
 
 %%
 

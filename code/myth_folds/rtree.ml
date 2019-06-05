@@ -1,5 +1,5 @@
 module MyRope = Rope
-open MyStdlib
+open Core
 open Consts
 open Printf
 open Lang
@@ -132,8 +132,8 @@ let core_deduper
       xs
   in
   let sorted_parititioned_i =
-    sort_and_partition_with_indices
-      (fun (e1,_) (e2,_) -> compare e1 e2)
+    List.sort_and_partition_with_indices
+      ~cmp:(fun (e1,_) (e2,_) -> compare e1 e2)
       sized_xs
   in
   List.map
@@ -196,7 +196,7 @@ let tests_outputs_to_tests_full_retriever
 
 
 let output_comparer = List.compare (Option.compare Lang.compare_val)
-let pp_output = List.to_string ~f:(MyStdlib.string_of_option Pp.pp_value)
+let pp_output = List.to_string ~f:(Option.value_map ~f:Pp.pp_value ~default:"None")
 
 let split_by_minimal
     (type a)
@@ -223,7 +223,7 @@ let split_by_minimal
             (h::others)
         else
           let (smalls,new_large) =
-            split_by_condition
+            List.partition_tf
               ~f:(fun s -> not (compare s h))
               smalls
           in
@@ -278,8 +278,8 @@ let deduper
       xs
   in
   let sorted_parititioned_i =
-    sort_and_partition_with_indices
-      (fun (_,_,e1) (_,_,e2) -> compare_test_output_tree_list e1 e2)
+    List.sort_and_partition_with_indices
+      ~cmp:(fun (_,_,e1) (_,_,e2) -> compare_test_output_tree_list e1 e2)
       es_outputs
   in
   List.map
@@ -297,10 +297,7 @@ let test_performance_to_ranking
     (tp:bool list)
   : Float.t =
   let success_count =
-    List.length @$
-    List.filter
-      ~f:ident
-      tp
+    List.length (List.filter ~f:ident tp)
   in
   let total_count = List.length tp in
   (Float.of_int success_count) /. (Float.of_int total_count)
@@ -737,17 +734,16 @@ let select_tops
     (to_size:'a -> Int.t)
   : ('a list * Float.t) option =
   let e_rank_size = List.map ~f:(fun e -> (e,(ranking e,-1 * to_size e))) es in
-  let sorted_e_rank = List.sort ~compare:(fun (_,f1) (_,f2) -> (pair_compare Float.compare Int.compare) f2 f1) e_rank_size in
+  let sorted_e_rank = List.sort ~compare:(fun (_,f1) (_,f2) -> (Tuple.T2.compare ~cmp1:Float.compare ~cmp2:Int.compare) f2 f1) e_rank_size in
   begin match sorted_e_rank with
     | [] -> None
     | (e,(r,_))::t ->
       if r = 1. then
         Some ([e],1.)
       else
-        Some (e::
-              (List.map
-                 ~f:fst
-                 (List.take_while ~f:(fun (_,(r',_)) -> r = r') t)),r)
+        Some (e :: (List.map
+                      ~f:fst
+                      (List.take_while ~f:(fun (_,(r',_)) -> r = r') t)),r)
   end
 
 let select_any_improve
@@ -766,19 +762,14 @@ let retrieve_maxes_and_indices
     (l:'a list)
     (cmp:'a -> 'a -> int)
   : ('a * int) list =
-  let open MyStdlib in
-  begin match l with
+  match l with
     | [] -> failwith "cannot"
-    | h::t ->
-      [List.foldi
-        ~f:(fun i (accv,acci) x ->
-            if cmp accv x < 0 then
-              (x,i+1)
-            else
-              (accv,acci))
-        ~init:(h,0)
-        t]
-  end
+    | h::t -> [List.foldi t ~init:(h,0)
+                          ~f:(fun i (accv,acci) x ->
+                              if cmp accv x < 0 then
+                                (x,i+1)
+                              else
+                                (accv,acci))]
 
 type pnode =
   | Node of exp * (pat * pnode) list
@@ -926,13 +917,13 @@ let rec rtree_equal r1 r2 : bool =
 and rnode_equal r1 r2 : bool =
   begin match (r1,r2) with
     | (SAbs (i1,a1,t1,rt1), SAbs (i2,a2,t2,rt2)) ->
-      is_equal @$ compare_id i1 i2
-      && is_equal @$ compare_arg a1 a2
-      && is_equal @$ compare_typ t1 t2
-      && rtree_equal rt1 rt2
+      (compare_id i1 i2 = 0) &&
+      (compare_arg a1 a2 = 0) &&
+      (compare_typ t1 t2 = 0) &&
+      rtree_equal rt1 rt2
     | (SCtor (i1,rt1), SCtor (i2,rt2)) ->
-      is_equal @$ compare_id i1 i2
-      && rtree_equal rt1 rt2
+      (compare_id i1 i2 = 0) &&
+      rtree_equal rt1 rt2
     | (STuple rts1, STuple rts2) ->
       List.equal ~equal:rtree_equal rts1 rts2
     | (SRcd _, SRcd _) -> failwith "todo"
@@ -941,14 +932,12 @@ and rnode_equal r1 r2 : bool =
   end
 
 and rmatch_equal (e1,branches1) (e2,branches2) : bool =
-  is_equal @$ compare_exp e1 e2
-  &&
-  List.equal
-    ~equal:((fun (pat1,rt1) (pat2,rt2) ->
-        is_equal @$ compare_pat pat1 pat2
-        && rtree_equal rt1 rt2))
-    branches1
-    branches2
+  (compare_exp e1 e2 = 0) &&
+  List.equal ~equal:((fun (pat1,rt1) (pat2,rt2)
+                     -> (compare_pat pat1 pat2 = 0) &&
+                        rtree_equal rt1 rt2))
+             branches1
+             branches2
 
 let solution_cache : partition_solution_cache ref = ref []
 
@@ -979,11 +968,10 @@ let lookup_in_solution_cache
               let fst_sat_o =
                 List.find
                   ~f:(fun (tests_outputs,_) ->
-                      is_equal
-                        (compare_list_as_multisets
-                           ~cmp:(pair_compare compare_exp compare_exp)
+                        (List.compare_as_multisets
+                           ~cmp:(Tuple.T2.compare ~cmp1:compare_exp ~cmp2:compare_exp)
                            (List.map ~f:(fun (e1,e2,_) -> (e1,e2)) tests_outputs)
-                           e12s))
+                           e12s) = 0)
                   minimal_partitions_tests_outputs
               in
               Option.map ~f:(fun (prior,remaining) -> (v,remaining,prior)) fst_sat_o
@@ -1046,7 +1034,6 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
     (tests_outputs:exp tests_outputs)
     (m:rmatch)
   : exp list =
-  let open MyStdlib in
   let (e, bs)  = m in
   (*let is_desired = e = EApp ((EApp (EVar "compare", EVar "n1")), EVar "n3") in*)
   (*if is_desired then print_endline "ITS HAPPENING";*)
@@ -1095,7 +1082,7 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
 
   (*let ans =
     ([[]],bs)
-    fold_until_completion
+    List.fold_until_completion
     ~f:(fun (established_branches,bs) ->
          let make_match bs = EMatch(e,bs) in
         if bs = [] then
@@ -1235,9 +1222,7 @@ and propogate_exps_node
 and propagate_enforced_matches
     ?short_circuit:(sc = true)
     (tests_outputs:exp tests_outputs)
-    (t:rtree)
-  : exp list =
-  let open MyStdlib in
+    (t:rtree) : exp list =
   let ppaths =
     retrieve_force_match_ppaths
       t
@@ -1254,7 +1239,7 @@ and propagate_enforced_matches
     end
   in
   let pns =
-  fold_until_completion
+  List.fold_until_completion
     ~f:(fun (pns,tests_outputs,prior_tests) ->
         if List.length tests_outputs = 0 then
           Right pns
@@ -1397,10 +1382,10 @@ and propagate_enforced_matches
                     ts)
               in
               let pns =
-                fold_until_completion
+                List.fold_until_completion
                   ~f:(fun (incompleted_pnts,completed_pns) ->
                       let (newly_completed_pnts,incompleted_pnts) =
-                        split_by_condition
+                        List.partition_tf
                           ~f:(fun (_,ts) -> List.length ts = 0)
                           incompleted_pnts
                       in
@@ -1414,9 +1399,9 @@ and propagate_enforced_matches
                         Right completed_pns
                       else
                         let incompleted_pnts =
-                          cartesian_filter_map
+                          List.cartesian_filter_map
                             ~f:(fun (p,e) (pn,ts) ->
-                                option_bind
+                                Option.bind
                                   ~f:(fun pn ->
                                       let (pn,ts') = pn_to_pnt ts pn in
                                       if List.length ts = List.length ts' then
@@ -1629,10 +1614,10 @@ and propagate_enforced_matches
                     ts)
               in
               let pns =
-                fold_until_completion
+                List.fold_until_completion
                   ~f:(fun (incompleted_pnts,completed_pns) ->
                       let (newly_completed_pnts,incompleted_pnts) =
-                        split_by_condition
+                        List.partition_tf
                           ~f:(fun (_,ts) -> List.length ts = 0)
                           incompleted_pnts
                       in
@@ -1646,9 +1631,9 @@ and propagate_enforced_matches
                         Right completed_pns
                       else
                         let incompleted_pnts =
-                          cartesian_filter_map
+                          List.cartesian_filter_map
                             ~f:(fun (p,e) (pn,ts) ->
-                                option_bind
+                                Option.bind
                                   ~f:(fun pn ->
                                       let (pn,ts') = pn_to_pnt ts pn in
                                       if List.length ts = List.length ts' then

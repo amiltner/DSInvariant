@@ -4,4 +4,4 @@
 
 (executable
     (name App)
-    (libraries DSInvGen base))
+    (libraries DSInvGen core rpc_parallel))

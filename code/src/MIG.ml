@@ -1,11 +1,12 @@
-open MyStdlib
+open Core
+
 open Lang
 
-module MIGLearner(V : Verifier.t) = struct
-  module VPIE = VPIE.Make(V)
+module MIGLearner(V : Verifier.t) (S : Synthesizer.t) = struct
+  module VPIE = VPIE.Make(V)(S)
 
   let push_boundary
-      ~(problem : problem)
+      ~(problem : Problem.t)
       ~eval:(eval : Expr.t)
       ~(eval_t : Type.t)
       ~post:(post : UniversalFormula.t)
@@ -23,13 +24,13 @@ module MIGLearner(V : Verifier.t) = struct
          ~post)
 
   let satisfyTransAll
-      ~problem:(problem : problem)
+      ~problem:(problem : Problem.t)
       ~invariant:(invariant : Expr.t)
       ~positives:(positives : Value.t list)
-    : ((Expr.t,Value.t) either) =
+    : ((Expr.t,Value.t) Either.t) =
     let rec helper
         (invariant : Expr.t)
-      : ((Expr.t,Value.t) either) =
+      : ((Expr.t,Value.t) Either.t) =
       let app_var = "x" in
       let invariant_applied = Expr.mk_app invariant (Expr.mk_var app_var) in
       let applied_arg = (app_var, Type.mk_var "t") in
@@ -56,7 +57,7 @@ module MIGLearner(V : Verifier.t) = struct
             (lazy ("Boundary Not Satisfied, counterexample:"
                    ^ (Log.indented_sep 4)
                    ^ (Value.show m))) ;
-          Right m
+          Second m
         | None ->
           Log.info
             (lazy ("IND >> Strengthening for inductiveness:"
@@ -70,8 +71,8 @@ module MIGLearner(V : Verifier.t) = struct
               ~positives:positives
           in
           Log.debug (lazy ("IND Delta: " ^ (Expr.show pre_inv))) ;
-          if is_equal @$ Expr.compare pre_inv (Expr.mk_constant_true_func Type.mk_t_var) then
-            Left (Expr.and_predicates pre_inv invariant)
+          if Expr.equal pre_inv (Expr.mk_constant_true_func Type.mk_t_var) then
+            First (Expr.and_predicates pre_inv invariant)
           else
             helper pre_inv
       end
@@ -79,17 +80,17 @@ module MIGLearner(V : Verifier.t) = struct
     helper invariant
 
   let satisfyTrans
-      ~problem:(problem : problem)
+      ~problem:(problem : Problem.t)
       ~invariant:(invariant : Expr.t)
       ~eval:(eval : Expr.t)
       ~eval_t:(eval_t : Type.t)
       ~positives:(positives : Value.t list)
-    : ((Expr.t,Value.t) either) =
+    : ((Expr.t,Value.t) Either.t) =
     Log.info
       (lazy ("Checking Satisfy Transitivity for: " ^ Expr.show eval));
     let rec helper
         (invariant : Expr.t)
-      : ((Expr.t,Value.t) either) =
+      : ((Expr.t,Value.t) Either.t) =
       let app_var = "x" in
       let invariant_applied = Expr.mk_app invariant (Expr.mk_var app_var) in
       let applied_arg = (app_var, Type.mk_var "t") in
@@ -108,7 +109,7 @@ module MIGLearner(V : Verifier.t) = struct
             (lazy ("Boundary Not Satisfied, counterexample:"
                    ^ (Log.indented_sep 4)
                    ^ (Value.show m))) ;
-          Right m
+          Second m
         | None ->
           Log.info
             (lazy ("IND >> Strengthening for inductiveness:"
@@ -124,8 +125,8 @@ module MIGLearner(V : Verifier.t) = struct
               ~positives:positives
           in
           Log.debug (lazy ("IND Delta: " ^ (Expr.show pre_inv))) ;
-          if is_equal @$ Expr.compare pre_inv invariant then
-            Left invariant
+          if Expr.equal pre_inv invariant then
+            First invariant
           else
             let new_inv = Expr.and_predicates pre_inv invariant in
             helper new_inv
@@ -134,7 +135,7 @@ module MIGLearner(V : Verifier.t) = struct
     helper invariant
 
   let rec learnInvariant_internal
-      ~problem:(problem : problem)
+      ~problem:(problem : Problem.t)
       ~positives:(positives : Value.t list)
       ~attempt:(attempt:int)
     : Expr.t =
@@ -183,12 +184,12 @@ module MIGLearner(V : Verifier.t) = struct
         problem.mod_vals
       in*)
     begin match inv_or_pos with
-      | Left inv -> inv
-      | Right ce -> restart_with_new_positives ce
+      | First inv -> inv
+      | Second ce -> restart_with_new_positives ce
     end
 
   let learnInvariant
-      ~unprocessed_problem:(unprocessed_problem : unprocessed_problem)
+      ~unprocessed_problem:(unprocessed_problem : Problem.t_unprocessed)
     : string =
     let problem = ProcessFile.process_full_problem unprocessed_problem in
     let (a,modi,c,d,e) = problem.unprocessed in

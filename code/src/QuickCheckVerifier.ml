@@ -1,43 +1,35 @@
-open MyStdlib
-open Utils
+open Core
+
 open Lang
+open Utils
 
-module T : Verifier.t =
-struct
-
+module T : Verifier.t = struct
   let _NUM_CHECKS_ = 4096
 
   let true_val : Value.t = (Value.mk_ctor "True" (Value.mk_tuple []))
 
-  module TypeToGeneratorDict =
-  struct
-    module Generators =
-    struct
+  module TypeToGeneratorDict = struct
+    module Generators = struct
       type t = Expr.t Sequence.t
-      [@@deriving ord]
-
-      let hash _ = failwith "dont"
-      let hash_fold_t _ = failwith "don't"
-      let pp _ = failwith "don't"
-      let show _ = failwith "don't"
     end
-    module D = DictOf(Type)(Generators)
 
-    type t = D.t * (Type.t -> Expr.t Sequence.t)
+    module D = Map.Make(Type)
+
+    type t = Generators.t D.t * (Type.t -> Expr.t Sequence.t)
 
     let get_val
         ((d,fs):t)
         (t:Type.t)
       : t * Expr.t =
-      begin match D.lookup d t with
+      begin match D.find d t with
         | None ->
           let g = fs t in
           let (v,g) = Option.value_exn (Sequence.next g) in
-          let d = D.insert d t g in
+          let d = D.set d ~key:t ~data:g in
           ((d,fs),v)
         | Some g ->
           let (v,g) = Option.value_exn (Sequence.next g) in
-          let d = D.insert d t g in
+          let d = D.set d ~key:t ~data:g in
           ((d,fs),v)
       end
 
@@ -55,7 +47,7 @@ struct
     fun i ->
       begin match t with
         | Var i ->
-          generator_of_type_simple (TypeContext.lookup_exn tc i)
+          generator_of_type_simple (Context.find_exn tc i)
         | Arr _ ->
           failwith "Will do if necessary..."
         | Tuple ts ->
@@ -63,7 +55,7 @@ struct
             ~f:Expr.mk_tuple
             (fun i -> (QC.product (List.map ~f:generator_of_type_simple ts)) i)
         | Mu (v,t) ->
-          let tc = TypeContext.insert tc v t in
+          let tc = Context.set tc ~key:v ~data:t in
           generator_of_type tc t
         | Variant options ->
           let options_generators =
@@ -78,7 +70,7 @@ struct
       end
         i
 
-  module TypeSet = SetOf(Type)
+  module TypeSet = Set.Make(Type)
 
   let contains_any
       (tc:TypeContext.t)
@@ -91,16 +83,16 @@ struct
         (checked:TypeSet.t)
         (t:Type.t)
       : bool =
-      if TypeSet.member checked t then
+      if TypeSet.mem checked t then
         false
-      else if is_equal (Type.compare t desired_t) then
+      else if Type.equal t desired_t then
         true
       else
-        let checked = TypeSet.insert t checked in
+        let checked = TypeSet.add checked t in
         let contains_any_simple = contains_any tc desired_t checked in
         begin match t with
           | Var v ->
-            begin match TypeContext.lookup tc v with
+            begin match Context.find tc v with
               | Some t -> contains_any_simple t
               | None -> false
             end
@@ -109,7 +101,7 @@ struct
           | Tuple ts ->
             List.exists ~f:contains_any_simple ts
           | Mu (i,t) ->
-            let tc = TypeContext.insert tc i t in
+            let tc = Context.set tc ~key:i ~data:t in
             contains_any tc desired_t checked t
           | Variant branches ->
             List.exists ~f:contains_any_simple (List.map ~f:snd branches)
@@ -124,7 +116,7 @@ struct
       (v:Value.t)
     : Value.t list =
     let extract_typed_subcomponents_simple = extract_typed_subcomponents tc desired_t in
-    if is_equal (Type.compare t desired_t) then
+    if Type.equal t desired_t then
       [v]
     else
       begin match (t,v) with
@@ -135,18 +127,18 @@ struct
         | (Variant branches, Ctor (c,v)) ->
           let t =
             List.Assoc.find_exn
-              ~equal:(is_equal %% String.compare)
+              ~equal:String.equal
               branches
               c
           in
           extract_typed_subcomponents_simple t v
         | (Var i, _) ->
-          begin match TypeContext.lookup tc i with
+          begin match Context.find tc i with
             | None -> []
             | Some t -> extract_typed_subcomponents_simple t v
           end
         | (Mu (i,t), _) ->
-          let tc = TypeContext.insert tc i t in
+          let tc = Context.set tc ~key:i ~data:t in
           extract_typed_subcomponents tc desired_t t v
         | (Arr _, _) -> failwith "arrows not currently supported"
         | _ -> failwith "Something went wrong"
@@ -163,7 +155,7 @@ struct
     end
 
   let make_random_evaluator
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
       ~(gen:TypeToGeneratorDict.t)
@@ -187,7 +179,7 @@ struct
     ,d)
 
   let equiv_false
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~cond:(cond:Expr.t)
     : bool =
     let num_checks = _NUM_CHECKS_ in
@@ -199,10 +191,10 @@ struct
        QC.g_to_seq g
      in
      let gen = TypeToGeneratorDict.create generators in
-     fold_until_completion
+     List.fold_until_completion
        ~f:(fun (i,gen) ->
            if i > num_checks then
-             Right true
+             Second true
            else
              let (_,res,gen) =
                make_random_evaluator
@@ -211,15 +203,15 @@ struct
                  ~eval_t:cond_t
                  ~gen
              in
-             if is_equal @$ Value.compare res Value.mk_true then
-               Right false
+             if Value.equal res Value.mk_true then
+               Second false
              else
-               Left (i+1,gen))
+               First (i+1,gen))
        (0,gen)
 
 
   let implication_counter_example
-      ~problem:(problem:problem)
+      ~problem:(problem:Problem.t)
       ~pre:(pre:Expr.t)
       ~eval:(eval:Expr.t)
       ~(eval_t:Type.t)
@@ -228,7 +220,7 @@ struct
     let desired_t = Type.mk_var "t" in
     if equiv_false ~problem ~cond:pre
     && List.exists
-         ~f:(fun (_,t) -> is_equal @$ Type.compare t desired_t)
+         ~f:(fun (_,t) -> Type.equal t desired_t)
          post_quants
     then
       begin
@@ -238,15 +230,13 @@ struct
     else
       let num_checks = _NUM_CHECKS_ in
       let (_,result_t) = extract_args eval_t in
-      if not @$ contains_any problem.tc desired_t result_t then
-        (None)
+      if not (contains_any problem.tc desired_t result_t) then
+        None
       else
-        (let generators
-            (t:Type.t)
-          : Expr.t Sequence.t =
+        (let generators (t:Type.t) : Expr.t Sequence.t =
           let g = generator_of_type problem.tc t in
           let seq = QC.g_to_seq g in
-          if is_equal (Type.compare desired_t t) then
+          if Type.equal desired_t t then
             Sequence.filter
               ~f:(fun e ->
                   let pre_e_app =
@@ -254,18 +244,18 @@ struct
                       pre
                       e
                   in
-                  let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
-                  is_equal (Value.compare v (Value.mk_ctor "True" (Value.mk_tuple []))))
+                  let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app
+                   in Value.equal v (Value.mk_ctor "True" (Value.mk_tuple [])))
               seq
           else
             seq
          in
          let gen = TypeToGeneratorDict.create generators in
         let result_list =
-          fold_until_completion
+          List.fold_until_completion
             ~f:(fun (resultant,i,gen) ->
                 if i > num_checks then
-                  Right resultant
+                  Second resultant
                 else
                   let (args,res,gen) =
                     make_random_evaluator
@@ -287,7 +277,7 @@ struct
                       split_res
                   in
                   let i = i + List.length split_res in
-                  Left (arged_split_res@resultant,i,gen))
+                  First (arged_split_res@resultant,i,gen))
             ([],0,gen)
         in
         let result_gen = QC.of_list result_list in
@@ -296,7 +286,7 @@ struct
           List.map
             ~f:(fun (i,t) ->
                 let gen =
-                  if is_equal (Type.compare (Type.mk_var "t") t) then
+                  if Type.equal (Type.mk_var "t") t then
                     result_gen
                   else
                     QC.map ~f:(fun g -> ([],g)) (generator_of_type problem.tc t)
@@ -308,10 +298,10 @@ struct
             post_quants
         in
         let ce_option =
-          fold_until_completion
+          List.fold_until_completion
             ~f:(fun (uf_types_seqs,i) ->
                 if i = 100 then
-                  Right None
+                  Second None
                 else
                   let (args_exps_names_types,uf_types_seqs) =
                     List.fold_right
@@ -322,31 +312,28 @@ struct
                       uf_types_seqs
                   in
                   let (args_l,names_exps) =
-                    List.unzip @$
-                    List.map
-                      ~f:(fun (args,exp,name,_) -> (args,(name,exp)))
-                      args_exps_names_types
+                    List.unzip (
+                      List.map
+                        ~f:(fun (args,exp,name,_) -> (args,(name,exp)))
+                        args_exps_names_types
+                    )
                   in
                   let args = List.concat args_l in
-                  let post_held =
-                    is_equal @$
-                    Value.compare
-                      true_val
-                      (Eval.evaluate_with_holes ~eval_context:(problem.eval_context@names_exps) post_expr)
+                  let post_res = Eval.evaluate_with_holes ~eval_context:(problem.eval_context@names_exps) post_expr
                   in
-                  if post_held then
-                    Left (uf_types_seqs,i+1)
+                  if Value.equal true_val post_res then
+                    First (uf_types_seqs,i+1)
                   else
                     let relevant =
                       List.filter_map
                         ~f:(fun (e,t) ->
-                            if is_equal @$ Type.compare desired_t t then
+                            if Type.equal desired_t t then
                               Some e
                             else
                               None)
                         args
                     in
-                    Right (Some relevant))
+                    Second (Some relevant))
             (uf_types_seqs,0)
         in
         Option.map
@@ -354,7 +341,7 @@ struct
           ce_option)
 
   let true_on_examples
-      ~(problem:problem)
+      ~(problem:Problem.t)
       ~(examples:Value.t list)
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
@@ -364,24 +351,24 @@ struct
     let desired_t = Type.mk_var "t" in
     let (args_t,result_t) = extract_args eval_t in
     if (List.length examples = 0
-        && List.mem ~equal:(is_equal %% Type.compare) args_t desired_t)
+        && List.mem ~equal:Type.equal args_t desired_t)
     || not (contains_any problem.tc desired_t result_t) then
       None
     else
       let generators
           (t:Type.t)
         : Expr.t Sequence.t =
-        if is_equal @$ Type.compare t desired_t then
-          QC.g_to_seq @$ QC.of_list (List.map ~f:Value.to_exp examples)
+        if Type.equal t desired_t then
+          QC.g_to_seq (QC.of_list (List.map ~f:Value.to_exp examples))
         else
-          QC.g_to_seq @$ generator_of_type problem.tc t
+          QC.g_to_seq (generator_of_type problem.tc t)
       in
       let gen = TypeToGeneratorDict.create generators in
       let result_list =
-        fold_until_completion
+        List.fold_until_completion
           ~f:(fun (resultant,i,gen) ->
               if i > num_checks then
-                Right resultant
+                Second resultant
               else
                 let (_,res,gen) = make_random_evaluator ~problem ~eval ~eval_t ~gen in
                 let split_res =
@@ -393,7 +380,7 @@ struct
                 in
                 let split_res_exps = List.map ~f:Value.to_exp split_res in
                 let i = i + List.length split_res in
-                Left (split_res_exps@resultant,i,gen))
+                First (split_res_exps@resultant,i,gen))
           ([],0,gen)
       in
       let result_gen = QC.of_list result_list in
@@ -402,7 +389,7 @@ struct
         List.map
           ~f:(fun (i,t) ->
               let gen =
-                if is_equal (Type.compare (Type.mk_var "t") t) then
+                if Type.equal (Type.mk_var "t") t then
                   result_gen
                 else
                   generator_of_type problem.tc t
@@ -414,10 +401,10 @@ struct
           post_quants
       in
       let ce_option =
-        fold_until_completion
+        List.fold_until_completion
           ~f:(fun (uf_types_seqs,i) ->
               if i = 100 then
-                Right None
+                Second None
               else
                 let (exps_names_types,uf_types_seqs) =
                   List.fold_right
@@ -428,37 +415,34 @@ struct
                     uf_types_seqs
                 in
                 let (names_exps,exps_types) =
-                  List.unzip @$
-                  List.map
-                    ~f:(fun (exp,name,typ) -> ((name,exp),(exp,typ)))
-                    exps_names_types
+                  List.unzip (
+                    List.map
+                      ~f:(fun (exp,name,typ) -> ((name,exp),(exp,typ)))
+                      exps_names_types
+                  )
                 in
-                let post_held =
-                  is_equal @$
-                  Value.compare
-                    true_val
-                    (Eval.evaluate_with_holes ~eval_context:(problem.eval_context@names_exps) post_expr)
+                let post_res =
+                  Eval.evaluate_with_holes ~eval_context:(problem.eval_context@names_exps) post_expr
                 in
-                if post_held then
-                  Left (uf_types_seqs,i+1)
+                if Value.equal true_val post_res then
+                  First (uf_types_seqs,i+1)
                 else
                   let relevant =
                     List.filter_map
                       ~f:(fun (e,t) ->
-                          if is_equal @$ Type.compare desired_t t then
+                          if Type.equal desired_t t then
                             Some e
                           else
                             None)
                       exps_types
-                  in
-                  Right (Some relevant))
+                  in Second (Some relevant))
           (uf_types_seqs,0)
       in
       Option.map
         ~f:(List.map ~f:Value.from_exp_exn)
         ce_option
 
-  let convert_foldable_to_full
+  (*let convert_foldable_to_full
       (tc:TypeContext.t)
       (fold_completion:Type.t)
     : Expr.t =
@@ -742,5 +726,5 @@ struct
               (TArr (t,end_type_myth))
               0
               true)
-           tests_outputs)
+           tests_outputs)*)
 end
