@@ -5,6 +5,7 @@ open Lang
 module Make (V : Verifier.t) (S : Synthesizer.t) = struct
 
   let negs : Value.t list ref = ref []
+  let possibilities : Expr.t list ref = ref [Expr.mk_constant_true_func Type.mk_t_var]
 
   let satisfies_testbed
       ~(problem:Problem.t)
@@ -139,10 +140,9 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
     let rec helper
         (attempt:int)
         (testbed:TestBed.t)
-        (pres:Expr.t list)
       : Expr.t =
        let pres =
-         begin match List.filter ~f:(satisfies_testbed ~problem testbed) pres with
+         begin match List.filter ~f:(satisfies_testbed ~problem testbed) !possibilities with
            | [] ->
              (Log.info (lazy ("Learning new precondition set.")));
              let subvalues =
@@ -176,7 +176,9 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                  ~init:testbed
                  all_inside_examples
              in
-             List.map ~f:Expr.simplify (S.synth ~problem ~testbed:testbed)
+             let pres = List.map ~f:Expr.simplify (S.synth ~problem ~testbed:testbed) in
+             possibilities := pres;
+             pres
            | pres ->
              pres
          end
@@ -240,7 +242,6 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
              helper
                (attempt+1)
                (TestBed.add_neg_test ~testbed new_neg_example)
-               pres
        end)
     in
     let testbed = TestBed.create_positive positives in
@@ -250,5 +251,5 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
         ~init:testbed
         !negs
     in
-    helper 0 testbed [Expr.mk_constant_true_func Type.mk_t_var]
+    helper 0 testbed
 end

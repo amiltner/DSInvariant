@@ -345,19 +345,6 @@ and gen_iexp_rel (tmo:Timeout.t) (s:Sigma.t)
 
   (***** gen_iexp_rel helpers {{{ *****)
 
-  let gen_ctor_one (s:Sigma.t) (g:Gamma.t) ((c, (c_typ, _)):id * (typ * id))
-                   (met:metric) : exp Rope.t =
-    let sub_exps =
-      gen_iexp_rel tmo s (erel, trel) g c_typ { met with size = met.size - 1 }
-    in
-    Rope.map ~f:(fun sub_exp -> ECtor (c, sub_exp)) sub_exps
-  in
-
-  let gen_ctors (s:Sigma.t) (g:Gamma.t) (dt:id) : exp Rope.t =
-    Sigma.ctors dt s |> Rope.of_list
-      |> Rope.concat_map ~f:(fun ctor -> gen_ctor_one s g ctor met)
-  in
-
   let gen_tuple (s:Sigma.t) (g:Gamma.t) (ts:typ list) : exp Rope.t =
     let argc = List.length ts in
     let choices = Util.partitions_rel argc in
@@ -419,7 +406,7 @@ and gen_iexp_rel (tmo:Timeout.t) (s:Sigma.t)
     (GTS.make_key (Gamma.insert_exp erel trel g) t met)
     begin fun _ ->
       begin match t with
-      | TBase dt -> gen_ctors s g dt
+        | TBase _ -> Rope.empty(*gen_ctors s g dt*)
       | TArr (t1, t2) -> gen_abs s g t1 t2
       | TTuple ts -> gen_tuple s g ts
       | TRcd ts -> gen_record s g ts
