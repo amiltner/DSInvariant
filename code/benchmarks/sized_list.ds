@@ -1,0 +1,127 @@
+type nat = mu nat .
+  | O
+  | S of nat
+
+type natoption =
+  | None
+  | Some of nat
+
+let pred = fun (x : nat) ->
+  match x binding p with
+  | O -> O
+  | S -> p
+;;
+
+type cmp =
+  | LT
+  | EQ
+  | GT
+
+let compare =
+  fix (compare : nat -> nat -> cmp) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 binding x1 with
+        | O -> (match x2 binding x2 with
+                | O -> EQ
+                | S -> LT)
+        | S -> (match x2 binding x2 with
+                | O -> GT
+                | S -> compare x1 x2)
+;;
+
+struct
+  type list = mu list .
+    | Nil of nat
+    | Cons of (nat * nat * list)
+
+  type t = list
+
+  let empty = Nil O ;;
+
+  let length =
+    fun (l : t) ->
+      match l binding lp with
+      | Nil -> lp
+      | Cons -> lp.0
+  ;;
+
+  let lookup =
+    fix (lookup : t -> nat -> bool) =
+      fun (l : t) -> fun (x : nat) ->
+        match l binding l with
+        | Nil -> False
+        | Cons ->
+          (match compare l.1 x binding c with
+           | EQ -> True
+           | LT -> lookup l.2 x
+           | GT -> lookup l.2 x)
+  ;;
+
+  let insert =
+    fun (l : t) ->
+      fun (x : nat) ->
+        Cons(S (length l), x, l)
+  ;;
+
+  let delete =
+    fun (l : t) -> fun (x : nat) ->
+      ((fix (delete : nat -> t -> nat -> t) =
+      fun (s : nat) -> fun (l : t) -> fun (x : nat) ->
+          match s binding sp with
+          | O -> l
+          | S ->
+          (match l binding lp with
+          | Nil -> l
+          | Cons -> (match compare x lp.1 binding c with
+                     | LT -> (fun (l : t) -> Cons(S (length l), lp.1, l))
+                             (delete sp lp.2 x)
+                     | EQ -> delete sp lp.2 x
+                     | GT -> (fun (l : t) -> Cons(S (length l), lp.1, l))
+                             (delete sp lp.2 x))))
+    (length l) l x)
+  ;;
+
+  (*let union =
+    fix (union : t -> t -> t) =
+      fun (la : t) ->
+        fun (lb : t) ->
+          match la binding la with
+          | Nil -> lb
+          | Cons -> (union la.1 (insert lb la.0))
+  ;;
+
+  let inter =
+    fix (inter : t -> t -> t) =
+      fun (la : t) ->
+        fun (lb : t) ->
+          match la binding la with
+          | Nil -> Nil
+          | Cons -> (match lookup lb la.0 binding r with
+                     | True -> Cons (la.0, (inter la.1 lb))
+                     | False -> inter la.1 lb)
+  ;;*)
+end
+:
+sig
+  type t
+
+  val empty : t
+
+  val length : t -> nat
+  val lookup : t -> nat -> bool
+
+  val insert : t -> nat -> t
+  val delete : t -> nat -> t
+
+  (*val union : t -> t -> t
+  val inter : t -> t -> t*)
+end
+
+maintains
+
+forall (s : t) .
+  forall (i : nat) .
+        (not (lookup (delete s i) i))
+
+accumulating nat

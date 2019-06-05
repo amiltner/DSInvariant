@@ -218,4 +218,34 @@ let rec contains
       | EVar _ -> false
     end
 
+let rec app_capital_to_ctor
+    (e:exp)
+  : exp =
+  begin match e with
+    | EVar _ -> e
+    | EApp ((EVar x),e') ->
+      let e' = app_capital_to_ctor e' in
+      if Char.is_uppercase (String.nget x 0) then
+        ECtor (x,e')
+      else
+        e
+    | EApp (e1,e2) ->
+      EApp (app_capital_to_ctor e1, app_capital_to_ctor e2)
+    | EFun (a,e) ->
+      EFun (a,app_capital_to_ctor e)
+    | ELet (i,b,ags,t,e1,e2) ->
+      ELet (i,b,ags,t,app_capital_to_ctor e1, app_capital_to_ctor e2)
+    | ECtor (i,e) -> ECtor (i, app_capital_to_ctor e)
+    | EMatch (e,bs) -> let e = app_capital_to_ctor e in
+      EMatch (e,
+              List.map
+                ~f:(fun (p,e) -> (p,app_capital_to_ctor e))
+                bs)
+    | EFix (i,a,t,e) -> EFix (i,a,t,app_capital_to_ctor e)
+    | ETuple es -> ETuple (List.map ~f:app_capital_to_ctor es)
+    | EProj (i,e) -> EProj (i,app_capital_to_ctor e)
+    | EUnit -> EUnit
+    | _ -> failwith "shouldnt"
+  end
+
 (***** }}} *****)

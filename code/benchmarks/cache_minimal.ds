@@ -1,0 +1,131 @@
+type nat = mu nat .
+  | O
+  | S of nat
+
+type natoption =
+  | None
+  | Some of nat
+
+type natoptionpair = natoption * natoption
+
+type cmp =
+  | LT
+  | EQ
+  | GT
+
+let compare =
+  fix (compare : nat -> nat -> cmp) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 binding x1 with
+        | O -> (match x2 binding x2 with
+                | O -> EQ
+                | S -> LT)
+        | S -> (match x2 binding x2 with
+                | O -> GT
+                | S -> compare x1 x2)
+;;
+
+struct
+  type t = natoptionpair
+
+  let empty = (None,None) ;;
+
+  let is_empty =
+    fun (r : t) ->
+      (match r.0 binding b with
+       | None ->
+         (match r.1 binding b with
+          | None -> True
+          | Some -> False)
+       | Some -> False)
+  ;;
+
+  let contains =
+    fun (r : t) -> fun (n : nat) ->
+      match r.0 binding z with
+      | None -> False
+      | Some ->
+        (match compare z n binding c with
+         | LT ->
+           (match r.1 binding z with
+            | None -> False
+            | Some ->
+              (match compare z n binding c with
+               | LT -> False
+               | EQ -> True
+               | GT -> False))
+         | EQ -> True
+         | GT ->
+           (match r.1 binding z with
+            | None -> False
+            | Some ->
+              (match compare z n binding c with
+               | LT -> False
+               | EQ -> True
+               | GT -> False)))
+  ;;
+
+  let insert =
+    fun (r : t) -> fun (n : nat) ->
+      match r.0 binding z with
+      | None -> (Some n, None)
+      | Some ->
+        (match compare z n binding c with
+         | LT -> (Some n,None)
+         | EQ -> (Some n,None)
+         | GT -> (Some n,Some z))
+  ;;
+
+  let delete =
+    fun (r : t) -> fun (n : nat) ->
+      match r.0 binding z with
+      | None ->
+        (match r.1 binding z with
+         | None -> r
+         | Some ->
+           (match compare z n binding c with
+            | LT -> r
+            | EQ -> (None, None)
+            | GT -> r))
+      | Some ->
+        (match compare z n binding c with
+         | LT ->
+           (match r.1 binding z with
+            | None -> r
+            | Some ->
+              (match compare z n binding c with
+               | LT -> r
+               | EQ -> (r.0, None)
+               | GT -> r))
+         | EQ -> (None,r.1)
+         | GT -> r)
+  ;;
+end
+:
+sig
+  type t
+
+  val empty : t
+
+  val is_empty : t -> bool
+
+  val contains : t -> nat -> bool
+
+  val insert : t -> nat -> t
+
+  val delete : t -> nat -> t
+
+  (*val union : t -> t -> t
+  val inter : t -> t -> t*)
+end
+
+maintains
+
+forall (r : t) .
+  forall (i : nat) .
+    (and
+      (contains (insert r i) i)
+      (not (contains (delete r i) i)))
+
+accumulating unit

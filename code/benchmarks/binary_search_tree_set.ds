@@ -1,42 +1,3 @@
-(* PRELUDE *)
-
-type bool =
-  | True
-  | False
-
-let not =
-  fun (v : bool) ->
-    match v binding i with
-    | True -> False
-    | False -> True
-;;
-
-let and =
-  fun (b1 : bool) ->
-    fun (b2 : bool) ->
-      match b1 binding b1 with
-      | True -> b2
-      | False -> False
-;;
-
-let or =
-  fun (b1 : bool) ->
-    fun (b2 : bool) ->
-      match b1 binding b1 with
-      | True -> True
-      | False -> b2
-;;
-
-let implies =
-  fun (b1 : bool) ->
-    fun (b2 : bool) ->
-      (or (not b1) b2)
-;;
-
-(* END_PRELUDE *)
-
-
-
 type nat = mu nat .
   | O
   | S of nat
@@ -67,6 +28,10 @@ let compare =
                 | O -> GT
                 | S -> compare x1 x2)
 ;;
+
+type natoption =
+  | None
+  | Some of nat
 
 struct
   type bst = mu bst .
@@ -171,8 +136,8 @@ sig
   val insert : t -> nat -> t
   val delete : t -> nat -> t
 
-  val union : t -> t -> t
-  val inter : t -> t -> t
+  (*val union : t -> t -> t
+  val inter : t -> t -> t*)
 end
 
 maintains
@@ -184,3 +149,5 @@ forall (s : t) .
         (not (lookup (delete s i) i))
         (implies (lookup (delete s i) j)
                  (lookup s j)))
+
+accumulating (natoption * natoption)

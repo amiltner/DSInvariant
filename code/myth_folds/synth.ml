@@ -18,7 +18,6 @@ let standard_synth_plan : synth_plan =
   ; SynthGrowScrutinees 4
   ; SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthGrowMatches
   ; SynthGrowScrutinees 4
   ; SynthSaturate 0.25
   ; SynthGrowMatches
@@ -73,7 +72,7 @@ let execute_synth_step
     (t:rtree)
     (st:synth_step)
     (tests_outputs:exp tests_outputs)
-  : exp option =
+  : exp list =
   reset_timeouts t;
   begin match st with
   | SynthSaturate timeout -> begin
@@ -96,18 +95,20 @@ let execute_synth_step
         ~action:(fun _ -> grow_scrutinees s env k t)
     end
   end;
-  do_if_verbose (fun _ -> printf "%s\n%!" (Rtree.pp_rtree t));
+  (*do_if_verbose (fun _ -> printf "%s\n%!" (Rtree.pp_rtree t));*)
+  print_endline "propogate";
   let es =
     Timing.record
       ~label:"synth::propogate_exps"
-      ~action:(fun _ -> propogate_exps ~short_circuit:false tests_outputs ~search_matches:true t)
+      ~action:(fun _ -> propogate_exps ~short_circuit:false false tests_outputs ~search_matches:true t)
   in
   let es =
     List.filter
       ~f:(has_passing_capabilities tests_outputs)
       es
   in
-  let es_s =
+  List.map ~f:app_capital_to_ctor es
+  (*let es_s =
     List.map
       ~f:(fun e -> (e,size e))
       es
@@ -120,7 +121,7 @@ let execute_synth_step
   begin match es_s with
   | [] -> None
   | (e,_) :: _ -> Some e
-  end
+    end*)
 
 let rec execute_synth_plan
     (s:Sigma.t)
@@ -128,13 +129,13 @@ let rec execute_synth_plan
     (t:rtree)
     (plan:synth_plan)
     (tests_outputs:exp tests_outputs)
-  : exp option =
+  : exp list =
   match plan with
-  | [] -> None
+  | [] -> []
   | st :: plan ->
     begin match execute_synth_step s env t st tests_outputs with
-      | Some e -> Some e
-      | None -> execute_synth_plan s env t plan tests_outputs
+      | [] -> execute_synth_plan s env t plan tests_outputs
+      | es -> es
     end
 
 let synthesize
@@ -142,6 +143,6 @@ let synthesize
     (env:env)
     (t:rtree)
     (tests_outputs:exp tests_outputs)
-  : exp option =
-  verbose_mode := false;
+  : exp list =
+  verbose_mode := true;
   execute_synth_plan s env t standard_synth_plan tests_outputs

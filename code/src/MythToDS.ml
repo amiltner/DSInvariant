@@ -41,7 +41,7 @@ let rec convert_expr : Myth_folds.Lang.exp -> Expr.t =
   | Myth_folds.Lang.ETuple explist
     -> Expr.Tuple (List.map ~f:convert_expr explist)
   | Myth_folds.Lang.EProj (int, exp)
-    -> Expr.Proj (int, (convert_expr exp))
+    -> Expr.Proj (int-1, (convert_expr exp))
   | Myth_folds.Lang.EFix (id, ((_, arg_typ) as arg), typ, body)
     -> Expr.Fix (id, (convert_type (Myth_folds.Lang.TArr (arg_typ, typ))),
                  (Expr.Func ((convert_arg arg), (convert_expr body))))

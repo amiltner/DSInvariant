@@ -87,10 +87,6 @@ forall (r : t) .
     forall (j : nat) .
       (and
         (contains (expand r i) i)
-        (and
-          (not (contains empty i))
-          (implies
-            (contains r i)
-            (contains (expand r j) i))))
+        (not (contains empty i)))
 
 accumulating unit

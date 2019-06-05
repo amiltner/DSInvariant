@@ -686,7 +686,7 @@ struct
       ~(problem:problem)
       ~(testbed:TestBed.t)
       ~(accumulator:Type.t)
-    : Expr.t option =
+    : Expr.t list =
     let end_type = Type.mk_tuple [Type.mk_bool_var ; accumulator] in
     let pos_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_true_exp)) testbed.pos_tests in
     let neg_examples = List.map ~f:(fun (v,_) -> (Value.to_exp v,Expr.mk_false_exp)) testbed.neg_tests in
@@ -720,7 +720,7 @@ struct
     in
     let problem = ProcessFile.process_full_problem unprocessed in
     if (List.length examples = 0) then
-      Some (Expr.mk_constant_true_func (Type.mk_var "t"))
+      [(Expr.mk_constant_true_func (Type.mk_var "t"))]
     else
       let (decls,myth_examples,t,end_type_myth) =
         DSToMyth.convert_problem_examples_type_to_myth
@@ -745,7 +745,8 @@ struct
       let tests_outputs : Myth_folds.Lang.exp Myth_folds.Rtree.tests_outputs =
         List.map
           ~f:(fun (input,expected_output) ->
-              (input
+              (true
+              ,input
               ,expected_output
               ,(fun e ->
                  let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
@@ -842,7 +843,7 @@ struct
                          | Myth_folds.Eval.Extr_error v -> Some v)
                      myth_examples)]
         in*)
-      Option.map
+      List.map
         ~f:(fun me ->
             let e = MythToDS.convert_expr me in
             let e = Typecheck.align_types desired_t e in
@@ -866,7 +867,7 @@ struct
   let synth
       ~(problem:problem)
       ~(testbed:TestBed.t)
-    : Expr.t option =
+    : Expr.t list =
     match problem.accumulator with
     | Some accumulator -> synth_core ~problem ~testbed ~accumulator
     | None -> raise (Exceptions.Internal_Exn "TODO")
