@@ -1008,11 +1008,11 @@ let lookup_in_solution_cache
         begin match acc_o with
           | Some _ -> acc_o
           | None ->
-            if prior_pns = prior_pns' && rtree_equal t' t && (is_equal
-                  (compare_list_as_multisets
-                     ~cmp:(pair_compare compare_exp compare_exp)
+            if prior_pns = prior_pns' && rtree_equal t' t && (
+                  (List.compare_as_multisets
+                     ~cmp:(Tuple.T2.compare ~cmp1:compare_exp ~cmp2:compare_exp)
                      (List.map ~f:(fun (_,e1,e2,_) -> (e1,e2)) tests_outputs)
-                     e12s)) then
+                     e12s) = 0) then
               Some v
             else
               None
@@ -1859,7 +1859,7 @@ and propagate_enforced_matches
           end)
       ppaths
   in
-  let ppes_o = distribute_option ppeos in
+  let ppes_o = Some (List.filter_map ppeos ~f:Fn.id) in
   begin match ppes_o with
     | None -> []
     | Some ppes ->
@@ -1870,10 +1870,10 @@ and propagate_enforced_matches
            (List.fold_left
               ~f:(fun pns (pp,es) ->
                   let ans =
-                    cartesian_filter_map
-                    ~f:(integrate_path pp)
-                    pns
-                    es
+                    List.cartesian_filter_map
+                      ~f:(integrate_path pp)
+                      pns
+                      es
                   in
                   if ans = [] then
                     pns

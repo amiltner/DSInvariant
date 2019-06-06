@@ -1,5 +1,4 @@
 open Core
-open Async
 
 open DSInvGen
 
@@ -23,18 +22,18 @@ open DSInvGen
     | Some anses -> print_endline (string_of_list Value.show anses)
   end*)
 
-module EMIG = MIG.MIGLearner (EnumerativeVerifier.T) (ParSynthesizer.T)
-module QCMIG = MIG.MIGLearner (QuickCheckVerifier.T) (ParSynthesizer.T)
+module EMIG = MIG.Make (EnumerativeVerifier.T) (ParSynthesizer.T)
+module QCMIG = MIG.Make (QuickCheckVerifier.T) (ParSynthesizer.T)
 
 let main (* nworkers *) filename () =
   Log.enable ~msg:"DSInfer" (Some "_log") ;
   let file_chan = Utils.get_in_channel filename in
   let problem_string = Prelude.prelude_string ^ (Stdio.In_channel.input_all file_chan)
    in Stdio.In_channel.close file_chan
-    ; let problem = Parser.unprocessed_problem
-          Lexer.token (Lexing.from_string problem_string)
-      in print_endline (EMIG.learnInvariant ~unprocessed_problem:problem)
-       ; Deferred.unit
+    ; let unprocessed_problem = Parser.unprocessed_problem
+                                  Lexer.token
+                                  (Lexing.from_string problem_string)
+      in print_endline (EMIG.learnInvariant ~unprocessed_problem)
 
 let spec =
   Command.Spec.(
@@ -45,5 +44,10 @@ let spec =
 
 let () =
   Rpc_parallel.start_app
-    (Command.async_spec spec main
-      ~summary: "Infer a loop invariant sufficient for proving the correctness of the input problem in SyGuS format.")
+     ~rpc_heartbeat_config:(
+       Async.Rpc.Connection.Heartbeat_config.create
+         ~timeout:(Time_ns.Span.of_min 3.0)
+         ~send_every:(Time_ns.Span.of_sec 15.0)
+    )
+    (Command.basic_spec spec main
+      ~summary: "Infer a representation invariant that is sufficient for proving the correctness of a module implementation.")

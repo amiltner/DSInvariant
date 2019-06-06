@@ -380,14 +380,14 @@ let and_predicates (e1:t) (e2:t) : t =
   else if is_true_func e2 then
     e1
   else if is_false_func e1 || is_false_func e2 then
-    mk_constant_false_func (Type.mk_var "t")
+    mk_constant_false_func (Type._t)
   else
     let var = "x" in
     let var_exp = mk_var var in
     let apped_e1 = mk_app e1 var_exp in
     let apped_e2 = mk_app e2 var_exp in
     mk_func
-      (var,Type.mk_var "t")
+      (var,Type._t)
       (and_exps apped_e1 apped_e2)
 
 let mk_let_in (i:Id.t) (t:Type.t) (e1:t) (e2:t) : t =

@@ -275,13 +275,11 @@ let rec update_first
   end
 
 module List = struct
-  open Core
   include Core.List
 
   let compare_as_multisets (l1 : 'a t) (l2 : 'a t) ~(cmp : 'a -> 'a -> int) : int =
-    List.compare cmp
-                 (List.sort ~compare:cmp l1)
-                 (List.sort ~compare:cmp l2)
+    compare cmp (sort ~compare:cmp l1)
+                (sort ~compare:cmp l2)
 
   let rec fold_until_completion ~f:(f: 'a -> ('a,'b) either) (acc:'a) : 'b =
     begin match f acc with
@@ -308,70 +306,15 @@ let sort_and_partition_with_indices ~(cmp : 'a -> 'a -> int)
                                : ('a*int) list list =
     begin match remaining with
     | [] -> currentacc :: accacc
-    | (h,i)::t -> let currenthd = fst (List.hd_exn currentacc)
+    | (h,i)::t -> let currenthd = fst (hd_exn currentacc)
                    in match cmp h currenthd with
                       | 0 -> merge_grouped_things t ((h,i)::currentacc) accacc
                       | _ -> merge_grouped_things t [(h,i)] (currentacc::accacc)
-    end
-  in let sorted = List.sort ~compare:(fun (x,_) (y,_) -> (cmp x y))
-                            (List.mapi ~f:(fun i x -> (x,i)) l)
+    end in
+  let sorted = sort ~compare:(fun (x,_) (y,_) -> cmp x y)
+                    (mapi ~f:(fun i x -> (x,i)) l)
   in begin match sorted with
        | [] -> []
        | h::t -> merge_grouped_things t [h] []
      end
 end
-
-
-
-let is_equal (c:int) : bool =
-  c = 0
-
-
-let compare_list_as_multisets
-    ~cmp:(cmp:'a -> 'a -> int)
-    (l1:'a list)
-    (l2:'a list)
-  : int =
-  let sorted_l1 = List.sort ~compare:cmp l1 in
-  let sorted_l2 = List.sort ~compare:cmp l2 in
-  List.compare cmp sorted_l1 sorted_l2
-
-
-
-let pair_compare
-    (fst_compare:'a -> 'a -> int)
-    (snd_compare:'b -> 'b -> int)
-    ((x1,x2):('a * 'b))
-    ((y1,y2):('a * 'b))
-  : int =
-  let cmp = fst_compare x1 y1 in
-  if (is_equal cmp) then
-    snd_compare x2 y2
-  else
-    cmp
-
-
-
-let distribute_option (l:('a option) list) : 'a list option =
-  (List.fold_left
-     ~f:(fun acc x ->
-         begin match (acc,x) with
-           | (None, _) -> None
-           | (_, None) -> None
-           | (Some acc', Some x') -> Some (x'::acc')
-         end)
-     ~init:(Some [])
-     (List.rev l))
-
-
-let cartesian_filter_map
-    ~f:(f:'a -> 'b -> 'c option)
-    (l1:'a list)
-    (l2:'b list)
-  : 'c list =
-  List.filter_map
-    ~f:(fun x -> x)
-    (cartesian_map
-       ~f:f
-       l1
-       l2)

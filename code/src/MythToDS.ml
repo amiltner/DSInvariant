@@ -14,10 +14,10 @@ let rec explode (binder: Expr.t) : Myth_folds.Lang.pattern list -> (Expr.t * Id.
 
 let rec convert_type : Myth_folds.Lang.typ -> Type.t =
   function [@warning "-8"]
-  | TBase id          -> Type.Var id
-  | TArr (typ1, typ2) -> Type.Arr ((convert_type typ1), (convert_type typ2))
+  | TBase id          -> Type.Named id
+  | TArr (typ1, typ2) -> Type.Arrow ((convert_type typ1), (convert_type typ2))
   | TTuple (typlist)  -> Type.Tuple (List.map ~f:convert_type typlist)
-  | TUnit             -> Type.mk_unit
+  | TUnit             -> Type._unit
 
 let convert_arg ((id, typ) : Myth_folds.Lang.arg) : Param.t =
   (id, convert_type typ)
@@ -52,7 +52,7 @@ let rec convert_expr : Myth_folds.Lang.exp -> Expr.t =
                                 (List.fold
                                   arglist
                                   ~init:(convert_type typ)
-                                  ~f:(fun etyp (_, t) -> Type.Arr (t, etyp))),
+                                  ~f:(fun etyp (_, t) -> Type.Arrow (t, etyp))),
                                 (List.fold
                                    arglist
                                    ~init:(convert_expr exp)
@@ -68,9 +68,9 @@ and convert_branch (binder : Id.t) : Myth_folds.Lang.branch -> (Id.t * Expr.t) =
   function [@warning "-8"]
   | ((id, None), exp) -> (id, convert_expr exp)
   | ((id, Some (Myth_folds.Lang.PVar _id)), exp)
-    -> (id, (Expr.mk_let_in _id Type.mk_unit (Expr.Var binder) (convert_expr exp)))
+    -> (id, (Expr.mk_let_in _id Type._unit (Expr.Var binder) (convert_expr exp)))
   | ((id, Some (Myth_folds.Lang.PTuple _plist)), exp)
     -> (id, (List.fold
                (explode (Expr.Var binder) _plist)
                ~init:(convert_expr exp)
-               ~f:(fun eacc (e, _id) -> Expr.mk_let_in _id Type.mk_unit e eacc)))
+               ~f:(fun eacc (e, _id) -> Expr.mk_let_in _id Type._unit e eacc)))

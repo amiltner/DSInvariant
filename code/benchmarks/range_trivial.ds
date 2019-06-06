@@ -1,30 +1,8 @@
-type nat = mu nat .
-  | O
-  | S of nat
-
-type natnatoption =
-  | None
-  | Some of nat * nat
-
-type cmp =
-  | LT
-  | EQ
-  | GT
-
-let compare =
-  fix (compare : nat -> nat -> cmp) =
-    fun (x1 : nat) ->
-      fun (x2 : nat) ->
-        match x1 binding x1 with
-        | O -> (match x2 binding x2 with
-                | O -> EQ
-                | S -> LT)
-        | S -> (match x2 binding x2 with
-                | O -> GT
-                | S -> compare x1 x2)
-;;
-
 struct
+  type natnatoption =
+    | None
+    | Some of nat * nat
+
   type t = natnatoption
 
   let empty = None ;;
@@ -41,8 +19,8 @@ struct
       match r binding r with
       | None -> False
       | Some ->
-        (match compare r.0 n binding c with
-         | LT -> (match compare r.1 n binding c with
+        (match cmp_nat r.0 n binding c with
+         | LT -> (match cmp_nat r.1 n binding c with
                   | LT -> False
                   | EQ -> True
                   | GT -> True)
@@ -55,8 +33,8 @@ struct
       match r binding rp with
       | None -> Some (n,n)
       | Some ->
-        (match compare rp.0 n binding c with
-         | LT -> (match compare rp.1 n binding c with
+        (match cmp_nat rp.0 n binding c with
+         | LT -> (match cmp_nat rp.1 n binding c with
                   | LT -> Some (rp.0,n)
                   | EQ -> r
                   | GT -> r)
@@ -88,5 +66,3 @@ forall (r : t) .
       (and
         (contains (expand r i) i)
         (not (contains empty i)))
-
-accumulating unit

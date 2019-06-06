@@ -1,32 +1,10 @@
-type nat = mu nat .
-  | O
-  | S of nat
-
-type natoption =
-  | None
-  | Some of nat
-
-type natoptionpair = natoption * natoption
-
-type cmp =
-  | LT
-  | EQ
-  | GT
-
-let compare =
-  fix (compare : nat -> nat -> cmp) =
-    fun (x1 : nat) ->
-      fun (x2 : nat) ->
-        match x1 binding x1 with
-        | O -> (match x2 binding x2 with
-                | O -> EQ
-                | S -> LT)
-        | S -> (match x2 binding x2 with
-                | O -> GT
-                | S -> compare x1 x2)
-;;
-
 struct
+  type natoption =
+    | None
+    | Some of nat
+
+  type natoptionpair = natoption * natoption
+
   type t = natoptionpair
 
   let empty = (None,None) ;;
@@ -46,12 +24,12 @@ struct
       match r.0 binding z with
       | None -> False
       | Some ->
-        (match compare z n binding c with
+        (match cmp_nat z n binding c with
          | LT ->
            (match r.1 binding z with
             | None -> False
             | Some ->
-              (match compare z n binding c with
+              (match cmp_nat z n binding c with
                | LT -> False
                | EQ -> True
                | GT -> False))
@@ -60,7 +38,7 @@ struct
            (match r.1 binding z with
             | None -> False
             | Some ->
-              (match compare z n binding c with
+              (match cmp_nat z n binding c with
                | LT -> False
                | EQ -> True
                | GT -> False)))
@@ -71,7 +49,7 @@ struct
       match r.0 binding z with
       | None -> (Some n, Some n)
       | Some ->
-        (match compare z n binding c with
+        (match cmp_nat z n binding c with
          | LT -> (Some n,Some n)
          | EQ -> (Some n,Some n)
          | GT -> (Some z,Some n))
@@ -84,17 +62,17 @@ struct
         (match r.1 binding z with
          | None -> r
          | Some ->
-           (match compare z n binding c with
+           (match cmp_nat z n binding c with
             | LT -> r
             | EQ -> (None, None)
             | GT -> r))
       | Some ->
-        (match compare z n binding c with
+        (match cmp_nat z n binding c with
          | LT ->
            (match r.1 binding z with
             | None -> r
             | Some ->
-              (match compare z n binding c with
+              (match cmp_nat z n binding c with
                | LT -> r
                | EQ -> (None, None)
                | GT -> r))
@@ -127,5 +105,3 @@ forall (r : t) .
     (and
       (contains (insert r i) i)
       (not (contains (delete r i) i)))
-
-accumulating unit

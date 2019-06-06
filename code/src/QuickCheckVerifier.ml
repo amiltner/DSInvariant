@@ -1,6 +1,5 @@
 open Core
 
-open Lang
 open Utils
 
 module T : Verifier.t = struct
@@ -40,15 +39,15 @@ module T : Verifier.t = struct
   end
 
   let rec generator_of_type
-      (tc:TypeContext.t)
+      (tc:Context.Types.t)
       (t:Type.t)
     : Expr.t QC.g =
     let generator_of_type_simple = generator_of_type tc in
     fun i ->
       begin match t with
-        | Var i ->
+        | Named i ->
           generator_of_type_simple (Context.find_exn tc i)
-        | Arr _ ->
+        | Arrow _ ->
           failwith "Will do if necessary..."
         | Tuple ts ->
           QC.map
@@ -73,12 +72,12 @@ module T : Verifier.t = struct
   module TypeSet = Set.Make(Type)
 
   let contains_any
-      (tc:TypeContext.t)
+      (tc:Context.Types.t)
       (desired_t:Type.t)
       (t:Type.t)
     : bool =
     let rec contains_any
-        (tc:TypeContext.t)
+        (tc:Context.Types.t)
         (desired_t:Type.t)
         (checked:TypeSet.t)
         (t:Type.t)
@@ -91,12 +90,12 @@ module T : Verifier.t = struct
         let checked = TypeSet.add checked t in
         let contains_any_simple = contains_any tc desired_t checked in
         begin match t with
-          | Var v ->
+          | Named v ->
             begin match Context.find tc v with
               | Some t -> contains_any_simple t
               | None -> false
             end
-          | Arr (t1,t2) ->
+          | Arrow (t1,t2) ->
             contains_any_simple t1 || contains_any_simple t2
           | Tuple ts ->
             List.exists ~f:contains_any_simple ts
@@ -110,7 +109,7 @@ module T : Verifier.t = struct
     contains_any tc desired_t TypeSet.empty t
 
   let rec extract_typed_subcomponents
-      (tc:TypeContext.t)
+      (tc:Context.Types.t)
       (desired_t:Type.t)
       (t:Type.t)
       (v:Value.t)
@@ -132,7 +131,7 @@ module T : Verifier.t = struct
               c
           in
           extract_typed_subcomponents_simple t v
-        | (Var i, _) ->
+        | (Named i, _) ->
           begin match Context.find tc i with
             | None -> []
             | Some t -> extract_typed_subcomponents_simple t v
@@ -140,7 +139,7 @@ module T : Verifier.t = struct
         | (Mu (i,t), _) ->
           let tc = Context.set tc ~key:i ~data:t in
           extract_typed_subcomponents tc desired_t t v
-        | (Arr _, _) -> failwith "arrows not currently supported"
+        | (Arrow _, _) -> failwith "arrows not currently supported"
         | _ -> failwith "Something went wrong"
       end
 
@@ -148,7 +147,7 @@ module T : Verifier.t = struct
       (t:Type.t)
     : Type.t list * Type.t =
     begin match t with
-      | Arr (t1,t2) ->
+      | Arrow (t1,t2) ->
         let (ts,tres) = extract_args t2 in
         (t1::ts,tres)
       | _ -> ([],t)
@@ -183,7 +182,7 @@ module T : Verifier.t = struct
       ~cond:(cond:Expr.t)
     : bool =
     let num_checks = _NUM_CHECKS_ in
-    let cond_t = Type.mk_arr Type.mk_t_var Type.mk_bool_var in
+    let cond_t = Type.mk_arrow (Type.mk_named"t") (Type.mk_named"bool") in
     let generators
         (t:Type.t)
       : Expr.t Sequence.t =
@@ -217,7 +216,7 @@ module T : Verifier.t = struct
       ~(eval_t:Type.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
     : Value.t list option =
-    let desired_t = Type.mk_var "t" in
+    let desired_t = Type.mk_named"t" in
     if equiv_false ~problem ~cond:pre
     && List.exists
          ~f:(fun (_,t) -> Type.equal t desired_t)
@@ -286,7 +285,7 @@ module T : Verifier.t = struct
           List.map
             ~f:(fun (i,t) ->
                 let gen =
-                  if Type.equal (Type.mk_var "t") t then
+                  if Type.equal (Type.mk_named"t") t then
                     result_gen
                   else
                     QC.map ~f:(fun g -> ([],g)) (generator_of_type problem.tc t)
@@ -348,7 +347,7 @@ module T : Verifier.t = struct
       ~post:((post_quants,post_expr):UniversalFormula.t)
     : Value.t list option =
     let num_checks = _NUM_CHECKS_ in
-    let desired_t = Type.mk_var "t" in
+    let desired_t = Type.mk_named"t" in
     let (args_t,result_t) = extract_args eval_t in
     if (List.length examples = 0
         && List.mem ~equal:Type.equal args_t desired_t)
@@ -389,7 +388,7 @@ module T : Verifier.t = struct
         List.map
           ~f:(fun (i,t) ->
               let gen =
-                if Type.equal (Type.mk_var "t") t then
+                if Type.equal (Type.mk_named"t") t then
                   result_gen
                 else
                   generator_of_type problem.tc t
@@ -443,7 +442,7 @@ module T : Verifier.t = struct
         ce_option
 
   (*let convert_foldable_to_full
-      (tc:TypeContext.t)
+      (tc:Context.Types.t)
       (fold_completion:Type.t)
     : Expr.t =
     let convert_internal_id = "convert'" in
@@ -488,15 +487,15 @@ module T : Verifier.t = struct
           incoming_exp
       end
     in
-    let t = TypeContext.lookup_exn tc "t" in
+    let t = Context.Types.lookup_exn tc "t" in
     let tv = Type.destruct_id_exn t in
-    let t = TypeContext.lookup_exn tc tv in
+    let t = Context.Types.lookup_exn tc tv in
     let ito = Type.destruct_mu t in
     let t' = Type.mk_var (Id.mk_prime "t") in
     begin match ito with
       | None ->
         Expr.mk_func
-          ("x",Type.mk_arr t' t')
+          ("x",Type.mk_arrow t' t')
           (Expr.mk_var "x")
       | Some (i,t_internal) ->
         Expr.mk_func
@@ -505,7 +504,7 @@ module T : Verifier.t = struct
              fold_completion)
           (Expr.mk_fix
              convert_internal_id
-             (Type.mk_arr Type.mk_t_var fold_completion)
+             (Type.mk_arrow Type.mk_t_var fold_completion)
              (Expr.mk_func
                 ("x",Type.mk_t_var)
                 (Expr.mk_app
@@ -518,7 +517,7 @@ module T : Verifier.t = struct
 
 
   let get_foldable_t
-      (tc:TypeContext.t)
+      (tc:Context.Types.t)
       (fold_completion:Type.t)
     : Type.t =
     let rec type_to_folded_type_internal
@@ -543,9 +542,9 @@ module T : Verifier.t = struct
         | Arr _ | Mu _ -> t
       end
     in
-    let t = TypeContext.lookup_exn tc "t" in
+    let t = Context.Types.lookup_exn tc "t" in
     let tv = Type.destruct_id_exn t in
-    let t = TypeContext.lookup_exn tc tv in
+    let t = Context.Types.lookup_exn tc tv in
     let ito = Type.destruct_mu t in
     begin match ito with
       | None -> t

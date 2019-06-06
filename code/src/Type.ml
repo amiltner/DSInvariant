@@ -1,36 +1,36 @@
 open Core
 
 type t =
-  | Var of Id.t
-  | Arr  of t * t
+  | Named of Id.t
+  | Arrow of t * t
   | Tuple of t list
   | Mu of Id.t * t
   | Variant of (Id.t * t) list
 [@@deriving bin_io, eq, hash, ord, sexp, show]
 
-let mk_var (i:Id.t) : t =
-  Var i
+let mk_named (i : Id.t) : t =
+  Named i
 
-let mk_arr (t1:t) (t2:t) : t =
-  Arr (t1,t2)
+let mk_arrow (t1:t) (t2:t) : t =
+  Arrow (t1,t2)
 
 let mk_mu (i:Id.t) (t:t) : t =
-  if equal t (mk_var i) then
+  if equal t (mk_named i) then
     failwith "cannot do infinite loop";
   Mu (i,t)
 
 let fold (type a)
-         ~(base_f:Id.t -> a)
-         ~(arr_f:a -> a -> a)
-         ~(tuple_f:a list -> a)
-         ~(mu_f:Id.t -> a -> a)
-         ~(variant_f:(Id.t * a) list -> a)
-         (e:t)
+         ~(name_f : Id.t -> a)
+         ~(arr_f : a -> a -> a)
+         ~(tuple_f : a list -> a)
+         ~(mu_f : Id.t -> a -> a)
+         ~(variant_f : (Id.t * a) list -> a)
+         (e : t)
          : a =
-  let rec fold_internal (e:t) : a =
+  let rec fold_internal (e : t) : a =
     match e with
-      | Var v -> base_f v
-      | Arr (e1,e2) -> arr_f (fold_internal e1) (fold_internal e2)
+      | Named v -> name_f v
+      | Arrow (e1,e2) -> arr_f (fold_internal e1) (fold_internal e2)
       | Tuple es -> tuple_f (List.map ~f:fold_internal es)
       | Mu (i,e) -> mu_f i (fold_internal e)
       | Variant variants ->
@@ -39,7 +39,7 @@ let fold (type a)
 
 let arr_apply (type a) ~(f : t -> t -> a) (ty : t) : a option =
   match ty with
-    | Arr (ty1,ty2) -> Some (f ty1 ty2)
+    | Arrow (ty1,ty2) -> Some (f ty1 ty2)
     | _ -> None
 
 let destruct_arr : t -> (t * t) option =
@@ -50,7 +50,7 @@ let destruct_arr_exn (t : t) : t * t =
 
 let id_apply (type a) ~(f:Id.t -> a) (ty:t) : a option =
   match ty with
-    | Var v -> Some (f v)
+    | Named v -> Some (f v)
     | _ -> None
 
 let destruct_id : t -> Id.t option =
@@ -98,14 +98,14 @@ let destruct_mu : t -> (Id.t * t) option =
 let destruct_mu_exn (t:t) : Id.t * t =
   Option.value_exn (destruct_mu t)
 
-let mk_unit : t = mk_tuple []
+let _unit : t = mk_tuple []
 
-let mk_t_var : t = mk_var "t"
+let _t = mk_named "t"
 
-let mk_bool_var : t = mk_var "bool"
+let _bool = mk_named "bool"
 
 let size : t -> int =
-  fold ~base_f:(fun _ -> 1)
+  fold ~name_f:(fun _ -> 1)
        ~arr_f:(fun x y -> x+y+1)
        ~tuple_f:(fun ss -> List.fold_left ~f:(+) ~init:1 ss)
        ~mu_f:(fun _ s -> s+1)

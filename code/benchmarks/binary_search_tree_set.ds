@@ -1,34 +1,3 @@
-type nat = mu nat .
-  | O
-  | S of nat
-
-let add =
-  fix (add : nat -> nat -> nat) =
-    fun (x1 : nat) ->
-      fun (x2 : nat) ->
-        match x1 binding x1 with
-        | O -> x2
-        | S -> add x1 (S x2)
-;;
-
-type cmp =
-  | LT
-  | EQ
-  | GT
-
-let compare =
-  fix (compare : nat -> nat -> cmp) =
-    fun (x1 : nat) ->
-      fun (x2 : nat) ->
-        match x1 binding x1 with
-        | O -> (match x2 binding x2 with
-                | O -> EQ
-                | S -> LT)
-        | S -> (match x2 binding x2 with
-                | O -> GT
-                | S -> compare x1 x2)
-;;
-
 type natoption =
   | None
   | Some of nat
@@ -56,7 +25,7 @@ struct
         fun (x : nat) ->
           match b binding b with
           | Leaf -> False
-          | Node -> match compare b.1 x binding c with
+          | Node -> match cmp_nat b.1 x binding c with
                     | EQ -> True
                     | LT -> lookup b.0 x
                     | GT -> lookup b.2 x
@@ -68,7 +37,7 @@ struct
         fun (x : nat) ->
           match b binding bp with
           | Leaf -> Node (Leaf, x, Leaf)
-          | Node -> (match compare x bp.1 binding c with
+          | Node -> (match cmp_nat x bp.1 binding c with
                      | LT -> Node ((insert bp.0 x), bp.1, bp.2)
                      | EQ -> b
                      | GT -> Node (bp.0, bp.1, (insert bp.2 x)))
@@ -91,7 +60,7 @@ struct
           match b binding bp with
           | Leaf -> Leaf
           | Node ->
-              (match compare x bp.1 binding c with
+              (match cmp_nat x bp.1 binding c with
                | LT -> Node ((delete bp.0 x), bp.1, bp.2)
                | EQ -> (match bp.0 binding bl with
                         | Leaf -> bp.2

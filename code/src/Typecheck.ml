@@ -1,37 +1,35 @@
 open Core
 
-open Lang
-
 let type_equiv
-    (tc:TypeContext.t)
+    (tc:Context.Types.t)
     (t1:Type.t)
     (t2:Type.t)
   : bool =
   let rec type_equiv_internal
-      (tc1:TypeContext.t)
-      (tc2:TypeContext.t)
+      (tc1:Context.Types.t)
+      (tc2:Context.Types.t)
       (t1:Type.t)
       (t2:Type.t)
     : bool =
     let replace_with_definition
-        (tc:TypeContext.t)
+        (tc:Context.Types.t)
         (v:Id.t)
       : Type.t =
       Context.find_exn tc v
     in
     let type_equiv_simple = type_equiv_internal tc1 tc2 in
     begin match (t1,t2) with
-      | (Var i1, Var i2) ->
+      | (Named i1, Named i2) ->
         if Id.equal i1 i2 then
           true
         else
           let t1 = replace_with_definition tc1 i1 in
           let t2 = replace_with_definition tc2 i2 in
           type_equiv_simple t1 t2
-      | (Var i1, _) ->
+      | (Named i1, _) ->
         let t1 = replace_with_definition tc1 i1 in
         type_equiv_simple t1 t2
-      | (_, Var i2) ->
+      | (_, Named i2) ->
         let t2 = replace_with_definition tc2 i2 in
         type_equiv_simple t1 t2
       | (Mu _, Mu _) ->
@@ -42,12 +40,12 @@ let type_equiv
       | (_, Mu (i2,t2')) ->
         let tc2 = Context.set tc2 ~key:i2 ~data:t2 in
         type_equiv_internal tc1 tc2 t1 t2'
-      | (Arr (t11,t12), Arr (t21,t22)) ->
+      | (Arrow (t11,t12), Arrow (t21,t22)) ->
         let t1_equiv = type_equiv_simple t11 t21 in
         let t2_equiv = type_equiv_simple t12 t22 in
         t1_equiv && t2_equiv
-      | (Arr _, _) -> false
-      | (_, Arr _) -> false
+      | (Arrow _, _) -> false
+      | (_, Arrow _) -> false
       | (Tuple t1s, Tuple t2s) ->
         Option.value_map
           ~default:false
@@ -77,11 +75,11 @@ let type_equiv
   type_equiv_internal tc tc t1 t2
 
 let rec concretify
-    (tc:TypeContext.t)
+    (tc:Context.Types.t)
     (t:Type.t)
   : Type.t =
   begin match t with
-    | Var i ->
+    | Named i ->
       concretify tc (Context.find_exn tc i)
     | Mu (i, t') ->
       let tc = Context.set tc ~key:i ~data:t in
@@ -90,9 +88,9 @@ let rec concretify
   end
 
 let rec typecheck_exp
-    (ec:ExprContext.t)
-    (tc:TypeContext.t)
-    (vc:VariantContext.t)
+    (ec:Context.Exprs.t)
+    (tc:Context.Types.t)
+    (vc:Context.Variants.t)
     (e:Expr.t)
   : Type.t =
   let typecheck_simple = typecheck_exp ec tc vc in
@@ -111,14 +109,8 @@ let rec typecheck_exp
                   ^ " instead of "
                   ^ (Type.show t11))
     | Func ((i,t),e) ->
-      let ec = Context.set ec ~key:i ~data:t in
-      Type.mk_arr
-        t
-        (typecheck_exp
-           ec
-           tc
-           vc
-           e)
+      let ec = Context.set ec ~key:i ~data:t
+       in Type.mk_arrow t (typecheck_exp ec tc vc e)
     | Ctor (i,e) ->
       let t = typecheck_simple e in
       let its = Context.find_exn vc i in
@@ -185,9 +177,9 @@ let rec typecheck_exp
   end
 
 let typecheck_formula
-    (ec:ExprContext.t)
-    (tc:TypeContext.t)
-    (vc:VariantContext.t)
+    (ec:Context.Exprs.t)
+    (tc:Context.Types.t)
+    (vc:Context.Variants.t)
     ((foralls,e):UniversalFormula.t)
   : Type.t list =
   let (ec,ts) =
@@ -204,7 +196,7 @@ let typecheck_formula
       vc
       e
   in
-  let equiv = type_equiv tc t (Type.mk_var "bool") in
+  let equiv = type_equiv tc t (Type._bool) in
   if equiv then
     ts
   else
@@ -217,7 +209,7 @@ let rec align_types
   begin match (t,e) with
     | (_, Expr.Fix (i,_,e)) ->
       Expr.mk_fix i t (align_types t e)
-    | (Type.Arr (t1,t2), Expr.Func ((i,_),e)) ->
+    | (Type.Arrow (t1,t2), Expr.Func ((i,_),e)) ->
       Expr.mk_func (i,t1) (align_types t2 e)
     | _ -> e
   end

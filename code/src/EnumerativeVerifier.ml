@@ -1,7 +1,6 @@
 open Core
 
 open Utils
-open Lang
 
 module T : Verifier.t = struct
   let _MAX_SIZE_ = 20
@@ -45,7 +44,7 @@ module T : Verifier.t = struct
     end*)
 
   let rec elements_of_type_and_size
-      (tc:TypeContext.t)
+      (tc:Context.Types.t)
       (t:Type.t)
       (s:int)
     : Expr.t list =
@@ -54,9 +53,9 @@ module T : Verifier.t = struct
     else
       let elements_simple = elements_of_type_and_size tc in
       begin match t with
-        | Var i ->
+        | Named i ->
           elements_simple (Context.find_exn tc i) s
-        | Arr _ ->
+        | Arrow _ ->
           failwith "Will do if necessary..."
         | Tuple ts ->
           let parts = List.partitions (s-1) (List.length ts) in
@@ -87,7 +86,7 @@ module T : Verifier.t = struct
 
 
   let elements_of_type_to_size
-      (tc:TypeContext.t)
+      (tc:Context.Types.t)
       (t:Type.t)
       (max_size:int)
     : Expr.t list =
@@ -97,7 +96,7 @@ module T : Verifier.t = struct
 
 
   let elements_of_type_to_size_unit
-      (tc:TypeContext.t)
+      (tc:Context.Types.t)
       (t:Type.t)
       (max_size:int)
     : (unit * Expr.t) list =
@@ -108,12 +107,12 @@ module T : Verifier.t = struct
   module TypeSet = Set.Make(Type)
 
   let contains_any
-      (tc:TypeContext.t)
+      (tc:Context.Types.t)
       (desired_t:Type.t)
       (t:Type.t)
     : bool =
     let rec contains_any
-        (tc:TypeContext.t)
+        (tc:Context.Types.t)
         (desired_t:Type.t)
         (checked:TypeSet.t)
         (t:Type.t)
@@ -126,12 +125,12 @@ module T : Verifier.t = struct
         let checked = TypeSet.add checked t in
         let contains_any_simple = contains_any tc desired_t checked in
         begin match t with
-          | Var v ->
+          | Named v ->
             begin match Context.find tc v with
               | Some t -> contains_any_simple t
               | None -> false
             end
-          | Arr (t1,t2) ->
+          | Arrow (t1,t2) ->
             contains_any_simple t1 || contains_any_simple t2
           | Tuple ts ->
             List.exists ~f:contains_any_simple ts
@@ -145,7 +144,7 @@ module T : Verifier.t = struct
     contains_any tc desired_t TypeSet.empty t
 
   let rec extract_typed_subcomponents
-      (tc:TypeContext.t)
+      (tc:Context.Types.t)
       (desired_t:Type.t)
       (t:Type.t)
       (v:Value.t)
@@ -164,7 +163,7 @@ module T : Verifier.t = struct
             List.Assoc.find_exn ~equal:String.equal branches c
           in
           extract_typed_subcomponents_simple t v
-        | (Var i, _) ->
+        | (Named i, _) ->
           begin match Context.find tc i with
             | None -> []
             | Some t -> extract_typed_subcomponents_simple t v
@@ -172,7 +171,7 @@ module T : Verifier.t = struct
         | (Mu (i,t), _) ->
           let tc = Context.set tc ~key:i ~data:t in
           extract_typed_subcomponents tc desired_t t v
-        | (Arr _, _) -> failwith "arrows not currently supported"
+        | (Arrow _, _) -> failwith "arrows not currently supported"
         | _ -> failwith "Something went wrong"
       end
 
@@ -180,7 +179,7 @@ module T : Verifier.t = struct
       (t:Type.t)
     : Type.t list * Type.t =
     begin match t with
-      | Arr (t1,t2) ->
+      | Arrow (t1,t2) ->
         let (ts,tres) = extract_args t2 in
         (t1::ts,tres)
       | _ -> ([],t)
@@ -249,7 +248,7 @@ module T : Verifier.t = struct
       ~(problem:Problem.t)
       ~cond:(cond:Expr.t)
     : bool =
-    let cond_t = Type.mk_arr Type.mk_t_var Type.mk_bool_var in
+    let cond_t = Type.mk_arrow (Type._t) (Type._bool) in
     (*let generators
         (t:Type.t)
       : Expr.t Sequence.t =
@@ -325,7 +324,7 @@ module T : Verifier.t = struct
       ~(eval_t:Type.t)
       ~(post:UniversalFormula.t)
     : ((Expr.t * Type.t) list * Value.t) list option =
-    let desired_t = Type.mk_var "t" in
+    let desired_t = Type._t in
     let (args_t,result_t) = extract_args eval_t in
     if (List.length examples = 0
         && List.mem ~equal:Type.equal args_t desired_t)
@@ -494,7 +493,7 @@ module T : Verifier.t = struct
       ~(post:UniversalFormula.t)
     : Value.t list option =
     let _ = eval in
-    let desired_t = Type.mk_var "t" in
+    let desired_t = Type._t in
     let examples =
       List.filter_map
         ~f:(fun e ->

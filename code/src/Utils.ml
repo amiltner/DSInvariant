@@ -1,4 +1,4 @@
-open Base
+open Core
 
 let (%) (f : 'b -> 'c) (g : 'a -> 'b) : 'a -> 'c =
   Fn.compose f g
@@ -14,11 +14,11 @@ module List = struct
                            (l1 : 'a list)
                            (l2 : 'b list)
                            : 'c list =
-    List.(rev (fold l1 ~init:[]
-                    ~f:(fun acc a -> fold l2 ~init:acc
-                                          ~f:(fun acc b -> match f a b with
-                                                           | None -> acc
-                                                           | Some c -> c :: acc))))
+    rev (fold l1 ~init:[]
+              ~f:(fun acc a -> fold l2 ~init:acc
+                                    ~f:(fun acc b -> match f a b with
+                                                     | None -> acc
+                                                     | Some c -> c :: acc)))
 
   let combinations (type a) (l : a list list) : a list list =
     let rec combinations_internal

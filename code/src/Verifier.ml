@@ -1,5 +1,3 @@
-open Lang
-
 module type t = sig
   val equiv_false :
     problem:Problem.t ->

@@ -1,7 +1,5 @@
 open Core
 
-open Lang
-
 module IdSet = Set.Make(Id)
 module MythLang = Myth_folds.Lang
 
@@ -27,12 +25,12 @@ let rec to_myth_type
     | Some mt -> ([],mt,tt)
     | None ->
       begin match t with
-        | Var v ->
+        | Named v ->
           if IdSet.mem real_vars v then
             ([],MythLang.TBase v,tt)
           else
             failwith ("non-real var: " ^ v)
-        | Arr (t1,t2) ->
+        | Arrow (t1,t2) ->
           let (ds1,mt1,tt1) = to_myth_type_simple t1 in
           let (ds2,mt2,tt2) = to_myth_type_simple t2 in
           ((ds1@ds2), MythLang.TArr (mt1, mt2), merge_tts tt1 tt2)
@@ -113,7 +111,7 @@ let rec to_myth_exp
   end
 
 let convert_decl_list_to_myth
-    (ec:ExprContext.t)
+    (ec:Context.Exprs.t)
     (ds:Declaration.t list)
   : MythLang.decl list * type_to_type =
   let (tt,ds) =
@@ -127,7 +125,7 @@ let convert_decl_list_to_myth
                     ~f:(fun (i,cs) -> MythLang.DData (i,cs))
                     ctors
                 in
-                let tt = TypeMap.set tt ~key:(Type.mk_var i) ~data:mt in
+                let tt = TypeMap.set tt ~key:(Type.mk_named i) ~data:mt in
                 (tt,new_ds@dsrev))
             ~expr_f:(fun i e ->
                 let new_d =
@@ -174,7 +172,7 @@ let convert_problem_examples_type_to_myth
       | None ->
         (MythLang.TBase "x",MythLang.TBase "x")
       | Some te ->
-        (to_myth_type_basic tt (Type.mk_var "t'")
+        (to_myth_type_basic tt (Type.mk_named "t'")
         ,to_myth_type_basic tt te)
     end
   in

@@ -1,57 +1,18 @@
-(* open Async *)
+module OurLog = Log
+
+open Async
 open Core
 
+module Log = OurLog
+
 open Utils
-open Lang
-
-(* module Worker = struct
-  module T = struct
-    type w_input = problem * TestBed.t * Type.t [@@deriving bin_io]
-    type w_output = Expr.t option [@@deriving bin_io]
-
-    type 'worker functions = {
-      synth : ('worker, w_input, w_output) Rpc_parallel.Function.t
-    }
-
-    module Worker_state = struct
-      type init_arg = unit [@@deriving bin_io]
-      type t = unit
-    end
-
-    module Connection_state = struct
-      type init_arg = unit [@@deriving bin_io]
-      type t = unit
-    end
-
-    module Functions (C : Rpc_parallel.Creator
-                          with type worker_state := Worker_state.t
-                          and type connection_state := Connection_state.t) =
-    struct
-      let print_impl ~worker_state:() ~conn_state:() string =
-        printf "%s\n" string;
-        return ()
-      ;;
-
-      let print =
-        C.create_rpc ~f:print_impl ~bin_input:String.bin_t ~bin_output:Unit.bin_t ()
-      ;;
-
-      let functions = { print }
-      let init_worker_state () = Deferred.unit
-      let init_connection_state ~connection:_ ~worker_state:_ = return
-    end
-  end
-
-  include Rpc_parallel.Make (T)
-end *)
 
 module T : Synthesizer.t = struct
-  let synth_core
-      ~(problem:Problem.t)
-      ~(testbed:TestBed.t)
-      ~(accumulator:Type.t)
-    : Expr.t list =
-    let end_type = Type.mk_tuple [Type.mk_bool_var ; accumulator] in
+  let synth_core ~(problem:Problem.t)
+                 ~(testbed:TestBed.t)
+                 ~(accumulator:Type.t)
+                 : Expr.t list =
+    let end_type = Type.mk_tuple [Type._bool ; accumulator] in
     let pos_examples = List.map ~f:(fun v -> (Value.to_exp v, Expr.mk_true_exp)) testbed.pos_tests in
     let neg_examples = List.map ~f:(fun v -> (Value.to_exp v, Expr.mk_false_exp)) testbed.neg_tests in
     let examples = pos_examples @ neg_examples in
@@ -67,9 +28,9 @@ module T : Synthesizer.t = struct
         Myth_folds.Gamma.Gamma.empty
         decls
     in
-    let foldable_t = get_foldable_t problem.tc end_type in
+    let foldable_t = Context.get_foldable_t problem.tc end_type in
     let fold_creater =
-      convert_foldable_to_full
+      Context.convert_foldable_to_full
         problem.tc
         end_type
     in
@@ -82,9 +43,9 @@ module T : Synthesizer.t = struct
       ,uf
       ,acc)
     in
-    let problem = ProcessFile.process_full_problem unprocessed in
+    let problem = Problem.process unprocessed in
     if (List.length examples = 0) then
-      [Expr.mk_constant_true_func (Type.mk_var "t")]
+      [Expr.mk_constant_true_func (Type._t)]
     else
       let (decls,myth_examples,t,end_type_myth) =
         DSToMyth.convert_problem_examples_type_to_myth
@@ -101,10 +62,7 @@ module T : Synthesizer.t = struct
       let env = Myth_folds.Eval.gen_init_env decls in
       let env = Myth_folds.Sigma.Sigma.add_ctors_env env sigma in
       let gamma = Myth_folds.Gamma.Gamma.add_ctors gamma sigma in
-      let desired_t =
-        Type.mk_arr
-          (Type.mk_var "t")
-          (Type.mk_var "bool")
+      let desired_t = Type.mk_arrow (Type._t) (Type._bool)
       in
       let tests_outputs : Myth_folds.Lang.exp Myth_folds.Rtree.tests_outputs =
         List.map
@@ -212,7 +170,7 @@ module T : Synthesizer.t = struct
             let e = Typecheck.align_types desired_t e in
             let full_e = Expr.mk_app fold_creater e in
             Expr.mk_func
-              ("x",Type.mk_t_var)
+              ("x",Type._t)
               (Expr.mk_proj 0
                  (Expr.mk_app full_e (Expr.mk_var "x"))))
         (Myth_folds.Synth.synthesize
@@ -227,20 +185,147 @@ module T : Synthesizer.t = struct
               true)
            tests_outputs)
 
-  let synth
-      ~(problem:Problem.t)
-      ~(testbed:TestBed.t)
-    : Expr.t list =
+  module Worker = struct
+    module T = struct
+      module Input = struct
+        type t_acc = ExistingType of Type.t
+                   | DerivedVariant of (Id.t * Type.t)
+        [@@deriving bin_io, show]
+
+        type t = {
+          problem : Problem.t ;
+          testbed : TestBed.t ;
+          accumulator : t_acc ;
+        }
+        [@@deriving bin_io]
+      end
+
+      module Output = struct
+        type t =
+          Expr.t list
+        [@@deriving bin_io]
+      end
+
+      type 'worker functions = {
+        synth : ('worker, Input.t, Output.t) Rpc_parallel.Function.t
+      }
+
+      module Worker_state = struct
+        type init_arg = unit [@@deriving bin_io]
+        type t = unit
+      end
+
+      module Connection_state = struct
+        type init_arg = unit [@@deriving bin_io]
+        type t = unit
+      end
+
+      module Functions (C : Rpc_parallel.Creator
+                            with type worker_state := Worker_state.t
+                             and type connection_state := Connection_state.t) =
+      struct
+        let synth_impl ~worker_state:() ~conn_state:() (input : Input.t) : Output.t Deferred.t =
+          return (match input.accumulator with
+                  | ExistingType accumulator
+                    -> synth_core ~problem:input.problem
+                                  ~testbed:input.testbed
+                                  ~accumulator
+                  | DerivedVariant (acc_name, acc_type)
+                    -> let d = Declaration.type_dec acc_name acc_type in
+                       let (ds,mi,ms,uf,acc) = input.problem.unprocessed in
+                       let unprocessed = (ds @ [d], mi, ms, uf, acc) in
+                       let problem = Problem.process unprocessed
+                        in synth_core ~problem
+                                      ~testbed:input.testbed
+                                      ~accumulator:(Type.mk_named acc_name))
+
+        let synth = C.create_rpc ~f:synth_impl
+                                 ~bin_input:Input.bin_t
+                                 ~bin_output:Output.bin_t
+                                 ()
+
+        let functions = { synth }
+        let init_worker_state () = Deferred.unit
+        let init_connection_state ~connection:_ ~worker_state:_ = return
+      end
+    end
+
+    include Rpc_parallel.Make (T)
+  end
+
+  let synth ~(problem:Problem.t) ~(testbed:TestBed.t) : Expr.t list =
     match problem.accumulator with
     | Some accumulator -> synth_core ~problem ~testbed ~accumulator
     | None -> begin
-      let config =
-          Rpc_parallel.Map_reduce.Config.create
-            ~local:4
-            ~redirect_stderr:`Dev_null
-            ~redirect_stdout:`Dev_null
-            ()
-       in ignore config
-        ; raise (Exceptions.Internal_Exn "TODO")
+        let extract_result conns_procs_def_results =
+          match%bind conns_procs_def_results with
+          | [] -> return []
+          | conns_procs_def_results
+            -> if conns_procs_def_results = [] then return []
+               else begin
+                 let conns_procs, def_results = List.unzip conns_procs_def_results in
+                 let helper : Worker.T.Output.t Or_error.t -> Expr.t list = function
+                    | Ok res
+                      -> List.iter conns_procs
+                                   ~f:(fun (c,p) -> ignore (Worker.Connection.close c)
+                                                  ; ignore (Signal.(send kill (`Pid (Process.pid p))))
+                                                  ; ignore (Process.wait p))
+                       ; res
+                    | Error err
+                      -> Log.error (lazy (Error.to_string_hum err))
+                       ; [] (* TODO: If a worker is errored, then remove it and and continue with the rest *)
+                 in let%map res = Deferred.any def_results
+                     in helper res
+               end
+        in
+        let _, _, (_, mod_spec), _, _ = problem.unprocessed in
+        let types = List.fold_left mod_spec ~init:[]
+                                   ~f:(fun acc (_, t) -> Type.(fold t ~arr_f:(fun a b -> a @ b)
+                                                                      ~tuple_f:(fun l -> List.concat l)
+                                                                      ~mu_f:(fun _ _ -> [])
+                                                                      ~variant_f:(fun _ -> [])
+                                                                      ~name_f:(fun n -> match n with
+                                                                                        | "t" | "bool" -> []
+                                                                                        | _ -> [n]))
+                                                       @ acc) in
+        let types = let open Worker.T.Input
+                     in (ExistingType Type._unit)
+                     :: (List.fold_left (List.dedup_and_sort ~compare:String.compare types)
+                                        ~init:[]
+                                        ~f:(fun acc n -> ExistingType (Type.mk_named n) 
+                                                      :: DerivedVariant (
+                                                          n ^ "_option",
+                                                          Variant [
+                                                            ("None_" ^ n, Type._unit) ;
+                                                            ("Some_" ^ n, Named n)
+                                                         ])
+                                                      :: acc))
+        in
+        Log.info (lazy ("Spinning " ^ (Int.to_string (List.length types))
+                       ^ " workers for accumulator types:")) ;
+        List.iter types ~f:(fun t -> Log.info (lazy ("  > "
+                                                    ^ (Worker.T.Input.show_t_acc t)))) ;
+        let conns_procs_def_results =
+              List.map types
+                ~f:(fun t -> let%map conn, proc =
+                               Worker.spawn_in_foreground_exn
+                                 ~shutdown_on:Disconnect
+                                 ~connection_state_init_arg:()
+                                 ~on_failure:Error.raise
+                                 () in
+                             let def_res = Worker.Connection.run
+                                             ~f:Worker.functions.synth
+                                             ~arg:{ problem
+                                                  ; testbed
+                                                  ; accumulator = t
+                                                  }
+                                             conn
+                              in ((conn, proc), def_res))
+         in match Thread_safe.block_on_async
+                    (fun () -> extract_result (Deferred.all conns_procs_def_results))
+            with Ok res    -> res
+               | Error exn -> Log.error (lazy (Exn.to_string exn))
+                            ; Log.error (lazy (Printexc.get_backtrace ()))
+                            ; []
     end
 end

@@ -1,5 +1,4 @@
-let prelude_string =
-  "
+let prelude_string = "
 (* PRELUDE *)
 
 type bool =
@@ -33,6 +32,37 @@ let implies =
   fun (b1 : bool) ->
     fun (b2 : bool) ->
       (or (not b1) b2)
+;;
+
+type cmp =
+  | LT
+  | EQ
+  | GT
+
+type nat = mu nat .
+  | O
+  | S of nat
+
+let cmp_nat =
+  fix (cmp_nat : nat -> nat -> cmp) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 binding x1 with
+        | O -> (match x2 binding x2 with
+                | O -> EQ
+                | S -> LT)
+        | S -> (match x2 binding x2 with
+                | O -> GT
+                | S -> cmp_nat x1 x2)
+;;
+
+let add =
+  fix (add : nat -> nat -> nat) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 binding x1 with
+        | O -> x2
+        | S -> add x1 (S x2)
 ;;
 
 (* END_PRELUDE *)

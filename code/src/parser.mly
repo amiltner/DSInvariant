@@ -1,6 +1,4 @@
 %{
-open Lang
-
 let rec appify (e:Expr.t) (es:Expr.t list) : Expr.t =
   match es with
   | [] -> e
@@ -159,7 +157,7 @@ typ_non_variant:
   | t=typ_mu      { t }
 
 typ_arrow:
-  | t=typ_non_arrow ARR t2=typ { Type.mk_arr t t2 }
+  | t=typ_non_arrow ARR t2=typ { Type.mk_arrow t t2 }
 
 typ_non_arrow:
   | t=typ_tuple { t }
@@ -185,7 +183,7 @@ typ_tuple_list_one: (* NOTE: reversed *)
   | ts=typ_tuple_list_one STAR t=typ_unit  { t :: ts }
 
 typ_base:
-  | d=LID { Type.mk_var d }
+  | d=LID { Type.mk_named d }
 
 typ_paren:
   | LPAREN t=typ RPAREN { t }
