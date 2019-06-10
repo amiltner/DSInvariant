@@ -202,7 +202,7 @@ module T : Synthesizer.t = struct
 
       module Output = struct
         type t =
-          Expr.t list
+          Type.t option * Expr.t list
         [@@deriving bin_io]
       end
 
@@ -227,17 +227,19 @@ module T : Synthesizer.t = struct
         let synth_impl ~worker_state:() ~conn_state:() (input : Input.t) : Output.t Deferred.t =
           return (match input.accumulator with
                   | ExistingType accumulator
-                    -> synth_core ~problem:input.problem
+                    -> (Some accumulator
+                       ,synth_core ~problem:input.problem
                                   ~testbed:input.testbed
-                                  ~accumulator
+                                  ~accumulator)
                   | DerivedVariant (acc_name, acc_type)
                     -> let d = Declaration.type_dec acc_name acc_type in
                        let (ds,mi,ms,uf,acc) = input.problem.unprocessed in
                        let unprocessed = (ds @ [d], mi, ms, uf, acc) in
                        let problem = Problem.process unprocessed
-                        in synth_core ~problem
+                        in (Some acc_type
+                           ,synth_core ~problem
                                       ~testbed:input.testbed
-                                      ~accumulator:(Type.mk_named acc_name))
+                                      ~accumulator:(Type.mk_named acc_name)))
 
         let synth = C.create_rpc ~f:synth_impl
                                  ~bin_input:Input.bin_t
@@ -253,29 +255,35 @@ module T : Synthesizer.t = struct
     include Rpc_parallel.Make (T)
   end
 
-  let synth ~(problem:Problem.t) ~(testbed:TestBed.t) : Expr.t list =
+  let synth ~(problem : Problem.t)
+            ~(testbed : TestBed.t)
+            : Type.t option * Expr.t list =
     match problem.accumulator with
-    | Some accumulator -> synth_core ~problem ~testbed ~accumulator
+    | Some accumulator -> (Some accumulator, synth_core ~problem ~testbed ~accumulator)
     | None -> begin
         let extract_result conns_procs_def_results =
           match%bind conns_procs_def_results with
-          | [] -> return []
+          | [] -> return (None, [])
           | conns_procs_def_results
-            -> if conns_procs_def_results = [] then return []
+            -> if conns_procs_def_results = [] then return (None, [])
                else begin
                  let conns_procs, def_results = List.unzip conns_procs_def_results in
-                 let helper : Worker.T.Output.t Or_error.t -> Expr.t list = function
-                    | Ok res
-                      -> List.iter conns_procs
-                                   ~f:(fun (c,p) -> ignore (Worker.Connection.close c)
-                                                  ; ignore (Signal.(send kill (`Pid (Process.pid p))))
-                                                  ; ignore (Process.wait p))
-                       ; res
-                    | Error err
-                      -> Log.error (lazy (Error.to_string_hum err))
-                       ; [] (* TODO: If a worker is errored, then remove it and and continue with the rest *)
-                 in let%map res = Deferred.any def_results
-                     in helper res
+                 let rec helper (def_results : Worker.T.Output.t Or_error.t Deferred.t list)
+                                : (Type.t option * Expr.t list) Deferred.t =
+                   if List.for_all def_results ~f:(fun dr -> Deferred.is_determined dr
+                                                          && Or_error.is_error (Deferred.value_exn dr))
+                   then return (None, []) else begin
+                     let determined, undetermined = List.partition_tf def_results ~f:Deferred.is_determined
+                      in match List.filter_map determined ~f:(Or_error.ok % Deferred.value_exn) with
+                         | [] -> let%bind _ = Deferred.any undetermined in helper undetermined
+                         | res :: _
+                           -> List.iter conns_procs
+                                        ~f:(fun (c,p) -> ignore (Worker.Connection.close c)
+                                                       ; ignore (Signal.(send kill (`Pid (Process.pid p))))
+                                                       ; ignore (Process.wait p))
+                            ; return res
+                   end
+                 in let%bind _ = Deferred.any def_results in helper def_results
                end
         in
         let _, _, (_, mod_spec), _, _ = problem.unprocessed in
@@ -294,10 +302,10 @@ module T : Synthesizer.t = struct
                                         ~init:[]
                                         ~f:(fun acc n -> ExistingType (Type.mk_named n) 
                                                       :: DerivedVariant (
-                                                          n ^ "_option",
+                                                          "__" ^ n ^ "_option__",
                                                           Variant [
-                                                            ("None_" ^ n, Type._unit) ;
-                                                            ("Some_" ^ n, Named n)
+                                                            ("D__None_" ^ n, Type._unit) ;
+                                                            ("D__Some_" ^ n, Named n)
                                                          ])
                                                       :: acc))
         in
@@ -326,6 +334,6 @@ module T : Synthesizer.t = struct
             with Ok res    -> res
                | Error exn -> Log.error (lazy (Exn.to_string exn))
                             ; Log.error (lazy (Printexc.get_backtrace ()))
-                            ; []
+                            ; (None, [])
     end
 end
