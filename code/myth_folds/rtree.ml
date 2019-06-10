@@ -1442,6 +1442,9 @@ and propagate_enforced_matches
                         b && not (passable_test_output_tree (otm (pnode_to_exp pn))))
                     ts)
               in
+              (*List.iter
+                ~f:(fun pn -> print_endline (Pp.pp_exp (pnode_to_exp pn)))
+                pns;*)
               let pns =
                 List.fold_until_completion
                   ~f:(fun (incompleted_pnts,completed_pns) ->

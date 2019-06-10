@@ -39,6 +39,14 @@ type cmp =
   | EQ
   | GT
 
+let is_eq =
+  fun (c:cmp) ->
+    match c binding c with
+    | LT -> False
+    | EQ -> True
+    | GT -> False
+;;
+
 type nat = mu nat .
   | O
   | S of nat

@@ -66,3 +66,5 @@ forall (r : t) .
       (and
         (contains (expand r i) i)
         (not (contains empty i)))
+
+accumulating unit

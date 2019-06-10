@@ -70,3 +70,5 @@ forall (r : t) .
           (implies
             (contains r i)
             (contains (expand r j) i))))
+
+accumulating unit

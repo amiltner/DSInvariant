@@ -84,6 +84,15 @@ module T : Verifier.t = struct
             options
       end
 
+  let elements_of_type_and_size_unit
+      (tc:Context.Types.t)
+      (t:Type.t)
+      (s:int)
+    : (unit * Expr.t) list =
+    List.map
+      ~f:(fun e -> ((),e))
+      (elements_of_type_and_size tc t s)
+
 
   let elements_of_type_to_size
       (tc:Context.Types.t)
@@ -95,14 +104,14 @@ module T : Verifier.t = struct
       (List.range 1 (max_size+1))
 
 
-  let elements_of_type_to_size_unit
+  (*let elements_of_type_to_size_unit
       (tc:Context.Types.t)
       (t:Type.t)
       (max_size:int)
     : (unit * Expr.t) list =
     List.map
       ~f:(fun r -> ((),r))
-      (elements_of_type_to_size tc t max_size)
+      (elements_of_type_to_size tc t max_size)*)
 
   module TypeSet = Set.Make(Type)
 
@@ -192,9 +201,43 @@ module T : Verifier.t = struct
       ~(problem:Problem.t)
       ~(eval:Expr.t)
       ~(args:Type.t list)
-    : ((a * Expr.t * Type.t) list * Value.t) list =
+    : ((a * Expr.t * Type.t) list * Value.t) Sequence.t =
     (* Eagerly returning all expressions till size "size" ... *)
-    let args_possibilities =
+    let args_sizes =
+      List.map
+        ~f:(fun a ->
+            List.map
+              ~f:(fun s -> (a,s))
+              (List.range 1 size))
+        args
+    in
+    let sizes_combinations =
+      List.sort
+        ~compare:(fun cs1 cs2 ->
+            let len1 = List.fold ~f:(+) ~init:0 (List.map ~f:snd cs1) in
+            let len2 = List.fold ~f:(+) ~init:0 (List.map ~f:snd cs2) in
+            Int.compare len1 len2)
+        (List.combinations args_sizes)
+    in
+    let sizes_combinations_sequences =
+      Sequence.of_list
+        sizes_combinations
+    in
+    let all_args =
+      Sequence.concat_map
+        ~f:(fun tss ->
+            let tss_a =
+              List.map
+                ~f:(fun (t,s) ->
+                    List.map
+                      ~f:(fun (d,e) -> (d,e,t))
+                      (generator t s))
+                tss
+            in
+            Sequence.of_list (List.combinations tss_a))
+        sizes_combinations_sequences
+    in
+    (*let args_possibilities =
       List.map
         ~f:(fun t ->
             List.map
@@ -202,8 +245,8 @@ module T : Verifier.t = struct
               (generator t size))
         args
     in
-    let all_args = List.combinations args_possibilities in
-    let args_sized =
+      let all_args = List.combinations args_possibilities in*)
+    (*let args_sized =
       List.map
         ~f:(fun args -> (args,(List.fold_left ~f:(+) ~init:0 (List.map ~f:(Expr.size % snd3) args))))
         all_args
@@ -213,8 +256,8 @@ module T : Verifier.t = struct
         ~compare:(fun (_,s1) (_,s2) -> Int.compare s1 s2)
         args_sized
     in
-    let all_args = List.map ~f:fst all_args_sized_ordered in
-    List.map
+      let all_args = List.map ~f:fst all_args_sized_ordered in*)
+    Sequence.map
       ~f:(fun args ->
           (args,
            Eval.evaluate_with_holes
@@ -234,7 +277,7 @@ module T : Verifier.t = struct
       ~(problem:Problem.t)
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
-    : ((a * Expr.t * Type.t) list * Value.t) list =
+    : ((a * Expr.t * Type.t) list * Value.t) Sequence.t =
     (* Eagerly returning all expressions till size "size" ... *)
     let (args,_) = extract_args eval_t in
     make_evaluators_to_size
@@ -256,9 +299,9 @@ module T : Verifier.t = struct
        QC.g_to_seq g
       in*)
     (*let gen = TypeToGeneratorDict.create generators*)
-     try List.fold
+     try Sequence.fold
            (fully_eval_exp_to_size
-              ~generator:(elements_of_type_to_size_unit problem.tc)
+              ~generator:(elements_of_type_and_size_unit problem.tc)
               ~size:_MAX_SIZE_
               ~problem
               ~eval:cond
@@ -307,7 +350,7 @@ module T : Verifier.t = struct
         ~eval
         ~args
     in
-    List.find_map
+    Sequence.find_map
       ~f:(fun (e,v) ->
           if Value.equal v Value.mk_true then
             None
@@ -344,10 +387,10 @@ module T : Verifier.t = struct
         : (unit * Expr.t) list =
         if Type.equal t desired_t then
           List.filter_map
-            ~f:(fun (x,s) -> if s <= size then Some ((),x) else None)
+            ~f:(fun (x,s) -> if s = size then Some ((),x) else None)
             sized_exs
         else
-          List.map ~f:(fun x -> ((),x)) (elements_of_type_to_size problem.tc t size)
+          List.map ~f:(fun x -> ((),x)) (elements_of_type_and_size problem.tc t size)
       in
       let results =
         fully_eval_exp_to_size
@@ -358,19 +401,20 @@ module T : Verifier.t = struct
           ~eval_t
       in
       let split_sized_results =
-        List.concat_map
+        Sequence.concat_map
           ~f:(fun (uets,res) ->
               let et = List.map ~f:(fun (_,e,t) -> (e,t)) uets in
-              List.map
-                ~f:(fun v ->
-                    let e = Value.to_exp v in
-                    let s = Expr.size e in
-                    ((et,v),e,s))
-                (extract_typed_subcomponents
-                   problem.tc
-                   desired_t
-                   result_t
-                   res))
+              Sequence.of_list
+                (List.map
+                   ~f:(fun v ->
+                       let e = Value.to_exp v in
+                       let s = Expr.size e in
+                       ((et,v),e,s))
+                   (extract_typed_subcomponents
+                      problem.tc
+                      desired_t
+                      result_t
+                      res)))
           results
       in
       let generator
@@ -379,10 +423,10 @@ module T : Verifier.t = struct
         : (((Expr.t * Type.t) list * Value.t) option * Expr.t) list =
         if Type.equal t desired_t then
           List.filter_map
-            ~f:(fun (etv,e,s) -> if s <= size then Some (Some etv,e) else None)
-            split_sized_results
+            ~f:(fun (etv,e,s) -> if s = size then Some (Some etv,e) else None)
+            (Sequence.to_list split_sized_results)
         else
-          List.map ~f:(fun x -> (None,x)) (elements_of_type_to_size problem.tc t size)
+          List.map ~f:(fun x -> (None,x)) (elements_of_type_and_size problem.tc t size)
       in
       let negative_example_o =
         ensure_uf_to_size
@@ -492,7 +536,6 @@ module T : Verifier.t = struct
       ~(eval_t:Type.t)
       ~(post:UniversalFormula.t)
     : Value.t list option =
-    let _ = eval in
     let desired_t = Type._t in
     let examples =
       List.filter_map

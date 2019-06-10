@@ -105,3 +105,5 @@ forall (r : t) .
     (and
       (contains (insert r i) i)
       (not (contains (delete r i) i)))
+
+accumulating unit

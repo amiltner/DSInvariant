@@ -29,3 +29,6 @@ test: unittest functionaltest
 
 documentation:
 	jbuilder build @docs
+
+generate-data: all
+	$(GENERATE_DATA) ./App.exe benchmarks
