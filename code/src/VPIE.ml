@@ -82,7 +82,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                  ~init:testbed
                  all_inside_examples
              in
-             List.map ~f:Expr.simplify (S.synth ~problem ~testbed:testbed)
+             List.map ~f:Expr.simplify (snd (S.synth ~problem ~testbed:testbed))
            | pres ->
              pres
          end
@@ -174,7 +174,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                  ~init:testbed
                  all_inside_examples
              in
-             let pres = List.map ~f:Expr.simplify (S.synth ~problem ~testbed:testbed)
+             let pres = List.map ~f:Expr.simplify (snd (S.synth ~problem ~testbed:testbed))
               in possibilities := pres
                ; pres
            | pres ->
