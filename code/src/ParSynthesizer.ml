@@ -45,7 +45,7 @@ module T : Synthesizer.t = struct
     in
     let problem = Problem.process unprocessed in
     if (List.length examples = 0) then
-      [Expr.mk_constant_true_func (Type._t)]
+      [Expr.mk_constant_false_func (Type._t)]
     else
       let (decls,myth_examples,t,end_type_myth) =
         DSToMyth.convert_problem_examples_type_to_myth

@@ -1,6 +1,15 @@
-type natoption =
+type natnatoption =
   | None
-  | Some of nat
+  | Some of nat * nat
+
+let is_lt =
+  fun (x : nat) ->
+    fun (y : nat) ->
+    match cmp_nat x y binding c with
+    | LT -> True
+    | EQ -> False
+    | GT -> False
+;;
 
 struct
   type bst = mu bst .
@@ -25,7 +34,7 @@ struct
         fun (x : nat) ->
           match b binding b with
           | Leaf -> False
-          | Node -> match cmp_nat b.1 x binding c with
+          | Node -> match cmp_nat x b.1 binding c with
                     | EQ -> True
                     | LT -> lookup b.0 x
                     | GT -> lookup b.2 x
@@ -119,4 +128,4 @@ forall (s : t) .
         (implies (lookup (delete s i) j)
                  (lookup s j)))
 
-accumulating (natoption * natoption)
+accumulating natnatoption

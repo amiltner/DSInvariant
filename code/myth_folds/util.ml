@@ -290,31 +290,52 @@ module List = struct
   let cartesian_filter_map ~(f : 'a -> 'b -> 'c option)
                            (l1 : 'a list)
                            (l2 : 'b list)
-                           : 'c list =
+    : 'c list =
     List.(rev (fold l1 ~init:[]
-                    ~f:(fun acc a -> fold l2 ~init:acc
-                                          ~f:(fun acc b -> match f a b with
-                                                           | None -> acc
-                                                           | Some c -> c :: acc))))
+                 ~f:(fun acc a -> fold l2 ~init:acc
+                        ~f:(fun acc b -> match f a b with
+                            | None -> acc
+                            | Some c -> c :: acc))))
 
-let sort_and_partition_with_indices ~(cmp : 'a -> 'a -> int)
-                                    (l:'a list)
-                                    : ('a * int) list list =
-  let rec merge_grouped_things (remaining:('a * int) list)
-                               (currentacc:('a*int) list)
-                               (accacc:('a*int) list list)
-                               : ('a*int) list list =
-    begin match remaining with
-    | [] -> currentacc :: accacc
-    | (h,i)::t -> let currenthd = fst (hd_exn currentacc)
-                   in match cmp h currenthd with
-                      | 0 -> merge_grouped_things t ((h,i)::currentacc) accacc
-                      | _ -> merge_grouped_things t [(h,i)] (currentacc::accacc)
-    end in
-  let sorted = sort ~compare:(fun (x,_) (y,_) -> cmp x y)
-                    (mapi ~f:(fun i x -> (x,i)) l)
-  in begin match sorted with
-       | [] -> []
-       | h::t -> merge_grouped_things t [h] []
-     end
+  let sort_and_partition_with_indices ~(cmp : 'a -> 'a -> int)
+      (l:'a list)
+    : ('a * int) list list =
+    let rec merge_grouped_things (remaining:('a * int) list)
+        (currentacc:('a*int) list)
+        (accacc:('a*int) list list)
+      : ('a*int) list list =
+      begin match remaining with
+        | [] -> currentacc :: accacc
+        | (h,i)::t -> let currenthd = fst (hd_exn currentacc)
+          in match cmp h currenthd with
+          | 0 -> merge_grouped_things t ((h,i)::currentacc) accacc
+          | _ -> merge_grouped_things t [(h,i)] (currentacc::accacc)
+      end in
+    let sorted = sort ~compare:(fun (x,_) (y,_) -> cmp x y)
+        (mapi ~f:(fun i x -> (x,i)) l)
+    in begin match sorted with
+      | [] -> []
+      | h::t -> merge_grouped_things t [h] []
+    end
+
+  let all_splittings
+      (type a)
+      (l:a list)
+    : (a list * a * a list) list =
+    let rec all_splittings
+        (prior_rev:a list)
+        (current:a list)
+      : (a list * a * a list) list =
+      begin match current with
+        | [] -> []
+        | h::t ->
+          let current_splitting = (prior_rev,h,t) in
+          let later_splittings = all_splittings (h::prior_rev) t in
+          current_splitting::later_splittings
+      end
+    in
+    let revved_first_answers = all_splittings [] l in
+    map
+      ~f:(fun (prior,current,post) -> (List.rev prior, current, post))
+      revved_first_answers
 end

@@ -150,7 +150,22 @@ let to_myth_exp_with_problem ~(problem:Problem.t) (e:Expr.t) : MythLang.exp =
 
 let to_pretty_myth_string ~(problem:Problem.t) (e:Expr.t) : string =
   let me = to_myth_exp_with_problem ~problem e
-   in Myth_folds.Pp.pp_exp me
+  in Myth_folds.Pp.pp_exp me
+
+let full_to_pretty_myth_string
+    ~(problem:Problem.t)
+    (inv:Expr.t)
+    : string =
+let full_ret = match problem.accumulator with
+  | None -> Type._bool
+  | Some acc -> Type.mk_tuple [(Type._bool) ; acc]
+in
+let t' = Context.get_foldable_t problem.tc full_ret in
+let (a,modi,c,d,e) = problem.unprocessed in
+let modi = modi @ [Declaration.TypeDeclaration (Id.mk_prime "t", t')] in
+let problem' = Problem.process (a,modi,c,d,e)
+in to_pretty_myth_string inv
+  ~problem:problem'
 
 let convert_problem_examples_type_to_myth
     (p:Problem.t)

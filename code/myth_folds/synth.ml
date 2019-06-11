@@ -1,7 +1,6 @@
 open Core
 open Consts
 open Lang
-open Printf
 open Rtree
 open Sigma
 
@@ -69,11 +68,11 @@ let saturate_guesses (timeout:float) ?short_circuit:(sc = true) (s:Sigma.t) (env
 let execute_synth_step
     (s:Sigma.t)
     (env:env)
-    (t:rtree)
-    (st:synth_step)
+    (ts:rtree list)
+    (_:synth_step)
     (tests_outputs:exp tests_outputs)
-  : exp list =
-  reset_timeouts t;
+  : exp list * rtree list =
+  (*reset_timeouts t;
   begin match st with
   | SynthSaturate timeout -> begin
       do_if_verbose (fun _ ->
@@ -94,19 +93,44 @@ let execute_synth_step
         ~label:"synth::grow_scrutinees"
         ~action:(fun _ -> grow_scrutinees s env k t)
     end
-  end;
+    end;*)
   (*do_if_verbose (fun _ -> printf "%s\n%!" (Rtree.pp_rtree t));*)
-  let es =
+  do_if_verbose (fun _ ->
+      printf "Saturating E-guesses and propogating...\n%!");
+  (*Timing.record
+    ~label:"synth::saturate_guesses"
+    ~action:(fun _ -> List.iter ~f:(fun t -> saturate_guesses 0.25 ~short_circuit:false s env t) ts);*)
+  print_endline (string_of_int (List.length ts));
+let es =
     Timing.record
       ~label:"synth::propogate_exps"
-      ~action:(fun _ -> propogate_exps ~short_circuit:false false tests_outputs ~search_matches:true t)
-  in
-  let es =
+      ~action:(fun _ ->
+          List.foldi
+            ~f:(fun i es t ->
+                begin match es with
+                  | [] -> print_endline (string_of_int i);
+                    saturate_guesses 0.25 ~short_circuit:false s env t;
+                    propogate_exps ~short_circuit:false false tests_outputs ~search_matches:true t
+                  | _ -> es
+                end)
+            ~init:[]
+            ts)
+in
+assert (List.for_all ~f:(has_passing_capabilities tests_outputs) es);
+  (*let es =
     List.filter
       ~f:(has_passing_capabilities tests_outputs)
       es
+    in*)
+  let es =
+    List.map ~f:app_capital_to_ctor es
   in
-  List.map ~f:app_capital_to_ctor es
+  if List.is_empty es then
+    (es, (do_if_verbose (fun _ -> printf "Growing matches...\n%!");
+          List.concat_map ~f:(fun t -> generate_matches tests_outputs s env t) ts))
+  else
+    (do_if_verbose (fun _ -> printf "found...\n%!");
+     (es,[]))
   (*let es_s =
     List.map
       ~f:(fun e -> (e,size e))
@@ -125,16 +149,16 @@ let execute_synth_step
 let rec execute_synth_plan
     (s:Sigma.t)
     (env:env)
-    (t:rtree)
+    (ts:rtree list)
     (plan:synth_plan)
     (tests_outputs:exp tests_outputs)
   : exp list =
   match plan with
   | [] -> []
   | st :: plan ->
-    begin match execute_synth_step s env t st tests_outputs with
-      | [] -> execute_synth_plan s env t plan tests_outputs
-      | es -> es
+    begin match execute_synth_step s env ts st tests_outputs with
+      | ([],ts) -> execute_synth_plan s env ts plan tests_outputs
+      | (es,_) -> es
     end
 
 let synthesize
@@ -143,5 +167,5 @@ let synthesize
     (t:rtree)
     (tests_outputs:exp tests_outputs)
   : exp list =
-  verbose_mode := false;
-  execute_synth_plan s env t standard_synth_plan tests_outputs
+  verbose_mode := true;
+  execute_synth_plan s env [t] standard_synth_plan tests_outputs

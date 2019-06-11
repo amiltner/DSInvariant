@@ -60,3 +60,14 @@ Fixpoint elements' (s: tree) (base: list (key*V)) : list (key * V) :=
  | T a k v b ⇒ elements' a ((k,v) :: elements' b base)
  end.
 Definition elements (s: tree) : list (key * V) := elements' s nil.
+
+
+
+
+
+Complete binary trees
+
+
+
+
+

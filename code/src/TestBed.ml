@@ -11,6 +11,11 @@ let create_positive pos_tests : t =
   { pos_tests = List.dedup_and_sort ~compare:Value.compare pos_tests
   ; neg_tests = [] }
 
+let contains_test ~(testbed : t) (test : Value.t) : bool =
+  List.exists testbed.pos_tests ~f:(Value.equal test) ||
+  List.exists testbed.neg_tests ~f:(Value.equal test)
+
+
 let add_pos_test ~(testbed : t) (test : Value.t) : t =
   if List.exists testbed.pos_tests ~f:(Value.equal test) then
     testbed

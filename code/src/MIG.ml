@@ -11,7 +11,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
       ~positives:(positives : Value.t list)
     : Value.t option =
     Log.info
-      (lazy ("Checking boundary for: " ^ Expr.show eval));
+      (lazy ("Checking boundary for:" ^ (DSToMyth.full_to_pretty_myth_string ~problem eval)));
     Option.map
       ~f:(List.hd_exn)
       (V.true_on_examples
@@ -60,7 +60,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
           Log.info
             (lazy ("IND >> Strengthening for inductiveness:"
                    ^ (Log.indented_sep 4)
-                   ^ (Expr.show invariant))) ;
+                   ^ (DSToMyth.full_to_pretty_myth_string ~problem invariant))) ;
           let pre_inv =
             VPIE.learnVPreCondAll
               ~problem
@@ -68,7 +68,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
               ~post
               ~positives:positives
           in
-          Log.debug (lazy ("IND Delta: " ^ (Expr.show pre_inv))) ;
+          Log.debug (lazy ("IND Delta: " ^ (DSToMyth.full_to_pretty_myth_string ~problem  pre_inv))) ;
           if Expr.equal pre_inv (Expr.mk_constant_true_func (Type._t)) then
             First (Expr.and_predicates pre_inv invariant)
           else
@@ -85,7 +85,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
       ~positives:(positives : Value.t list)
     : ((Expr.t,Value.t) Either.t) =
     Log.info
-      (lazy ("Checking Satisfy Transitivity for: " ^ Expr.show eval));
+      (lazy ("Checking Satisfy Transitivity for: " ^ (DSToMyth.full_to_pretty_myth_string ~problem eval)));
     let rec helper
         (invariant : Expr.t)
       : ((Expr.t,Value.t) Either.t) =
@@ -112,7 +112,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
           Log.info
             (lazy ("IND >> Strengthening for inductiveness:"
                    ^ (Log.indented_sep 4)
-                   ^ (Expr.show invariant))) ;
+                   ^ (DSToMyth.full_to_pretty_myth_string ~problem invariant))) ;
           let pre_inv =
             VPIE.learnVPreCond
               ~problem
@@ -122,7 +122,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
               ~post
               ~positives:positives
           in
-          Log.debug (lazy ("IND Delta: " ^ (Expr.show pre_inv))) ;
+          Log.debug (lazy ("IND Delta: " ^ (DSToMyth.full_to_pretty_myth_string ~problem pre_inv))) ;
           if Expr.equal pre_inv invariant then
             First invariant
           else
@@ -193,14 +193,6 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                 ~positives:[]
                 ~attempt:0
     in
-    let full_ret = match problem.accumulator with
-                   | None -> Type._bool
-                   | Some acc -> Type.mk_tuple [(Type._bool) ; acc]
-    in
-    let t' = Context.get_foldable_t problem.tc full_ret in
-    let (a,modi,c,d,e) = problem.unprocessed in
-    let modi = modi @ [Declaration.TypeDeclaration (Id.mk_prime "t", t')] in
-    let problem' = Problem.process (a,modi,c,d,e)
-     in DSToMyth.to_pretty_myth_string inv
-                                       ~problem:problem'
+    DSToMyth.full_to_pretty_myth_string inv
+      ~problem
 end

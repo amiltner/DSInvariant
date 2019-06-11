@@ -77,24 +77,30 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                             ~post:post) then
                        TestBed.add_neg_test ~testbed:tb e
                      else
-                       TestBed.add_pos_test ~testbed:tb e
+                       (if TestBed.contains_test ~testbed:tb e then
+                          tb
+                        else
+                         TestBed.add_pos_test ~testbed:tb e)
                    )
                  ~init:testbed
                  all_inside_examples
              in
+             Log.info (lazy "testbed");
+             Log.info (lazy (TestBed.show testbed));
              List.map ~f:Expr.simplify (snd (S.synth ~problem ~testbed:testbed))
            | pres ->
              pres
          end
        in
        let synthed_pre = List.hd_exn pres in
-       Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
+       Log.info (lazy ("Candidate Precondition: " ^ (DSToMyth.full_to_pretty_myth_string ~problem synthed_pre)));
        let full_pre = Expr.and_predicates pre synthed_pre in
        let model_o =
          List.fold_left
            ~f:(fun acc (eval,eval_t) ->
                begin match acc with
                  | None ->
+                   Log.info (lazy (DSToMyth.full_to_pretty_myth_string ~problem eval));
                    V.implication_counter_example
                      ~problem
                      ~pre:full_pre
@@ -108,7 +114,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
        in
        begin match model_o with
          | None ->
-           Log.info (lazy ("Verified Precondition: " ^ (Expr.show synthed_pre)));
+           Log.info (lazy ("Verified Precondition: " ^ (DSToMyth.full_to_pretty_myth_string ~problem synthed_pre)));
            synthed_pre
          | Some model ->
            if (List.length model <> 1) then
@@ -174,6 +180,8 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                  ~init:testbed
                  all_inside_examples
              in
+             Log.info (lazy "testbed");
+             Log.info (lazy (TestBed.show testbed));
              let pres = List.map ~f:Expr.simplify (snd (S.synth ~problem ~testbed:testbed))
               in possibilities := pres
                ; pres
@@ -216,7 +224,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
            all_inside_examples
        in
        let synthed_pre = List.hd_exn pres in
-       Log.info (lazy ("Candidate Precondition: " ^ (Expr.show synthed_pre)));
+       Log.info (lazy ("Candidate Precondition: " ^ (DSToMyth.full_to_pretty_myth_string ~problem synthed_pre)));
        let full_pre = Expr.and_predicates pre synthed_pre in
        let model_o =
          V.implication_counter_example
@@ -228,7 +236,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
        in
        begin match model_o with
          | None ->
-           Log.info (lazy ("Verified Precondition: " ^ (Expr.show synthed_pre)));
+           Log.info (lazy ("Verified Precondition: " ^ (DSToMyth.full_to_pretty_myth_string ~problem synthed_pre)));
            synthed_pre
          | Some model ->
            if (List.length model <> 1) then
@@ -236,6 +244,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
            else
              let new_neg_example = List.hd_exn model in
              negs := new_neg_example::!negs;
+             print_endline ("Add negative example: " ^ (Value.show new_neg_example));
              Log.info (lazy ("Add negative example: " ^ (Value.show new_neg_example)));
              helper
                (attempt+1)

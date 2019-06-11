@@ -78,7 +78,7 @@ def gather_data(rootlength, prog, path, base):
     def ctime_combiner(run_data_transpose):
         print(run_data_transpose[0])
         computation_time_col = [float(x) for x in run_data_transpose[0]]
-        ans = stddev(computation_time_col)
+        ans = sum(computation_time_col)/len(computation_time_col)
         return ans
 
     def exs_reqd_combiner(run_data_transpose):
