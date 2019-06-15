@@ -107,7 +107,7 @@ module Gamma_Struct (Dict : Dictionary) : Gamma_Sig = struct
       fresh 1
 
     (* Only projection and variables are valid inhabitants of contexts.                   *)
-    let rec cmp_exp e1 e2 = match (e1, e2) with
+    let rec cmp_exp (e1:exp) (e2:exp) = match (e1.node, e2.node) with
       | (EVar s1, EVar s2) -> s1 = s2
       | (EProj (n1, e1'), EProj (n2, e2')) -> n1 = n2 && cmp_exp e1' e2'
       | (ERcdProj (l1, e1'), ERcdProj (l2, e2')) -> l1 = l2 && cmp_exp e1' e2'
@@ -129,10 +129,10 @@ module Gamma_Struct (Dict : Dictionary) : Gamma_Sig = struct
       | TBase _ | TArr _ ->
         let x = fresh_id (gen_var_base t) g in
         (PVar x, 
-        { g with active = Dict.set (EVar x) t g.active
+         { g with active = Dict.set (create_exp (EVar x)) t g.active
                ; ids = Dict.set x t g.ids
-               ; recent = (EVar x, t) :: g.recent
-               ; variant = Set.add (EVar x) g.variant
+                ; recent = (create_exp (EVar x), t) :: g.recent
+                ; variant = Set.add (create_exp (EVar x)) g.variant
         })
 
       | TTuple ts ->
@@ -154,13 +154,13 @@ module Gamma_Struct (Dict : Dictionary) : Gamma_Sig = struct
     let rec focus (e:exp) (t:typ) : (exp * typ) list =
       begin match t with
       | TUnit | TArr _ | TBase _ -> [(e, t)]
-      | TTuple ts -> List.concat_mapi ~f:(fun i t -> focus (EProj (i+1, e)) t) ts
-      | TRcd ts -> List.concat_map ~f:(fun (l,t) -> focus (ERcdProj (l, e)) t) ts
+      | TTuple ts -> List.concat_mapi ~f:(fun i t -> focus (create_exp (EProj (i+1, e))) t) ts
+      | TRcd ts -> List.concat_map ~f:(fun (l,t) -> focus (create_exp (ERcdProj (l, e))) t) ts
       end
 
     (* Insert ids, which are automatically focused.                                       *)
     let insert (x:id) (t:typ) (is_variant:bool) (g:t) =
-      let focused = focus (EVar x) t in
+      let focused = focus (create_exp (EVar x)) t in
       let active' = List.fold_left ~f:(fun a (e, t) -> Dict.set e t a)
                                    ~init:g.active
                                    focused
@@ -241,7 +241,7 @@ module Gamma_Struct (Dict : Dictionary) : Gamma_Sig = struct
     let rec contains_variant (x:exp) (g:t) : bool =
       let contains_variant x = contains_variant x g in
       Set.has x g.variant ||
-      begin match x with
+      begin match x.node with
         | EApp (e1,e2) -> contains_variant e1 || contains_variant e2
         | EFun (_,e) -> contains_variant e
         | ELet (_,_,_,_,e1,e2) -> contains_variant e1 || contains_variant e2
@@ -298,7 +298,7 @@ module Gamma_Struct (Dict : Dictionary) : Gamma_Sig = struct
     let is_id_rec_fun (f:id) (g:t) : bool = Option.is_some (Dict.find f g.fun_to_arg)
       
     (* PRIVATE: Extract a recursive function id from e.                                   *)
-    let extract_rec_fun_from_exp (e:exp) (g:t) : id option = match e with
+    let extract_rec_fun_from_exp (e:exp) (g:t) : id option = match e.node with
       | EVar f -> if is_id_rec_fun f g then Some f else None
       | _ -> None 
 
@@ -314,7 +314,7 @@ module Gamma_Struct (Dict : Dictionary) : Gamma_Sig = struct
 
     (* PRIVATE: Extract an argument id from e.                                            *)
     let rec extract_arg_from_exp (e:exp) (g:t) : id option =
-      match e with
+      match e.node with
       | EVar x -> Some x
       | EProj (_, e) -> extract_arg_from_exp e g
       | ERcdProj (_, e) -> extract_arg_from_exp e g
@@ -328,7 +328,7 @@ module Gamma_Struct (Dict : Dictionary) : Gamma_Sig = struct
 
     (* PUBLIC: Is an application valid?                                                  *)
     let is_valid_app (func:exp) (arg:exp) (g:t) =
-      let rec is_dec_arg_of_func (arg:exp) (f:id) = match arg with
+      let rec is_dec_arg_of_func (arg:exp) (f:id) = match arg.node with
         | EVar x -> is_id_dec_arg x f g
         | EProj (_, e) -> is_dec_arg_of_func e f
         | ERcdProj (_, e) -> is_dec_arg_of_func e f
@@ -353,12 +353,12 @@ module Gamma_Struct (Dict : Dictionary) : Gamma_Sig = struct
 
     (* Hashes a context.                                                                 *)
     let hash (g:t) =
-      let rec hash_exp = function
+      (*let rec hash_exp = function
         | EVar x -> String.hash x
         | EProj (n, e) -> (Int.hash n) lxor (hash_exp e)
         | ERcdProj (n, e) -> (String.hash n) lxor (hash_exp e)
         | _ -> failwith "Cannot hash non-projections."
-      in
+        in*)
       List.foldi
         ~f:(fun i ans (e, t) ->
             (hash_typ t) lxor (hash_exp e) lxor (Int.hash i) lxor ans)

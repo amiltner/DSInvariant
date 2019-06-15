@@ -2,30 +2,30 @@ let prelude_string = "
 (* PRELUDE *)
 
 type bool =
-  | True
   | False
+  | True
 
 let not =
   fun (v : bool) ->
     match v binding i with
-    | True -> False
     | False -> True
+    | True -> False
 ;;
 
 let and =
   fun (b1 : bool) ->
     fun (b2 : bool) ->
       match b1 binding b1 with
-      | True -> b2
       | False -> False
+      | True -> b2
 ;;
 
 let or =
   fun (b1 : bool) ->
     fun (b2 : bool) ->
       match b1 binding b1 with
-      | True -> True
       | False -> b2
+      | True -> True
 ;;
 
 let implies =

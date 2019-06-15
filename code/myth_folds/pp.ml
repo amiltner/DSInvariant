@@ -50,43 +50,55 @@ and fpf_record_typ ppf (lvl, ts) =
 (***** Declarations and expressions  *****)
 
 let prec_of_exp (e:exp) : int =
-  match e with
+  match e.node with
   | EApp _  -> 500
   | EProj _ -> 500
   | ERcdProj _ -> 500
   | EFun _ | EFix _ | EPFun _ | ELet _-> 100
-  | ECtor  (_, e) -> (match e with EUnit -> 1000 | _ -> 600)
+  | ECtor  (_, e) -> (match e.node with EUnit -> 1000 | _ -> 600)
   | ERcd _       -> 800
   | ETuple _       -> 700
   | EMatch  _      -> 200
   | _              -> 1000
 
 let prec_of_value (v:value) : int =
-  match v with
-  | VFun _ | VPFun _ -> 100
-  | VCtor (_, v) -> (match v with VUnit -> 1000 | _ -> 600)
+  match v.node with
+  | VFun _ | VPFun _ | VFix _ -> 100
+  | VCtor (_, v) -> (match v.node with VUnit -> 1000 | _ -> 600)
   | VTuple _ -> 700
   | VRcd _ -> 800
   | VUnit    -> 1000
 
 let rec is_nat_literal (e:exp) : bool =
-  match e with
-  | ECtor ("O", EUnit) -> true
-  | ECtor ("S", e)     -> is_nat_literal e
+  match e.node with
+  | ECtor ("O", e') ->
+    begin match e'.node with
+      | EUnit -> true
+      | _ -> is_nat_literal e'
+    end
   | _                  -> false
 
 let rec is_list_literal (e:exp) : bool =
-  match e with
-  | ECtor ("Nil", EUnit)          -> true
-  | ECtor ("Cons", ETuple [_; e]) -> is_list_literal e
+  match e.node with
+  | ECtor ("Nil", e')          ->
+    begin match e'.node with
+      | EUnit -> true
+      | ETuple [_; e] -> is_list_literal e
+      | _ -> false
+    end
   | _                             -> false
 
 let fpf_nat_literal ppf e =
-  let rec count n e =
-    match e with
-    | ECtor ("O", EUnit) -> fpf ppf "%d" n
-    | ECtor ("S", e)     -> count (n+1) e
+  let rec count n (e:exp) =
+    begin match e.node with
+    | ECtor ("O", e') ->
+      begin match e'.node with
+        | EUnit -> fpf ppf "%d" n
+        | _ -> internal_error "fpf_nat_literal" "non-nat literal encountered"
+      end
+    | ECtor ("S", e')     -> count (n+1) e'
     | _ -> internal_error "fpf_nat_literal" "non-nat literal encountered"
+    end
   in
   count 0 e
 
@@ -192,7 +204,7 @@ and fpf_exp ppf ((lvl, e):int * exp) =
   else
     let this_lvl = prec_of_exp e in
     (if this_lvl < lvl then fpf ppf "(");
-    begin match e with
+    begin match e.node with
     | EVar x -> fpf ppf "%a" ident x
     | EApp (e1, e2) ->
         fpf ppf "@[<2>%a@ %a@]"
@@ -208,8 +220,11 @@ and fpf_exp ppf ((lvl, e):int * exp) =
           ident f fpf_arg_list xs fpf_typ (0, t)
           fpf_exp (this_lvl, e1);
         fpf ppf "@[<2>in@\n%a@]" fpf_exp (this_lvl, e2)
-    | ECtor (c, EUnit)  -> fpf ppf "@[<2>%a@]" ident c
-    | ECtor (c, e)      -> fpf ppf "@[<2>%a %a@]" ident c fpf_exp (this_lvl + 1, e)
+    | ECtor (c, e')  ->
+      begin match e'.node with
+        | EUnit -> fpf ppf "@[<2>%a@]" ident c
+        | _ -> fpf ppf "@[<2>%a %a@]" ident c fpf_exp (this_lvl + 1, e')
+      end
     | EMatch (e, bs) ->
         fpf ppf "@[<2>match %a with@\n%a@]"
           fpf_exp (0, e) fpf_branches (this_lvl+1, bs)
@@ -226,11 +241,24 @@ and fpf_exp ppf ((lvl, e):int * exp) =
 and fpf_list_literal ppf e =
   let rec fpf_elems ppf e =
     match e with
-    | ECtor ("Nil", EUnit) -> ()
-    | ECtor ("Cons", ETuple [e; ECtor ("Nil", EUnit)]) -> fpf ppf "%a" fpf_exp (0, e)
-    | ECtor ("Cons", ETuple [e1; e2]) -> begin
-        fpf ppf "%a; " fpf_exp (0, e1);
-        fpf_elems ppf e2
+    | ECtor ("Nil", e') ->
+      begin match e'.node with
+        | EUnit -> ()
+        | _ -> internal_error "fpf_list_literal"
+                 (sprintf "non-list literal encountered")
+      end
+    | ECtor ("Cons", e') ->
+      begin match e'.node with
+        | ETuple [e; e2] ->
+          begin match e2.node with
+            | ECtor ("Nil", _) ->fpf ppf "%a" fpf_exp (0,e)
+            | _ -> begin
+                fpf ppf "%a; " fpf_exp (0, e);
+                fpf_elems ppf e2.node
+              end
+          end
+        | _ -> internal_error "fpf_list_literal"
+                 (sprintf "non-list literal encountered")
       end
     | _ -> internal_error "fpf_list_literal"
         (sprintf "non-list literal encountered")
@@ -239,7 +267,7 @@ and fpf_list_literal ppf e =
          * print formatters are reentrant... >_< *)
   in
   fpf ppf "[";
-  fpf_elems ppf e;
+  fpf_elems ppf e.node;
   fpf ppf "]"
 
 and fpf_value_list ppf (vs:value list) =
@@ -264,12 +292,17 @@ and fpf_value_pairs ppf ((lvl, vps):int * (value * value) list) =
 and fpf_value ppf ((lvl, v):int * value) =
   let this_lvl = prec_of_value v in
   (if this_lvl < lvl then fpf ppf "(");
-  begin match v with
-  | VCtor (c, VUnit) -> fpf ppf "@[<2>%a@]" ident c
-  | VCtor (c, VTuple e) -> fpf ppf "@[<2>%a %a@]" ident c fpf_value (this_lvl, VTuple e)
-  | VCtor (c, v)     -> fpf ppf "@[<2>%a %a@]" ident c fpf_value (this_lvl, v)
+  begin match v.node with
+    | VCtor (c, v') ->
+      begin match v'.node with
+        | VUnit -> fpf ppf "@[<2>%a@]" ident c
+        | VTuple _ -> fpf ppf "@[<2>%a %a@]" ident c fpf_value (this_lvl, v')
+        | _     -> fpf ppf "@[<2>%a %a@]" ident c fpf_value (this_lvl, v')
+      end
   | VFun (x, e, _) ->
       fpf ppf "@[<2>fun %a ->@ %a@]" ident x fpf_exp (this_lvl, e)
+  | VFix (_, x, e, _) ->
+    fpf ppf "@[<2>fun %a ->@ %a@]" ident x fpf_exp (this_lvl, e)
   | VPFun vps -> fpf ppf "@[<2>%a@]" fpf_value_pairs (this_lvl, vps)
   | VTuple vs -> fpf ppf "@[<2>(%a)@]" fpf_value_list vs
   | VRcd vs -> fpf ppf "@[<2>{%a}@]" fpf_record_value vs

@@ -112,7 +112,7 @@ module Sigma = struct
           in
           List.fold_left
             ~f:(fun e (s,(_,_)) ->
-                (s,VFun ("i",(ECtor (s,EVar "i")), ref []))::e
+                (s,vfun "i" (create_exp (ECtor (s,create_exp (EVar "i")))) [])::e
               )
             ~init:e
             ctors)

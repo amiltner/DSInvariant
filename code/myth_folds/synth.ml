@@ -108,8 +108,11 @@ let es =
           List.foldi
             ~f:(fun i es t ->
                 begin match es with
-                  | [] -> print_endline (string_of_int i);
-                    saturate_guesses 0.25 ~short_circuit:false s env t;
+                  | [] ->
+                    print_endline "number";
+                    print_endline (string_of_int i);
+                    magic_num := i;
+                    saturate_guesses 0.5 ~short_circuit:false s env t;
                     propogate_exps ~short_circuit:false false tests_outputs ~search_matches:true t
                   | _ -> es
                 end)
@@ -122,9 +125,9 @@ assert (List.for_all ~f:(has_passing_capabilities tests_outputs) es);
       ~f:(has_passing_capabilities tests_outputs)
       es
     in*)
-  let es =
+  (*let es =
     List.map ~f:app_capital_to_ctor es
-  in
+    in*)
   if List.is_empty es then
     (es, (do_if_verbose (fun _ -> printf "Growing matches...\n%!");
           List.concat_map ~f:(fun t -> generate_matches tests_outputs s env t) ts))

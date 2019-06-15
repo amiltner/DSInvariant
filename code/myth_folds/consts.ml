@@ -20,7 +20,7 @@ let max_eguess_size : int ref = ref 5
 let eterm_lookup_tables : bool ref = ref true
 
 (* Enables caching of evaluation results *)
-let eval_lookup_tables : bool ref = ref true
+let eval_lookup_tables : bool ref = ref false
 
 (* Enables pretty printed constructors (e.g., nats as numbers) *)
 let pretty_ctors : bool ref = ref true
@@ -45,3 +45,7 @@ let incomplete_constraints_flag : bool ref = ref false
 (* Enables verbose mode *)
 let verbose_mode : bool ref = ref false
 let do_if_verbose (f:unit -> unit) = if !verbose_mode then f () ;;
+
+let utilization : int ref = ref 0
+
+let magic_num : int ref = ref 0

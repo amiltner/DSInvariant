@@ -1,5 +1,6 @@
 open Core
 open Printf
+open My_hash_cons
 
 (**** Language {{{ *****)
 
@@ -51,13 +52,8 @@ type pat = id * (pattern option)   (* (id of constructor, pattern). *)
 type arg = id * typ
 [@@deriving eq, hash, ord, show]
 
-type env = (id * value) list
-
-and decl =
-  | DData of id * ctor list
-  | DLet  of id * bool * arg list * typ * exp
-
-and exp =
+type exp = e_node hash_consed
+and e_node =
   | EVar of id
   | EApp of exp * exp
   | EFun of arg * exp
@@ -73,26 +69,149 @@ and exp =
   | EUnit
 
 and branch = pat * exp
+[@@deriving hash, ord, show]
 
-and value =
+let exp_table = HashConsTable.create 1000000
+let hashcons_exp = HashConsTable.hashcons hash_e_node compare_e_node exp_table
+let create_exp enode = hashcons_exp enode
+
+type decl =
+    | DData of id * ctor list
+  | DLet  of id * bool * arg list * typ * exp
+
+type value =
+  v_node hash_consed
+and v_node =
   | VCtor  of id * value
-  | VFun   of id * exp * env ref
+  | VFun   of id * exp * env
+  | VFix   of id * id * exp * env
   | VPFun  of (value * value) list
   | VTuple of value list (* Invariant: List must always have two members. *)
   | VRcd of value record
   | VUnit
-[@@deriving eq, hash, ord, show]
+
+and env = (id * value) list
+[@@deriving hash, ord, show]
+
+let rec compare_v_node
+ (v1:v_node) (v2:v_node) : int =
+  begin match (v1,v2) with
+    | (VCtor (i1,v1), VCtor (i2,v2)) ->
+      Util.pair_compare String.compare compare_val (i1,v1) (i2,v2)
+    | (VCtor _, _) -> -1
+    | (_, VCtor _) -> 1
+    | (VFun (i1,e1,env1), VFun (i2,e2,env2)) ->
+      Util.triple_compare String.compare compare_exp compare_env (i1,e1,env1) (i2,e2,env2)
+    | (VFun _, _) -> -1
+    | (_, VFun _) -> 1
+    | (VFix (i11,i12,e1,env1), VFix (i21,i22,e2,env2)) ->
+      Util.quad_compare String.compare String.compare compare_exp compare_env (i11,i12,e1,env1) (i21,i22,e2,env2)
+    | (VFix _, _) -> -1
+    | (_, VFix _) -> 1
+    | (VPFun _, VPFun _) -> failwith "no happen"
+    | (VPFun _, _) -> failwith "no happen"
+    | (_, VPFun _) -> failwith "no happen"
+    | (VTuple vs1, VTuple vs2) ->
+      List.compare
+        compare_val
+        vs1
+        vs2
+    | (VTuple _, _) -> -1
+    | (_, VTuple _) -> 1
+    | (VRcd _, VRcd _) -> failwith "no happen"
+    | (VRcd _, _) -> failwith "no happen"
+    | (_, VRcd _) -> failwith "no happen"
+    | (VUnit,VUnit) -> 0
+  end
+and compare_val (v1:value) (v2:value) : int =
+  Int.compare v1.tag v2.tag
+and compare_env (env1:env) (env2:env) : int =
+  List.compare
+    (Util.pair_compare String.compare compare_val)
+    env1
+    env2
 
 module Type = struct
   type t = typ
-  [@@deriving eq, hash, ord, show]
+  [@@deriving eq, ord, show]
 end
 
-let compare_val (v1:value) (v2:value) : int =
-  compare v1 v2
+(*let rec compare_val (v1:value) (v2:value) : int =
+  begin match (v1,v2) with
+    | (VCtor (i1,v1), VCtor (i2,v2)) ->
+      Util.pair_compare String.compare compare_val (i1,v1) (i2,v2)
+    | (VCtor _, _) -> -1
+    | (_, VCtor _) -> 1
+    | (VFun (i1,e1,envr1), VFun (i2,e2,envr2)) ->
+      let env1 = !envr1 in
+      let env2 = !envr2 in
+      envr1 := [];
+      envr2 := [];
+      let ans = Util.triple_compare String.compare compare_exp compare_env (i1,e1,env1) (i2,e2,env2) in
+      envr1 := env1;
+      envr2 := env2;
+      ans
+    | (VFun _, _) -> -1
+    | (_, VFun _) -> 1
+    | (VPFun _, VPFun _) -> failwith "no happen"
+    | (VPFun _, _) -> failwith "no happen"
+    | (_, VPFun _) -> failwith "no happen"
+    | (VTuple vs1, VTuple vs2) ->
+      List.compare
+        compare_val
+        vs1
+        vs2
+    | (VTuple _, _) -> -1
+    | (_, VTuple _) -> 1
+    | (VRcd _, VRcd _) -> failwith "no happen"
+    | (VRcd _, _) -> failwith "no happen"
+    | (_, VRcd _) -> failwith "no happen"
+    | (VUnit,VUnit) -> 0
+  end
+and compare_env
+    (env1:env)
+    (env2:env)
+  : int =
+  List.compare
+    (Util.pair_compare String.compare compare_val)
+    env1
+    env2*)
+
+(*let rec hash_v_node = function
+  | VCtor (i,v)  -> abs ((String.hash i) + 79 * (hash_value v) + 73)
+  | VFun (i,e,env) ->
+    abs ((String.hash i) + 79 * (hash_exp e) + 79 * (hash_env env) + 73)
+  | VFix (i1,i2,e,env) ->
+    abs (79 * (String.hash i1) + 79 * (String.hash i2) + 79 * (hash_exp e) + 79 * (hash_env env) + 73)
+  | VPFun _ -> failwith "cannot"
+  | VTuple vs -> List.fold_left
+                   ~f:(fun acc v ->
+                       acc + 79 * (hash_value v) + 73 )
+                   ~init:73
+                   vs
+  | VRcd _ -> failwith "cannot"
+  | VUnit -> 1
+
+and hash_env env =
+  List.fold_left
+    ~f:(fun acc (i,v) ->
+        acc + 79 * (String.hash i) + 79 * (hash_value v) + 73 )
+    ~init:73
+    env
+
+  and hash_value v = v.hkey*)
+
+let value_table = HashConsTable.create 10000
+let hashcons_value = HashConsTable.hashcons hash_v_node compare_v_node value_table
+let create_value vnode = hashcons_value vnode
+let vctor i v = create_value (VCtor (i,v))
+let vfun i e env = create_value (VFun (i,e,env))
+let vfix f i e env = create_value (VFix (f,i,e,env))
+let vtuple vs = create_value (VTuple vs)
+let vunit = create_value VUnit
 
 let compare_exp (e1:exp) (e2:exp) : int =
-  compare e1 e2
+  compare_exp e1 e2
 
 type synth_problem = id * typ * exp list
 
@@ -115,6 +234,32 @@ let rec hash_typ = function
       ~init:73
       ts
 
+(*let rec hash_value = function
+  | VCtor (i,v)  -> abs ((String.hash i) + 79 * (hash_value v) + 73)
+  | VFun (i,e,envr) ->
+    let env = !envr in
+    envr := [];
+    let ans = abs ((String.hash i) + 79 * (hash_exp e) + 79 * (hash_env env) + 73) in
+    envr := env;
+    ans
+  | VPFun _ -> failwith "cannot"
+  | VTuple vs -> List.fold_left
+                   ~f:(fun acc v ->
+                       acc + 79 * (hash_value v) + 73 )
+                   ~init:73
+                   vs
+  | VRcd _ -> failwith "cannot"
+  | VUnit -> 1
+
+and hash_env env =
+  List.fold_left
+    ~f:(fun acc (i,v) ->
+        acc + 79 * (String.hash i) + 79 * (hash_value v) + 73 )
+    ~init:73
+    env*)
+
+(*let hash_fold_value s v = Hash.fold_int s (hash_value v)*)
+
 let rec types_to_arr (ts:typ list) =
   match ts with
   | []  -> internal_error "types_to_arr" "empty type list provided"
@@ -122,7 +267,7 @@ let rec types_to_arr (ts:typ list) =
   | t :: ts -> TArr (t, types_to_arr ts)
 
 let rec free_vars (e:exp) : id list =
-  match e with
+  match e.node with
   | EVar x -> [x]
   | EApp (e1, e2) -> free_vars e1 @ free_vars e2
   | EFun (_, e) -> free_vars e
@@ -144,7 +289,7 @@ let rec free_vars (e:exp) : id list =
   | EUnit -> []
 
 let rec size (e:exp) : int =
-  match e with
+  match e.node with
   | EVar _ -> 1
   | EApp (e1, e2) -> 1 + size e1 + size e2
   | EFun (_, e) -> 1 + size e
@@ -162,7 +307,7 @@ let rec size (e:exp) : int =
   | EUnit -> 1
 
 let rec examples_count (v:value) : int =
-  match v with
+  match v.node with
   | VPFun ios ->
       List.fold_left ~f:(fun n (_, v) -> n + examples_count v) ~init:0 ios
   | _ -> 1
@@ -189,7 +334,7 @@ let rec contains
   if e1 = e2 then
     true
   else
-    begin match e1 with
+    begin match e1.node with
       | EApp (e1,e2) -> contains_rec e1 || contains_rec e2
       | EFun (_,e) -> contains_rec e
       | ELet (_,_,_,_,e1,e2) -> contains_rec e1 || contains_rec e2
@@ -221,30 +366,33 @@ let rec contains
 let rec app_capital_to_ctor
     (e:exp)
   : exp =
-  begin match e with
+  begin match e.node with
     | EVar _ -> e
-    | EApp ((EVar x),e') ->
-      let e' = app_capital_to_ctor e' in
-      if Char.is_uppercase (String.nget x 0) then
-        ECtor (x,e')
-      else
-        e
     | EApp (e1,e2) ->
-      EApp (app_capital_to_ctor e1, app_capital_to_ctor e2)
+      begin match e1.node with
+        | EVar x ->
+          let e2 = app_capital_to_ctor e2 in
+          if Char.is_uppercase (String.nget x 0) then
+            create_exp (ECtor (x,e2))
+          else
+            e
+        | _ ->
+          create_exp (EApp (app_capital_to_ctor e1, app_capital_to_ctor e2))
+      end
     | EFun (a,e) ->
-      EFun (a,app_capital_to_ctor e)
+      create_exp (EFun (a,app_capital_to_ctor e))
     | ELet (i,b,ags,t,e1,e2) ->
-      ELet (i,b,ags,t,app_capital_to_ctor e1, app_capital_to_ctor e2)
-    | ECtor (i,e) -> ECtor (i, app_capital_to_ctor e)
+      create_exp (ELet (i,b,ags,t,app_capital_to_ctor e1, app_capital_to_ctor e2))
+    | ECtor (i,e) -> create_exp (ECtor (i, app_capital_to_ctor e))
     | EMatch (e,bs) -> let e = app_capital_to_ctor e in
-      EMatch (e,
+      create_exp (EMatch (e,
               List.map
                 ~f:(fun (p,e) -> (p,app_capital_to_ctor e))
-                bs)
-    | EFix (i,a,t,e) -> EFix (i,a,t,app_capital_to_ctor e)
-    | ETuple es -> ETuple (List.map ~f:app_capital_to_ctor es)
-    | EProj (i,e) -> EProj (i,app_capital_to_ctor e)
-    | EUnit -> EUnit
+                bs))
+    | EFix (i,a,t,e) -> create_exp (EFix (i,a,t,app_capital_to_ctor e))
+    | ETuple es -> create_exp (ETuple (List.map ~f:app_capital_to_ctor es))
+    | EProj (i,e) -> create_exp (EProj (i,app_capital_to_ctor e))
+    | EUnit -> create_exp EUnit
     | _ -> failwith "shouldnt"
   end
 

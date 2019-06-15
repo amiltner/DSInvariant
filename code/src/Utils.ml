@@ -59,3 +59,15 @@ module List = struct
     else let (first_i_1, i_onwards) = split_n l i
           in first_i_1 @ (drop i_onwards 1)
 end
+
+let pair_compare
+    (fst_compare:'a -> 'a -> int)
+    (snd_compare:'b -> 'b -> int)
+    ((x1,x2):('a * 'b))
+    ((y1,y2):('a * 'b))
+  : int =
+  let cmp = fst_compare x1 y1 in
+  if (0 = cmp) then
+    snd_compare x2 y2
+  else
+    cmp

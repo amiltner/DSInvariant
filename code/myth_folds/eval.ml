@@ -19,7 +19,7 @@ let rec find_first_branch (c:id) (bs:branch list) : branch =
   | ((c', x), e)::bs -> if c = c' then ((c', x), e) else find_first_branch c bs
 
 let rec extract_values_from_pattern (v:value) (p:pattern) : (id * value) list =
-  match (p, v) with
+  match (p, v.node) with
   | (PWildcard, _) -> []
   | (PVar x,    _) -> [(x, v)]
   | (PTuple ps, VTuple vs) ->
@@ -47,9 +47,15 @@ end = struct
   module T = struct
     type t = { env : env; e : exp }
     let make_key (env:env) (e:exp) = { env = env; e = e }
-    let hash k = Hashtbl.hash k
+    let hash k = hash_env k.env + 79 * hash_exp k.e + 73
     let hash_fold_t s k = Hash.fold_int s (hash k)
-    let compare = compare
+    let compare x y =
+      let exp_compare = compare_exp x.e y.e in
+      if exp_compare = 0 then
+        let env_compare = compare_env x.env y.env in
+        env_compare
+      else
+        exp_compare
     let sexp_of_t (_:t) : Sexp.t = failwith "GTS.sexp_of_t unimplemented"
     let t_of_sexp (_:Sexp.t) : t = failwith "GTS.t_of_sexp unimplemented"
   end
@@ -57,42 +63,77 @@ end = struct
   include Hashable.Make(T)
 end
 
+module GTSCache = struct
+  module GTS : sig
+    type t = { env : env; e : exp }
+    val make_key : env -> exp -> t
+    include Hashable.S with type t := t
+  end = struct
+    module T = struct
+      type t = { env : env; e : exp }
+      let make_key (env:env) (e:exp) = { env = env; e = e }
+      let hash k = hash_env k.env + 79 * hash_exp k.e + 73
+      let hash_fold_t s k = Hash.fold_int s (hash k)
+      let compare x y =
+        let exp_compare = compare_exp x.e y.e in
+        if exp_compare = 0 then
+          let env_compare = compare_env x.env y.env in
+          env_compare
+        else
+          exp_compare
+      let sexp_of_t (_:t) : Sexp.t = failwith "GTS.sexp_of_t unimplemented"
+      let t_of_sexp (_:Sexp.t) : t = failwith "GTS.t_of_sexp unimplemented"
+    end
+    include T
+    include Hashable.Make(T)
+  end
+
+  include Lrucache.Make(GTS)
+  let make_key (env:env) (e:exp) : GTS.t = { env = env; e = e }
+end
+
 let lookup_tables : bool ref = ref true ;;
 let memo_eval_tbl : (GTS.t, value) Hashtbl.t =
   GTS.Table.create ()
+let lrucache : value GTSCache.t =
+  if !eval_lookup_tables then
+    GTSCache.init ~size:8388608 (GTSCache.make_key [] (create_exp EUnit))
+  else
+    GTSCache.init ~size:1 (GTSCache.make_key [] (create_exp EUnit))
 
 let find_in_table tbl key =
-  if !eval_lookup_tables then
-    Hashtbl.find tbl key
-  else
-    None
+  Hashtbl.find tbl key
 
 (***** }}} *****)
 
 (* Evaluates e to a value under env *)
 let rec eval (env:env) (e:exp) : value =
-  let key = GTS.make_key env e in
-  match find_in_table memo_eval_tbl key with
-  | Some ans -> ans
-  | None ->
-      let ans = begin match e with
-      | EVar x -> List.Assoc.find_exn ~equal:String.equal env x
-      | EApp (e1, e2) ->
-            let (v1, v2) = (eval env e1, eval env e2) in
-            begin match v1 with
-            | VFun (x, e, closure) -> eval ((x, v2) :: !closure) e
+  let key = GTSCache.make_key env e in
+  let calc = (fun (enve: GTSCache.key) ->
+      let env = enve.env in
+      let e = enve.e in
+      (*match find_in_table memo_eval_tbl key with
+        | Some ans -> ans
+        | None ->*)
+      let ans = begin match e.node with
+        | EVar x -> List.Assoc.find_exn ~equal:String.equal env x
+        | EApp (e1, e2) ->
+          let (v1, v2) = (eval env e1, eval env e2) in
+          begin match v1.node with
+            | VFun (x, e, closure) -> eval ((x, v2) :: closure) e
+            | VFix (f, x, e, closure) -> eval ((x, v2) :: (f, v1) :: closure) e
             | VPFun vps ->
-                begin match Util.find_first (fun (v1, _) -> v1 = v2) vps with
+              begin match Util.find_first (fun (v1, _) -> v1 = v2) vps with
                 | Some (_, v) -> v
                 | None ->
-                    raise_eval_error @@ sprintf
-                      "Non-matched value %s found with partial function:\n%s"
-                        (Pp.pp_value v2) (Pp.pp_value v1)
-                end
+                  raise_eval_error @@ sprintf
+                    "Non-matched value %s found with partial function:\n%s"
+                    (Pp.pp_value v2) (Pp.pp_value v1)
+              end
             | _ -> raise_eval_error ("Non-function value found in application" ^ (Pp.pp_value v1))
-            end
-      | EFun ((x, _), e) -> VFun (x, e, ref env)
-      | ELet (f, is_rec, xs, t, e1, e2) ->
+          end
+        | EFun ((x, _), e) -> vfun x e env
+        | ELet (f, is_rec, xs, t, e1, e2) ->
           let count = List.length xs in
           if count = 0 then
             (* Value binding *)
@@ -103,61 +144,66 @@ let rec eval (env:env) (e:exp) : value =
             let rec binding_to_funs xs e =
               match xs with
               | []      -> e
-              | x :: xs -> EFun (x, binding_to_funs xs e)
+              | x :: xs -> create_exp (EFun (x, binding_to_funs xs e))
             in
             let (x1, t1) = List.hd_exn xs in
             let fn = if is_rec then
-              let e1 = binding_to_funs (List.tl_exn xs) e1 in
-                EFix ( f, (x1, t1)
-                     , (List.map ~f:snd (List.tl_exn xs)) @ [t] |> types_to_arr
-                     , e1 )
-            else
-              binding_to_funs xs e1
+                let e1 = binding_to_funs (List.tl_exn xs) e1 in
+                create_exp (EFix ( f, (x1, t1)
+                                 , (List.map ~f:snd (List.tl_exn xs)) @ [t] |> types_to_arr
+                                 , e1 ))
+              else
+                binding_to_funs xs e1
             in
             eval ((f, eval env fn) :: env) e2
-      | ECtor (c, e)  -> VCtor (c, eval env e)
-      | ETuple es     -> VTuple (List.map ~f:(eval env) es)
-      | ERcd es       -> VRcd (List.map ~f:(fun (l,e) -> (l,eval env e)) es)
-      | EMatch (e, bs) ->
+        | ECtor (c, e)  -> vctor c (eval env e)
+        | ETuple es     -> vtuple (List.map ~f:(eval env) es)
+        | ERcd _       -> failwith "ah" (*(List.map ~f:(fun (l,e) -> (l,eval env e)) es)*)
+        | EMatch (e, bs) ->
           let v = eval env e in
-          begin match v with
-          | VCtor (c, v) ->
+          begin match v.node with
+            | VCtor (c, v) ->
               let ((_, p_opt), e) = find_first_branch c bs in
               begin match p_opt with
-              | None -> eval env e
-              | Some p -> eval ((extract_values_from_pattern v p) @ env) e
+                | None -> eval env e
+                | Some p -> eval ((extract_values_from_pattern v p) @ env) e
               end
-          | _ ->
-            raise_eval_error @@
+            | _ ->
+              raise_eval_error @@
               sprintf "Non-datatype value found in match: %s" (Pp.pp_exp e)
           end
-      | EPFun ios ->
-          VPFun (List.map ~f:(fun (e1, e2) -> (eval env e1, eval env e2)) ios)
-      | EFix (f, (x, _), _, e) ->
-          let closure = ref [] in
-          let v = VFun (x, e, closure) in
-          closure := (f, v) :: env; v
-      | EProj (n, e) ->
-          begin match eval env e with
-          | VTuple vs -> List.nth_exn vs (n - 1)
-          | _ -> raise_eval_error @@
-                 sprintf "Non-tuple value found in projection: %s" (Pp.pp_exp e)
+        | EPFun _ ->
+          (*VPFun (List.map ~f:(fun (e1, e2) -> (eval env e1, eval env e2)) ios)*) failwith "ah"
+        | EFix (f, (x, _), _, e) ->
+          let closure = env in
+          let v = vfix f x e closure in
+          v
+        | EProj (n, e) ->
+          begin match (eval env e).node with
+            | VTuple vs -> List.nth_exn vs (n - 1)
+            | _ -> raise_eval_error @@
+              sprintf "Non-tuple value found in projection: %s" (Pp.pp_exp e)
           end
-      | ERcdProj (l, e) ->
-        let v = eval env e in
-        begin match v with
-        | VRcd vs -> begin match Util.lookup l vs with
-                      | Some v' -> v'
-                      | None -> raise_eval_error @@
-                                sprintf "Label '%s' not found in record: %s" l (Pp.pp_value v)
-                      end
-        | _ -> raise_eval_error @@
-               sprintf "Non-record value found in projection: %s" (Pp.pp_exp e)
-        end
-      | EUnit -> VUnit
+        | ERcdProj (l, e) ->
+          let v = eval env e in
+          begin match v.node with
+            | VRcd vs -> begin match Util.lookup l vs with
+                | Some v' -> v'
+                | None -> raise_eval_error @@
+                  sprintf "Label '%s' not found in record: %s" l (Pp.pp_value v)
+              end
+            | _ -> raise_eval_error @@
+              sprintf "Non-record value found in projection: %s" (Pp.pp_exp e)
+          end
+        | EUnit -> vunit
       end
+      in
+      (*Hashtbl.set memo_eval_tbl ~key ~data:ans; ans*)(ans))
   in
-  (*(Hashtbl.set memo_eval_tbl ~key ~data:ans; ans)*) ans
+  if !eval_lookup_tables then
+    GTSCache.get lrucache key calc
+  else
+    calc key
 
 (* Generates the initial synthesis environment. *)
 let gen_init_env (ds:decl list) : env =
@@ -170,7 +216,7 @@ let gen_init_env (ds:decl list) : env =
           (f, v) :: env
         else
           (* Function binding *)
-          let v = eval env (ELet (f, is_rec, xs, t, e, EVar f)) in
+          let v = eval env (create_exp (ELet (f, is_rec, xs, t, e, create_exp (EVar f)))) in
           (f, v) :: env
   in
     List.fold_left ~f:process ~init:[] ds

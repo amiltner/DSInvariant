@@ -36,17 +36,20 @@ type 'a test = 'a -> bool list
   type 'a tests_outputs = (('a test_output_retriever)) list*)
 
 
-type test_output_tree =
-  | InternalNode of test_output_tree list
-  | ExistantLeaf of bool * value option
-  | NonexistantLeaf
+type test_output_result = bool * value option
 [@@deriving ord, show, hash]
 
-type test_output_tree_list = test_output_tree list
+type test_output_result_lazy = test_output_result Lazy.t
 [@@deriving ord, show, hash]
+
+type test_output_result_list = test_output_result_lazy list
+[@@deriving ord, show, hash]
+
+type 'a test_output =
+  (bool * exp * exp * ('a -> test_output_result))
 
 type 'a tests_outputs =
-  (bool * exp * exp * ('a -> test_output_tree)) list
+  'a test_output list
 
 let tests_outputs_update
     (type a)
@@ -60,26 +63,19 @@ let tests_outputs_update
     tests_outputs
 
 
-let to_test_output_tree_list
+let to_test_output_result_list
     (type a)
     (tests_outputs:a tests_outputs)
     (e:a)
-  : test_output_tree_list =
+  : test_output_result_list =
   List.map
-    ~f:(fun (_,_,_,v) -> v e)
+    ~f:(fun (_,_,_,v) -> lazy (v e))
     tests_outputs
 
-let rec passable_test_output_tree
-    (test_output_tree:test_output_tree)
+let passing_test_output_result
+    (res_lazy:test_output_result Lazy.t)
   : bool =
-  begin match test_output_tree with
-    | InternalNode totl ->
-      List.exists
-        ~f:passable_test_output_tree
-        totl
-    | ExistantLeaf (b,_) -> b
-    | NonexistantLeaf -> false
-  end
+  fst (Lazy.force_val res_lazy)
 
 let has_passing_capabilities
     (type a)
@@ -87,34 +83,27 @@ let has_passing_capabilities
     (x:a)
   : bool =
   List.for_all
-    ~f:passable_test_output_tree
-    (to_test_output_tree_list
+    ~f:passing_test_output_result
+    (to_test_output_result_list
        tests_outputs
        x)
 
-let to_test_io_output_tree_list
+(*let to_test_io_output_tree_list
     (type a)
     (tests_outputs:a tests_outputs)
     (e:a)
-  : (bool * exp * exp * test_output_tree) list =
+  : (exp * exp * test_output_result) list =
   List.map
-    ~f:(fun (b,e1,e2,v) -> (b,e1,e2,v e))
-    tests_outputs
+    ~f:(fun (e1,e2,v) -> (e1,e2,v e))
+    tests_outputs*)
 
 let any_updated
-    (test_output_trees:test_output_tree list)
+    (test_output_trees:test_output_result_lazy list)
   : bool =
-  let rec any_updated_tree
-      (test_output_tree:test_output_tree)
+  let any_updated_tree
+      (res:test_output_result Lazy.t)
     : bool =
-    begin match test_output_tree with
-      | InternalNode ts ->
-        List.exists
-          ~f:any_updated_tree
-          ts
-      | NonexistantLeaf -> false
-      | ExistantLeaf (b,_) -> b
-    end
+    passing_test_output_result res
   in
   List.exists
     ~f:any_updated_tree
@@ -156,7 +145,7 @@ let minimize
   let es_exs_tests_outputs =
     List.map
       ~f:(fun e ->
-          (e,to_test_output_tree_list tests_outputs e))
+          (e,to_test_output_result_list tests_outputs e))
       es
   in
   let productive_es_etc =
@@ -166,7 +155,7 @@ let minimize
   in
   let deduped_es =
     core_deduper
-      (fun (_,o1) (_,o2) -> compare_test_output_tree_list o1 o2)
+      (fun (_,o1) (_,o2) -> compare_test_output_result_list o1 o2)
       (fun (e,_) -> to_size e)
       productive_es_etc
   in
@@ -274,12 +263,12 @@ let deduper
   : a list =
   let es_outputs =
     List.map
-      ~f:(fun x -> (x, to_size x, (to_test_output_tree_list tests_outputs x)))
+      ~f:(fun x -> (x, to_size x, (to_test_output_result_list tests_outputs x)))
       xs
   in
   let sorted_parititioned_i =
     List.sort_and_partition_with_indices
-      ~cmp:(fun (_,_,e1) (_,_,e2) -> compare_test_output_tree_list e1 e2)
+      ~cmp:(fun (_,_,e1) (_,_,e2) -> compare_test_output_result_list e1 e2)
       es_outputs
   in
   List.map
@@ -622,7 +611,8 @@ let rec generate_matches
         let bs_splittings = List.all_splittings bs in
         List.concat_map
           ~f:(fun (pre,(p,t),post) ->
-              let make_match e' = EMatch(e,[(p,e')]) in
+              (*print_endline (string_of_int (List.length pre));*)
+              let make_match e' = create_exp (EMatch(e,[(p,e')])) in
               let tests_outputs =
                 tests_outputs_update
                   make_match
@@ -649,7 +639,7 @@ and generate_matches_rnode
     (s:Sigma.t) (env:env) (n:rnode) : rnode list =
   match n with
   | SAbs (f, x, ty, t) ->
-    let e_transformer = fun e -> EFix (f, x, ty, e) in
+    let e_transformer = fun e -> create_exp (EFix (f, x, ty, e)) in
     let tests_outputs = tests_outputs_update e_transformer tests_outputs in
     List.map
                            ~f:(fun t -> SAbs(f,x,ty,t))
@@ -741,7 +731,7 @@ let rec update_exps ?short_circuit:(sc = true) (timeout:float)
         Timing.record
           ~label:"update_exps::gen"
           ~action:begin fun _ ->
-            Gen.gen_eexp
+            Gen.gen_iexp
               (Timeout.create timeout) s t.g t.t (Gen.gen_metric t.sz 1)
           end
         |> Rope.iter ~f:begin fun e ->
@@ -865,6 +855,7 @@ let retrieve_maxes_and_indices
 type pnode =
   | Node of exp * (pat * pnode) list
   | Leaf of exp
+[@@deriving ord, show, hash]
 
 type ppath = (exp * pat) list
 [@@deriving ord, show, hash]
@@ -874,7 +865,7 @@ let rec pnode_to_exp
   : exp =
   begin match p with
     | Node (e,ppns) ->
-      EMatch (e, List.map ~f:(fun (p,pn) -> (p,pnode_to_exp pn)) ppns)
+      create_exp (EMatch (e, List.map ~f:(fun (p,pn) -> (p,pnode_to_exp pn)) ppns))
     | Leaf e -> e
   end
 
@@ -961,8 +952,8 @@ let integrate_path
   else
     Some (integrate_path_internal pp pn)
 
-type partition_solution_cache_key = rtree * (exp * exp) list * int
-type partition_solution_cache_value_component = (ppath * exp)
+type partition_solution_cache_key = rtree * (exp * exp) list
+type partition_solution_cache_value_component = pnode
 [@@deriving ord, show, hash]
 type partition_solution_cache_value = partition_solution_cache_value_component list
 type partition_solution_cache =
@@ -1034,43 +1025,46 @@ and rmatch_equal (e1,branches1) (e2,branches2) : bool =
 let solution_cache : partition_solution_cache ref = ref []
 
 let update_solution_cache
-    (t:rtree)
-    (prior_pns:int)
-    (prior_tests:exp tests_outputs)
-    (relevant_tests:exp tests_outputs)
-    (ppath_exps:(ppath * exp) list)
+    (_:rtree)
+    (_:exp tests_outputs)
+    (_:pnode list)
   : unit =
-  solution_cache :=
-    ((duplicate_rtree t,List.map ~f:(fun (_,i,o,_) -> (i,o)) (prior_tests@relevant_tests), prior_pns), ppath_exps)
-    ::!solution_cache
+  solution_cache := []
+    (*((duplicate_rtree t,List.map ~f:(fun (_,i,o,_) -> (i,o)) tests_outputs), pnodes)
+      ::!solution_cache*)
 
 
 let lookup_in_solution_cache
     (t:rtree)
-    (prior_tests_outputs:exp tests_outputs)
-    (relevant_tests_outputs:exp tests_outputs)
-    (prior_pns:int)
-  : partition_solution_cache_value option =
-  (*let minimal_partitions_tests_outputs =
+    (tests_outputs:exp tests_outputs)
+  : (partition_solution_cache_value * exp tests_outputs * exp tests_outputs) option =
+  let minimal_partitions_tests_outputs =
     split_into_minimal_partitions
-      ~compare:(fun (e1,_,_) (e2,_,_) -> contains e1 e2)
-      ~total_order:(fun (e1,_,_) (e2,_,_) -> compare_exp e1 e2)
+      ~compare:(fun (_,e1,_,_) (_,e2,_,_) -> contains e1 e2)
+      ~total_order:(fun (_,e1,_,_) (_,e2,_,_) -> compare_exp e1 e2)
       tests_outputs
-    in*)
-  let tests_outputs = prior_tests_outputs@relevant_tests_outputs in
+  in
   List.fold_left
-    ~f:(fun acc_o ((t',e12s,prior_pns'),v) ->
+    ~f:(fun acc_o ((t',e12s),v) ->
         begin match acc_o with
           | Some _ -> acc_o
           | None ->
-            if prior_pns = prior_pns' && rtree_equal t' t && (
-                  (List.compare_as_multisets
-                     ~cmp:(Tuple.T2.compare ~cmp1:compare_exp ~cmp2:compare_exp)
-                     (List.map ~f:(fun (_,e1,e2,_) -> (e1,e2)) tests_outputs)
-                     e12s) = 0) then
-              Some v
+            if rtree_equal t' t then
+              let fst_sat_o =
+                List.find
+                  ~f:(fun (tests_outputs,_) ->
+                        0 = (List.compare_as_multisets
+                           ~cmp:(pair_compare compare_exp compare_exp)
+                           (List.map ~f:(fun (_,e1,e2,_) -> (e1,e2)) tests_outputs)
+                           e12s))
+                  minimal_partitions_tests_outputs
+              in
+              Option.map ~f:(fun (prior,remaining) -> (v,remaining,prior)) fst_sat_o
             else
               None
+        end)
+    ~init:None
+    (!solution_cache)
 (*
               let fst_sat_o =
                 List.find
@@ -1083,10 +1077,10 @@ let lookup_in_solution_cache
               in
               Option.map ~f:(fun (prior,remaining) -> (v,remaining,prior)) fst_sat_o
             else
-              None*)
+              None
         end)
     ~init:None
-    (!solution_cache)
+    (!solution_cache)*)
 
 let rec propogate_exps ?short_circuit:(sc = true)
     (enforced_completed:bool)
@@ -1152,11 +1146,12 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
     print_endline (List.to_string ~f:(fun (p,r) -> "(" ^ Pp.pp_pat p ^ "," ^ pp_rtree r ^ ")") bs);*)
   (*print_endline "startb";
     print_endline (string_of_int (List.length bs));*)
+  print_endline "never hit";
   let nonprod_bs =
     List.map
       ~f:(fun (p,t) ->
           (*print_endline "this is slow why?";*)
-          let make_match e' = EMatch(e,[(p,e')]) in
+          let make_match e' = create_exp (EMatch(e,[(p,e')])) in
           let tests_outputs = tests_outputs_update make_match tests_outputs in
           let initial_es = propogate_exps ~short_circuit:sc enforced_completed tests_outputs ~search_matches:true t in
           (*print_endline "1";*)
@@ -1188,7 +1183,7 @@ and propogate_exps_rmatch ?short_circuit:(sc = true)
     []
   else
     let brancheses = combinations bs in
-    let ans = List.map ~f:(fun bs -> EMatch(e,bs)) brancheses in
+    let ans = List.map ~f:(fun bs -> create_exp (EMatch(e,bs))) brancheses in
 
   (*let ans =
     ([[]],bs)
@@ -1301,10 +1296,10 @@ and propogate_exps_node
     (n:rnode)
   : exp list =
   match n with
-  | SUnit -> [EUnit]
+  | SUnit -> [create_exp EUnit]
 
   | SAbs (f, x, ty, t) ->
-    let e_transformer = fun e -> EFix (f, x, ty, e) in
+    let e_transformer = fun e -> create_exp (EFix (f, x, ty, e)) in
     let tests_outputs = tests_outputs_update e_transformer tests_outputs in
     List.map
       ~f:e_transformer
@@ -1316,18 +1311,18 @@ and propogate_exps_node
          t)
 
   | SCtor (c, t) ->
-    propogate_exps ~short_circuit:sc enforced_completed tests_outputs ~search_matches t |> List.map ~f:(fun e -> ECtor (c, e))
+    propogate_exps ~short_circuit:sc enforced_completed tests_outputs ~search_matches t |> List.map ~f:(fun e -> create_exp (ECtor (c, e)))
 
   | STuple ts ->
     List.map ~f:(propogate_exps ~short_circuit:sc enforced_completed tests_outputs ~search_matches) ts
     |> Util.combinations
-    |> List.map ~f:(fun es -> ETuple es)
+    |> List.map ~f:(fun es -> create_exp (ETuple es))
 
   | SRcd ts ->
     List.map ~f:(fun (l,t) ->
         List.map ~f:(fun e -> (l,e)) (propogate_exps ~short_circuit:sc enforced_completed tests_outputs ~search_matches t)) ts
     |> Util.combinations
-    |> List.map ~f:(fun es -> ERcd es)
+    |> List.map ~f:(fun es -> create_exp (ERcd es))
 
 and propagate_enforced_matches
     ?short_circuit:(sc = true)
@@ -1342,26 +1337,62 @@ and propagate_enforced_matches
            above_adder
            condition)*)
   in
+  (*print_endline (List.to_string ~f:(fun (e,_,_) -> Pp.pp_exp e) tests_outputs);*)
+  (*List.iter
+    ~f:(fun pp -> print_endline (show_ppath (fst pp)))
+    ppaths;*)
+  let initial_pns_tests : pnode list * exp tests_outputs * exp tests_outputs =
+    (*begin match lookup_in_solution_cache t tests_outputs with
+      | None -> print_endline "cache miss baby";*) ([Node (retrieve_match_exp_exn t,[])], tests_outputs, [])
+      (*| Some v -> print_endline "cache hit baby"; v
+        end*)
+  in
   let pns =
   List.fold_until_completion
     ~f:(fun (pns,tests_outputs,prior_tests) ->
+        print_endline (string_of_int (List.length pns));
+        (*if (!magic_num = 33 && List.length pns = 50) then
+          List.iter
+            ~f:(print_endline % Pp.pp_exp % pnode_to_exp)
+            pns;
+        if (!magic_num = 33 && List.length pns = 50) then
+          List.iter
+            ~f:(print_endline % Pp.pp_exp % fst3)
+            tests_outputs;*)
+        (*print_endline (string_of_int (List.length pns));
+          print_endline (List.to_string ~f:(fun (e,_,_) -> Pp.pp_exp e) tests_outputs);*)
         if List.length tests_outputs = 0 then
           Right pns
         else
-          let passing =
+          (*let passing =
               List.filter
                 ~f:(fun pn ->
                     has_passing_capabilities
                       (tests_outputs_update pnode_to_exp tests_outputs)
                       pn)
                 pns
-          in
+            in*)
           let standard_calc () =
             let (relevant_tests_outputs,next_tests_outputs) =
-                split_by_minimal
-                  ~compare:(fun (_,e1,_,_) (_,e2,_,_) -> contains e1 e2)
-                  tests_outputs
-              in
+              split_by_minimal
+                ~compare:(fun (_,e1,_,_) (_,e2,_,_) -> contains e1 e2)
+                tests_outputs
+            in
+            let tests_outputs =
+              relevant_tests_outputs
+              (*@
+                (List.map ~f:(fun (_,e1,e2,r) -> (false,e1,e2,r)) next_tests_outputs)*)
+            in
+            if (!magic_num = 33 && List.length pns = 50) then
+                print_endline "AND THEN";
+              if (!magic_num = 33 && List.length pns = 50) then
+                List.iter
+                  ~f:(print_endline % Pp.pp_exp % (fun (_,e1,_,_) -> e1))
+                  tests_outputs;
+              if (!magic_num = 33 && List.length pns = 50) then
+                List.iter
+                  ~f:(print_endline % Pp.pp_exp % (fun (_,_,e2,_) -> e2))
+                  tests_outputs;
               (*let all_tests_outputs =
                 relevant_tests_outputs
                 @
@@ -1369,29 +1400,21 @@ and propagate_enforced_matches
                    ~f:(fun (_,e,r,t) -> (false,e,r,t))
                    next_tests_outputs)
                 in*)
-              let pns_size = List.length pns in
 
-              let possible_branches =
-                begin match lookup_in_solution_cache t prior_tests relevant_tests_outputs pns_size with
-                  | Some bs ->
-                    (*do_if_verbose (fun _ ->
-                      print_endline "cache hit");*)
-                    bs
-                  | None ->
                     (*do_if_verbose (fun _ ->
                       print_endline "cache miss");*)
                     let possible_branches =
                       List.concat_map
                         ~f:(fun (p,t) ->
-                            let make_match pn e =
+                            (*let make_match pn e =
                               Option.map
                                 ~f:(fun pn -> pnode_to_exp pn)
                                 (integrate_path
                                    p
                                    pn
                                    e)
-                            in
-                            let lower_tests_outputs =
+                              in*)
+                            (*let lower_tests_outputs =
                               (List.map
                                  ~f:(fun (b,e1,e2,otm) ->
                                      (b,e1,e2,fun e ->
@@ -1404,7 +1427,7 @@ and propagate_enforced_matches
                                                   end)
                                               pns)))
                                  relevant_tests_outputs)
-                            in
+                              in*)
                             let es =
                               propogate_exps
                                 ~short_circuit:sc
@@ -1419,7 +1442,7 @@ and propagate_enforced_matches
                                            | Some e -> (exp_to_output e).node
                                          end)
                                      pns))*)
-                                lower_tests_outputs
+                                (*lower_*)tests_outputs
                                 (*(fun e ->
                                    snd @$
                                    Option.value_exn
@@ -1432,12 +1455,12 @@ and propagate_enforced_matches
                                            pns)))*)
                                 t
                             in
-                            let es =
+                            (*let es =
                               minimize
                                 size
                                 es
                                 lower_tests_outputs
-                            in
+                              in*)
                             List.map
                               ~f:(fun e -> (p,e))
                               es
@@ -1488,27 +1511,82 @@ and propagate_enforced_matches
                              (*(test_performance_to_ranking % tests % pnode_to_exp)*)
                              (size % pnode_to_exp)))*)
                         ppaths
-                    in
-                    update_solution_cache t pns_size prior_tests relevant_tests_outputs possible_branches;
-                    possible_branches
-                end
               in
-              let pn_to_pnt (ts:exp tests_outputs) pn =
-                (pn
-                ,List.filter
-                    ~f:(fun (b,_,_,otm) ->
-                        b && not (passable_test_output_tree (otm (pnode_to_exp pn))))
-                    ts)
+              let valid_pnt
+                  ((_,tests_outputs_results):pnode * (pnode test_output * test_output_result_lazy) list)
+                : bool =
+                List.for_all
+                  ~f:(fun (_,res) ->
+                      let (b,vo) = Lazy.force_val res in
+                      b || (Option.is_none vo))
+                  tests_outputs_results
+              in
+              let did_update_tests
+                  ((_,tests_outputs_results1):pnode * (pnode test_output * test_output_result_lazy) list)
+                  ((_,tests_outputs_results2):pnode * (pnode test_output * test_output_result_lazy) list)
+                : bool =
+                List.exists
+                  ~f:(fun ((_,res1),(_,res2)) ->
+                      let (_,b1) = Lazy.force_val res1 in
+                      let (_,b2) = Lazy.force_val res2 in
+                      b1 <> b2)
+                  (List.zip_exn tests_outputs_results1 tests_outputs_results2)
+              in
+              let update_pnt
+                  (old_pnt:pnode * (pnode test_output * test_output_result_lazy) list)
+                  (new_pn:pnode)
+                : (pnode * (pnode test_output * test_output_result_lazy) list) option =
+                let (_,tests_outputs_results) = old_pnt in
+                let new_pnt =
+                  (new_pn
+                  ,List.map
+                      ~f:(fun ((b,e1,e2,runner),res) ->
+                          let lazy_result =
+                            lazy
+                              (let (b,vo) = Lazy.force_val res in
+                               begin match vo with
+                                 | None -> runner new_pn
+                                 | Some _ -> (b,vo)
+                               end)
+                          in
+                          ((b,e1,e2,runner),lazy_result))
+                      tests_outputs_results)
+                in
+                if (valid_pnt new_pnt) && (did_update_tests old_pnt new_pnt) then
+                  Some new_pnt
+                else
+                  None
               in
               (*List.iter
                 ~f:(fun pn -> print_endline (Pp.pp_exp (pnode_to_exp pn)))
                 pns;*)
+              let pnode_tests_outputs =
+                tests_outputs_update pnode_to_exp tests_outputs
+              in
+              let initial_pnts =
+                List.filter_map
+                  ~f:(fun pn ->
+                      let initial_ts =
+                        List.map
+                          ~f:(fun (b,e1,e2,runner) ->
+                              let res = lazy (runner pn) in
+                              ((b,e1,e2,runner),res))
+                          pnode_tests_outputs
+                      in
+                      let pnt = (pn,initial_ts) in
+                      if valid_pnt pnt then
+                        Some pnt
+                      else
+                        None)
+                  pns
+              in
               let pns =
                 List.fold_until_completion
                   ~f:(fun (incompleted_pnts,completed_pns) ->
+                      (*print_endline "here doing";*)
                       let (newly_completed_pnts,incompleted_pnts) =
                         List.partition_tf
-                          ~f:(fun (_,ts) -> List.length ts = 0)
+                          ~f:(fun (_,ts) -> List.for_all ~f:(fun (_,res) -> fst (Lazy.force_val res)) ts)
                           incompleted_pnts
                       in
                       let newly_completed_pns =
@@ -1521,32 +1599,40 @@ and propagate_enforced_matches
                         Right completed_pns
                       else
                         let incompleted_pnts =
+                          (*print_endline (string_of_int (List.length incompleted_pnts));*)
                           List.cartesian_filter_map
-                            ~f:(fun (p,e) (pn,ts) ->
+                            ~f:(fun (p,e) old_pnt ->
                                 Option.bind
-                                  ~f:(fun pn ->
-                                      let (pn,ts') = pn_to_pnt ts pn in
-                                      if List.length ts = List.length ts' then
-                                        None
-                                      else
-                                        Some (pn,ts'))
-                                  (integrate_path p pn e))
+                                  ~f:(fun pn -> update_pnt old_pnt pn)
+                                  (integrate_path p (fst old_pnt) e))
                             possible_branches
                             incompleted_pnts
                         in
+                        (*print_endline (string_of_int (List.length incompleted_pnts));*)
                         let incompleted_pnts =
-                          deduper
-                            (tests_outputs_update (pnode_to_exp % fst) relevant_tests_outputs)
+                          core_deduper
+                            (fun (_,tores1) (_,tores2) ->
+                               let bos1 = List.map ~f:(Lazy.force_val % snd) tores1 in
+                               let bos2 = List.map ~f:(Lazy.force_val % snd) tores2 in
+                               List.compare compare_test_output_result bos1 bos2)
                             (size % pnode_to_exp % fst)
                             incompleted_pnts
-                        in
+                            (*(tests_outputs_update (pnode_to_exp % fst) relevant_tests_outputs)*)
+                          in
+                          let incompleted_pnts' =
+                            minimize
+                              (size % pnode_to_exp % fst)
+                              incompleted_pnts
+                              (tests_outputs_update (pnode_to_exp % fst) tests_outputs)
+                            in
+                          assert (List.length incompleted_pnts' = List.length incompleted_pnts);
                         Left (incompleted_pnts,completed_pns)
                     )
-                  (List.map ~f:(pn_to_pnt relevant_tests_outputs) pns,[])
+                  (initial_pnts,[])
               in
               let pns =
                 deduper
-                  (tests_outputs_update pnode_to_exp relevant_tests_outputs)
+                  (tests_outputs_update pnode_to_exp tests_outputs)
                   (size % pnode_to_exp)
                   pns
               in
@@ -1603,16 +1689,17 @@ and propagate_enforced_matches
                           relevant_tests)
                     filtered_combos
                 in*)
+              let prior_tests_outputs = prior_tests@relevant_tests_outputs in
+              update_solution_cache t prior_tests_outputs pns;
               if List.is_empty pns then
-                Right []
+                ((*print_endline "was empty";*) Right [])
               else
-                let prior_tests_outputs = prior_tests@relevant_tests_outputs in
                 Left (pns,next_tests_outputs,prior_tests_outputs)
           in
 
-          if not (List.is_empty passing) then
+          (*if not (List.is_empty passing) then
             Right passing
-          else
+            else*)
             standard_calc ()
                 (*begin match integrations_ranks_o with
                   | None -> Right []
@@ -1658,7 +1745,7 @@ and propagate_enforced_matches
                       failwith "TODO"
                   end*)
             )
-    ([Node (retrieve_match_exp_exn t,[])],tests_outputs,[])
+    (initial_pns_tests)
   in
   let ppeos =
     List.map

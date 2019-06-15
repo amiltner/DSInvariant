@@ -27,8 +27,8 @@ let create_fresh_var () : Id.t =
   _FRESH_VAR_COUNTER := !_FRESH_VAR_COUNTER + 1 ;
   "N_fresh_var_" ^ Int.to_string (!_FRESH_VAR_COUNTER)
 
-let rec convert_expr : Myth_folds.Lang.exp -> Expr.t =
-  function [@warning "-8"]
+let  [@warning "-8"] rec convert_expr (e : Myth_folds.Lang.exp) : Expr.t =
+  begin match e.node with
   | Myth_folds.Lang.EUnit
     -> Expr.Tuple []
   | Myth_folds.Lang.EVar id
@@ -63,6 +63,7 @@ let rec convert_expr : Myth_folds.Lang.exp -> Expr.t =
         in Expr.Match ((convert_expr exp),
                        fresh_var,
                        (List.map ~f:(convert_branch fresh_var) branchlist))
+    end
 
 and convert_branch (binder : Id.t) : Myth_folds.Lang.branch -> (Id.t * Expr.t) =
   function [@warning "-8"]

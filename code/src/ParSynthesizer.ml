@@ -60,8 +60,8 @@ module T : Synthesizer.t = struct
           decls
       in
       let env = Myth_folds.Eval.gen_init_env decls in
-      let env = Myth_folds.Sigma.Sigma.add_ctors_env env sigma in
-      let gamma = Myth_folds.Gamma.Gamma.add_ctors gamma sigma in
+      (*let env = Myth_folds.Sigma.Sigma.add_ctors_env env sigma in
+        let gamma = Myth_folds.Gamma.Gamma.add_ctors gamma sigma in*)
       let desired_t = Type.mk_arrow (Type._t) (Type._bool)
       in
       let tests_outputs : Myth_folds.Lang.exp Myth_folds.Rtree.tests_outputs =
@@ -70,13 +70,13 @@ module T : Synthesizer.t = struct
               (true,input
               ,expected_output
               ,(fun e ->
-                 let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
+                 let evaler = Myth_folds.Lang.create_exp (Myth_folds.Lang.EApp (Myth_folds.Lang.create_exp (EVar "convert"), e)) in
                  let (output,is_real) =
                    try
                      let ans =
                        Myth_folds.Eval.eval
                          env
-                         (Myth_folds.Lang.EApp(evaler,input))
+                         ((Myth_folds.Lang.create_exp (Myth_folds.Lang.EApp(evaler,input))))
                      in
                      (Some ans,true)
                    with
@@ -87,13 +87,16 @@ module T : Synthesizer.t = struct
                    is_real &&
                    begin match output with
                      | None -> false
-                     | Some (Myth_folds.Lang.VTuple vs) ->
-                       let ans = Myth_folds.Eval.eval env expected_output in
-                       ans = List.hd_exn vs
-                     | _ -> false
+                     | Some v ->
+                       begin match v.node with
+                         | (Myth_folds.Lang.VTuple vs) ->
+                           let ans = Myth_folds.Eval.eval env expected_output in
+                           ans = List.hd_exn vs
+                         | _ -> false
+                       end
                    end
                  in
-                 Myth_folds.Rtree.ExistantLeaf (correct, output))))
+                 (correct, output))))
           myth_examples
       in
       (*Some [(

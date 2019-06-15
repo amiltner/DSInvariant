@@ -18,7 +18,7 @@ module Typecheck : Typecheck_Sig = struct
 
     (***** Typecheck expressions {{{ *****)
     let rec check_exp (s:Sigma.t) (g:Gamma.t) (e:exp) : typ =
-      match e with
+      match e.node with
       (* Variable: Retrieve its type from the context.                                    *)
       | EVar x -> begin match Gamma.lookup_type x g with
           | Some t -> t

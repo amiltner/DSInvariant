@@ -77,7 +77,7 @@ let rec to_myth_exp
     (e:Expr.t)
   : MythLang.exp =
   let to_myth_exp = to_myth_exp tt in
-  begin match e with
+  MythLang.create_exp (begin match e with
     | Var i -> MythLang.EVar i
     | App (e1,e2) -> MythLang.EApp (to_myth_exp e1, to_myth_exp e2)
     | Func ((i,t),e) ->
@@ -108,7 +108,7 @@ let rec to_myth_exp
         MythLang.ETuple (List.map ~f:to_myth_exp es)
     | Proj (i,e) ->
       MythLang.EProj (i+1, to_myth_exp e)
-  end
+    end)
 
 let convert_decl_list_to_myth
     (ec:Context.Exprs.t)

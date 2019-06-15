@@ -26,53 +26,62 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
       ~invariant:(invariant : Expr.t)
       ~positives:(positives : Value.t list)
     : ((Expr.t,Value.t) Either.t) =
-    let rec helper
-        (invariant : Expr.t)
-      : ((Expr.t,Value.t) Either.t) =
+    let create_invariant_post
+        (invariant:Expr.t)
+      : UniversalFormula.t =
       let app_var = "x" in
       let invariant_applied = Expr.mk_app invariant (Expr.mk_var app_var) in
       let applied_arg = (app_var, Type._t) in
-      let post = ([applied_arg],invariant_applied) in
-      let boundary_validity =
-        List.fold_left
-          ~f:(fun acc (eval,eval_t) ->
-              begin match acc with
-                | None ->
-                  push_boundary
-                    ~problem
-                    ~eval
-                    ~eval_t
-                    ~post
-                    ~positives
-                | Some _ -> acc
-              end)
-          ~init:None
-          problem.mod_vals
+      ([applied_arg],invariant_applied)
+    in
+    let check_boundary
+        (invariant:Expr.t)
+      : Value.t option =
+      let post = create_invariant_post invariant in
+      List.fold_left
+        ~f:(fun acc (eval,eval_t) ->
+            begin match acc with
+              | None ->
+                push_boundary
+                  ~problem
+                  ~eval
+                  ~eval_t
+                  ~post
+                  ~positives
+              | Some _ -> acc
+            end)
+        ~init:None
+        problem.mod_vals
+    in
+    let rec helper
+        (invariant : Expr.t)
+      : ((Expr.t,Value.t) Either.t) =
+      let post = create_invariant_post invariant in
+      let pre_or_ce =
+        VPIE.learnVPreCondAll
+          ~problem
+          ~pre:invariant
+          ~post
+          ~positives:positives
+          ~checker:check_boundary
       in
-      begin match boundary_validity with
-        | Some m ->
-          Log.info
-            (lazy ("Boundary Not Satisfied, counterexample:"
-                   ^ (Log.indented_sep 4)
-                   ^ (Value.show m))) ;
-          Second m
-        | None ->
-          Log.info
-            (lazy ("IND >> Strengthening for inductiveness:"
-                   ^ (Log.indented_sep 4)
-                   ^ (DSToMyth.full_to_pretty_myth_string ~problem invariant))) ;
-          let pre_inv =
-            VPIE.learnVPreCondAll
-              ~problem
-              ~pre:invariant
-              ~post
-              ~positives:positives
-          in
+      Log.info
+        (lazy ("IND >> Strengthening for inductiveness:"
+               ^ (Log.indented_sep 4)
+               ^ (DSToMyth.full_to_pretty_myth_string ~problem invariant))) ;
+      begin match pre_or_ce with
+        | First pre_inv ->
           Log.debug (lazy ("IND Delta: " ^ (DSToMyth.full_to_pretty_myth_string ~problem  pre_inv))) ;
           if Expr.equal pre_inv (Expr.mk_constant_true_func (Type._t)) then
             First (Expr.and_predicates pre_inv invariant)
           else
             helper pre_inv
+        | Second m ->
+          Log.info
+            (lazy ("Boundary Not Satisfied, counterexample:"
+                   ^ (Log.indented_sep 4)
+                   ^ (Value.show m))) ;
+          Second m
       end
     in
     helper invariant
@@ -193,6 +202,8 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                 ~positives:[]
                 ~attempt:0
     in
+    print_endline "utilization";
+    print_endline (string_of_int !Myth_folds.Consts.utilization);
     DSToMyth.full_to_pretty_myth_string inv
       ~problem
 end

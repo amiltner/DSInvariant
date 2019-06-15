@@ -3,8 +3,8 @@ open Lang
 
 let rec fix_to_let (e:exp) : exp =
   let trans : exp -> exp = fix_to_let in
-  match e with
-  | EVar _ -> e
+  create_exp (match e.node with
+  | EVar _ -> e.node
   | EApp (e1, e2) -> EApp (trans e1, trans e2)
   | EFun (x, e) -> EFun (x, trans e)
   | ELet (f, is_rec, xs, t, e1, e2) ->
@@ -20,10 +20,10 @@ let rec fix_to_let (e:exp) : exp =
       EPFun (List.map ~f:(fun (e1, e2) -> (trans e1, trans e2)) ios)
   | EFix (f, (x, t1), t2, e) ->
       if List.mem ~equal:String.equal (free_vars e) f then
-        ELet (f, true, [(x, t1)], t2, trans e, EVar f)
+        ELet (f, true, [(x, t1)], t2, trans e, create_exp (EVar f))
       else
         EFun ((x, t1), trans e)
-  | EUnit -> EUnit
+  | EUnit -> EUnit)
 
 let wrap_in_dlet (x:id) (t:typ) (e:exp) : decl = DLet (x, false, [], t, e)
 

@@ -325,17 +325,112 @@ module List = struct
     let rec all_splittings
         (prior_rev:a list)
         (current:a list)
+        (splittings_acc:(a list * a * a list) list)
       : (a list * a * a list) list =
       begin match current with
-        | [] -> []
+        | [] -> splittings_acc
         | h::t ->
           let current_splitting = (prior_rev,h,t) in
-          let later_splittings = all_splittings (h::prior_rev) t in
-          current_splitting::later_splittings
+          all_splittings
+            (h::prior_rev)
+            t
+            (current_splitting::splittings_acc)
       end
     in
-    let revved_first_answers = all_splittings [] l in
+    let revved_first_answers = all_splittings [] l [] in
     map
       ~f:(fun (prior,current,post) -> (List.rev prior, current, post))
       revved_first_answers
 end
+
+let pair_compare
+    (fst_compare:'a -> 'a -> int)
+    (snd_compare:'b -> 'b -> int)
+    ((x1,x2):('a * 'b))
+    ((y1,y2):('a * 'b))
+  : int =
+  let cmp = fst_compare x1 y1 in
+  if (0 = cmp) then
+    snd_compare x2 y2
+  else
+    cmp
+
+let triple_compare
+    (fst_compare:'a -> 'a -> int)
+    (snd_compare:'b -> 'b -> int)
+    (trd_compare:'c -> 'c -> int)
+    ((x1,x2,x3):('a * 'b * 'c))
+    ((y1,y2,y3):('a * 'b * 'c))
+  : int =
+  let cmp = fst_compare x1 y1 in
+  if (0 = cmp) then
+    pair_compare
+      snd_compare
+      trd_compare
+      (x2,x3)
+      (y2,y3)
+  else
+    cmp
+
+let quad_compare
+    (fst_compare:'a -> 'a -> int)
+    (snd_compare:'b -> 'b -> int)
+    (trd_compare:'c -> 'c -> int)
+    (rth_compare:'d -> 'd -> int)
+    ((x1,x2,x3,x4):('a * 'b * 'c * 'd))
+    ((y1,y2,y3,y4):('a * 'b * 'c * 'd))
+  : int =
+  let cmp = fst_compare x1 y1 in
+  if (0 = cmp) then
+    triple_compare
+      snd_compare
+      trd_compare
+      rth_compare
+      (x2,x3,x4)
+      (y2,y3,y4)
+  else
+    cmp
+
+let quint_compare
+    (fst_compare:'a -> 'a -> int)
+    (snd_compare:'b -> 'b -> int)
+    (trd_compare:'c -> 'c -> int)
+    (rth_compare:'d -> 'd -> int)
+    (fth_compare:'e -> 'e -> int)
+    ((x1,x2,x3,x4,x5):('a * 'b * 'c * 'd * 'e))
+    ((y1,y2,y3,y4,y5):('a * 'b * 'c * 'd * 'e))
+  : int =
+  let cmp = fst_compare x1 y1 in
+  if (0 = cmp) then
+    quad_compare
+      snd_compare
+      trd_compare
+      rth_compare
+      fth_compare
+      (x2,x3,x4,x5)
+      (y2,y3,y4,y5)
+  else
+    cmp
+
+let sext_compare
+    (fst_compare:'a -> 'a -> int)
+    (snd_compare:'b -> 'b -> int)
+    (trd_compare:'c -> 'c -> int)
+    (rth_compare:'d -> 'd -> int)
+    (fth_compare:'e -> 'e -> int)
+    (sth_compare:'f -> 'f -> int)
+    ((x1,x2,x3,x4,x5,x6):('a * 'b * 'c * 'd * 'e * 'f))
+    ((y1,y2,y3,y4,y5,y6):('a * 'b * 'c * 'd * 'e * 'f))
+  : int =
+  let cmp = fst_compare x1 y1 in
+  if (0 = cmp) then
+    quint_compare
+      snd_compare
+      trd_compare
+      rth_compare
+      fth_compare
+      sth_compare
+      (x2,x3,x4,x5,x6)
+      (y2,y3,y4,y5,y6)
+  else
+    cmp
