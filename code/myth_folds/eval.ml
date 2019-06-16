@@ -97,14 +97,64 @@ let memo_eval_tbl : (GTS.t, value) Hashtbl.t =
   GTS.Table.create ()
 let lrucache : value GTSCache.t =
   if !eval_lookup_tables then
-    GTSCache.init ~size:8388608 (GTSCache.make_key [] (create_exp EUnit))
+    GTSCache.init ~size:8388608 (GTSCache.make_key ([]) (create_exp EUnit))
   else
-    GTSCache.init ~size:1 (GTSCache.make_key [] (create_exp EUnit))
+    GTSCache.init ~size:1 (GTSCache.make_key ([]) (create_exp EUnit))
 
 let find_in_table tbl key =
   Hashtbl.find tbl key
 
 (***** }}} *****)
+
+let insert_env
+    (e:env)
+    (i:id)
+    (v:value)
+  : env =
+  (i,v)::e
+  (*begin match e with
+    | [] -> [(i,v)]
+    | h::t ->
+      let (i',_) = h in
+      let c = String.compare i i' in
+      if c > 0 then
+        h::(insert_env t i v)
+      else if c = 0 then
+        (i,v)::t
+      else
+        (i,v)::e
+    end*)
+
+let insert_all
+    (e:env)
+    (ivs:(string * value) list)
+  : env =
+  ivs@e
+  (*List.fold
+    ~f:(fun env (i,v) -> insert_env env i v)
+    ~init:e
+    ivs*)
+
+let lookup_env
+    (e:env)
+    (i:id)
+  : value =
+  (*let rec lookup_env_internal e i =
+    if not (List.is_sorted ~compare:(fun (i1,_) (i2,_) -> String.compare i1 i2) e) then failwith (Pp.pp_env e);
+    begin match e with
+      | [] -> failwith i
+      | (i',v)::t ->
+        let c = String.compare i i' in
+        if c < 0 then
+          failwith (Pp.pp_env (e))
+        else if c = 0 then
+          v
+        else
+          lookup_env_internal t i
+    end
+  in
+    lookup_env_internal e i*)
+  List.Assoc.find_exn ~equal:(String.equal) e i
 
 (* Evaluates e to a value under env *)
 let rec eval (env:env) (e:exp) : value =
@@ -116,12 +166,20 @@ let rec eval (env:env) (e:exp) : value =
         | Some ans -> ans
         | None ->*)
       let ans = begin match e.node with
-        | EVar x -> List.Assoc.find_exn ~equal:String.equal env x
+        | EVar x -> lookup_env env x
         | EApp (e1, e2) ->
           let (v1, v2) = (eval env e1, eval env e2) in
           begin match v1.node with
-            | VFun (x, e, closure) -> eval ((x, v2) :: closure) e
-            | VFix (f, x, e, closure) -> eval ((x, v2) :: (f, v1) :: closure) e
+            | VFun (x, e, closure) ->
+              let closure = insert_env closure x v2 in
+              eval closure e
+            | VFix (f, x, e, closure) ->
+              eval
+                (insert_env
+                   (insert_env closure f v1)
+                   x
+                   v2)
+                e
             | VPFun vps ->
               begin match Util.find_first (fun (v1, _) -> v1 = v2) vps with
                 | Some (_, v) -> v
@@ -132,13 +190,14 @@ let rec eval (env:env) (e:exp) : value =
               end
             | _ -> raise_eval_error ("Non-function value found in application" ^ (Pp.pp_value v1))
           end
-        | EFun ((x, _), e) -> vfun x e env
+        | EFun ((x, _), e) ->
+          vfun x e env
         | ELet (f, is_rec, xs, t, e1, e2) ->
           let count = List.length xs in
           if count = 0 then
             (* Value binding *)
             let v1 = eval env e1 in
-            eval ((f, v1) :: env) e2
+            eval (insert_env env f v1) e2
           else
             (* Function binding *)
             let rec binding_to_funs xs e =
@@ -155,7 +214,7 @@ let rec eval (env:env) (e:exp) : value =
               else
                 binding_to_funs xs e1
             in
-            eval ((f, eval env fn) :: env) e2
+            eval (insert_env env f (eval env fn)) e2
         | ECtor (c, e)  -> vctor c (eval env e)
         | ETuple es     -> vtuple (List.map ~f:(eval env) es)
         | ERcd _       -> failwith "ah" (*(List.map ~f:(fun (l,e) -> (l,eval env e)) es)*)
@@ -166,7 +225,14 @@ let rec eval (env:env) (e:exp) : value =
               let ((_, p_opt), e) = find_first_branch c bs in
               begin match p_opt with
                 | None -> eval env e
-                | Some p -> eval ((extract_values_from_pattern v p) @ env) e
+                | Some p ->
+                  eval
+                    (List.fold_left
+                       ~f:(fun env (label,value) ->
+                           insert_env env label value)
+                       ~init:env
+                       (extract_values_from_pattern v p))
+                    e
               end
             | _ ->
               raise_eval_error @@
@@ -207,16 +273,16 @@ let rec eval (env:env) (e:exp) : value =
 
 (* Generates the initial synthesis environment. *)
 let gen_init_env (ds:decl list) : env =
-  let process env = function
+  let process (env:env) = function
     | DData _ -> env
     | DLet (f, is_rec, xs, t, e) ->
         if List.length xs = 0 then
           (* Value binding *)
           let v = eval env e in
-          (f, v) :: env
+          insert_env env f v
         else
           (* Function binding *)
           let v = eval env (create_exp (ELet (f, is_rec, xs, t, e, create_exp (EVar f)))) in
-          (f, v) :: env
+          insert_env env f v
   in
-    List.fold_left ~f:process ~init:[] ds
+  (List.fold_left ~f:process ~init:([]) ds)

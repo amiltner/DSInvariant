@@ -287,9 +287,10 @@ module List = struct
     | Right answer -> answer
     end
 
-  let cartesian_filter_map ~(f : 'a -> 'b -> 'c option)
-                           (l1 : 'a list)
-                           (l2 : 'b list)
+  let cartesian_filter_map
+      ~(f : 'a -> 'b -> 'c option)
+      (l1 : 'a list)
+      (l2 : 'b list)
     : 'c list =
     List.(rev (fold l1 ~init:[]
                  ~f:(fun acc a -> fold l2 ~init:acc
@@ -318,6 +319,33 @@ module List = struct
       | h::t -> merge_grouped_things t [h] []
     end
 
+  let core_deduper
+      (type a)
+      ~(compare:a -> a -> int)
+      ~(to_size:a -> int)
+      (xs:a list)
+    : a list =
+    let sized_xs =
+      map
+        ~f:(fun x -> (x,to_size x))
+        xs
+    in
+    let sorted_parititioned_i =
+      sort_and_partition_with_indices
+        ~cmp:(fun (e1,_) (e2,_) -> compare e1 e2)
+        sized_xs
+    in
+    map
+      ~f:(fun esl ->
+          let ordered_by_size =
+            sort
+              ~compare:(fun ((_,s1),_) ((_,s2),_) -> Core.Int.compare s1 s2)
+              esl
+          in
+          let ((a,_),_) = hd_exn ordered_by_size in
+          a)
+      sorted_parititioned_i
+
   let all_splittings
       (type a)
       (l:a list)
@@ -341,6 +369,62 @@ module List = struct
     map
       ~f:(fun (prior,current,post) -> (List.rev prior, current, post))
       revved_first_answers
+
+  let contains_as_multiset
+      (type a)
+      (l1:a list)
+      (l2:a list)
+      ~(compare:a -> a -> int)
+    : bool =
+    let l1 = List.sort compare l1 in
+    let l2 = List.sort compare l2 in
+    let rec contains_internal
+        (l1:a list)
+        (l2:a list)
+      : bool =
+      begin match (l1,l2) with
+        | (_,[]) -> true
+        | ([],_::_) -> false
+        | (h1::t1,h2::t2) ->
+          let c = compare h1 h2 in
+          if c = 0 then
+            contains_internal t1 t2
+          else if c < 0 then
+            contains_internal t1 l2
+          else
+            false
+      end
+    in
+    contains_internal l1 l2
+
+  let cartesian_filter_map_dedup
+      (type a)
+      (type b)
+      (type c)
+      ~(f : a -> b -> c option)
+      ~(compare : c -> c -> int)
+      ~(to_size : c -> int)
+      (l1 : a list)
+      (l2 : b list)
+    : c list =
+    let dedup = core_deduper ~compare ~to_size in
+    let ans =
+      rev
+        (fold
+           l1
+           ~init:[]
+           ~f:(fun acc a ->
+               let partial_result =
+                 fold
+                   l2
+                   ~init:acc
+                   ~f:(fun acc b -> match f a b with
+                       | None -> acc
+                       | Some c -> c :: acc)
+               in
+               dedup partial_result))
+    in
+    dedup ans
 end
 
 let pair_compare

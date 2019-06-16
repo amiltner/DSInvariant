@@ -95,27 +95,4 @@ module Sigma = struct
     List.exists
       ~f:(fun (_,(t,_)) -> contains_t t)
       (ctors type_name s)
-
-  let add_ctors_env (e:env) (s:t) : env =
-    let ts = types s in
-    let tis =
-      List.map
-        ~f:(function (TBase i) -> i | _ -> failwith "not happen")
-        ts
-    in
-    List.fold_left
-      ~f:(fun e ti ->
-          let ctors =
-            ctors
-              ti
-              s
-          in
-          List.fold_left
-            ~f:(fun e (s,(_,_)) ->
-                (s,vfun "i" (create_exp (ECtor (s,create_exp (EVar "i")))) [])::e
-              )
-            ~init:e
-            ctors)
-      ~init:e
-      tis
 end

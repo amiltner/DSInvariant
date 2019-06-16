@@ -67,7 +67,7 @@ module T : Synthesizer.t = struct
       let tests_outputs : Myth_folds.Lang.exp Myth_folds.Rtree.tests_outputs =
         List.map
           ~f:(fun (input,expected_output) ->
-              (true,input
+              (input
               ,expected_output
               ,(fun e ->
                  let evaler = Myth_folds.Lang.create_exp (Myth_folds.Lang.EApp (Myth_folds.Lang.create_exp (EVar "convert"), e)) in

@@ -154,7 +154,7 @@ and fpf_env ppf (ev:env) =
   match ev with
   | []    -> fpf ppf "·"
   | [v]   -> fpf ppf "%a" fpf_env_one v
-  | v::vs -> fpf ppf "%a,@\n%a" fpf_env_one v fpf_env vs
+  | v::vs -> fpf ppf "%a,@\n%a" fpf_env_one v fpf_env (vs)
 
 and fpf_exp_list ppf (es:exp list) =
   match es with

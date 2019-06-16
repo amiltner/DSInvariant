@@ -101,7 +101,7 @@ let execute_synth_step
     ~label:"synth::saturate_guesses"
     ~action:(fun _ -> List.iter ~f:(fun t -> saturate_guesses 0.25 ~short_circuit:false s env t) ts);*)
   print_endline (string_of_int (List.length ts));
-let es =
+  let es =
     Timing.record
       ~label:"synth::propogate_exps"
       ~action:(fun _ ->
@@ -118,8 +118,8 @@ let es =
                 end)
             ~init:[]
             ts)
-in
-assert (List.for_all ~f:(has_passing_capabilities tests_outputs) es);
+  in
+  assert (List.for_all ~f:(has_passing_capabilities tests_outputs) es);
   (*let es =
     List.filter
       ~f:(has_passing_capabilities tests_outputs)
@@ -134,20 +134,20 @@ assert (List.for_all ~f:(has_passing_capabilities tests_outputs) es);
   else
     (do_if_verbose (fun _ -> printf "found...\n%!");
      (es,[]))
-  (*let es_s =
-    List.map
-      ~f:(fun e -> (e,size e))
-      es
+(*let es_s =
+  List.map
+    ~f:(fun e -> (e,size e))
+    es
   in
   let es_s =
-    List.sort
-      ~compare:(fun (_,s1) (_,s2) -> Int.compare s1 s2)
-      es_s
+  List.sort
+    ~compare:(fun (_,s1) (_,s2) -> Int.compare s1 s2)
+    es_s
   in
   begin match es_s with
   | [] -> None
   | (e,_) :: _ -> Some e
-    end*)
+  end*)
 
 let rec execute_synth_plan
     (s:Sigma.t)
@@ -161,7 +161,7 @@ let rec execute_synth_plan
   | st :: plan ->
     begin match execute_synth_step s env ts st tests_outputs with
       | ([],ts) -> execute_synth_plan s env ts plan tests_outputs
-      | (es,_) -> es
+      | (es,_) -> print_endline (string_of_int (List.length es)); es
     end
 
 let synthesize
@@ -171,4 +171,5 @@ let synthesize
     (tests_outputs:exp tests_outputs)
   : exp list =
   verbose_mode := true;
+  eval_lookup_tables := false;
   execute_synth_plan s env [t] standard_synth_plan tests_outputs
