@@ -1,12 +1,8 @@
-type natoption =
-  | None
-  | Some of nat
+type list = mu list .
+  | Nil
+  | Cons of (nat * list)
 
 struct
-  type list = mu list .
-    | Nil
-    | Cons of (nat * list)
-
   type t = list
 
   let empty = Nil ;;
@@ -55,7 +51,8 @@ struct
                 | GT -> Cons(lp.0, Cons(lp.0, delete lp.1 x))))
   ;;
 
-  (*let union =
+(*
+let union =
     fix (union : t -> t -> t) =
       fun (la : t) ->
         fun (lb : t) ->
@@ -73,7 +70,8 @@ struct
           | Cons -> (match lookup lb la.0 binding r with
                      | True -> Cons (la.0, (inter la.1 lb))
                      | False -> inter la.1 lb)
-  ;;*)
+  ;;
+*)
 end
 :
 sig
@@ -87,8 +85,10 @@ sig
   val insert : t -> nat -> t
   val delete : t -> nat -> t
 
-  (*val union : t -> t -> t
-  val inter : t -> t -> t*)
+(*
+  val union : t -> t -> t
+  val inter : t -> t -> t
+*)
 end
 
 maintains
@@ -101,5 +101,3 @@ forall (s : t) .
           (not (is_eq (cmp_nat i j)))
           (lookup s j))
         (lookup (delete s i) j))
-
-accumulating natoption

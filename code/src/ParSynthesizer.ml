@@ -286,35 +286,51 @@ module T : Synthesizer.t = struct
                  in let%bind _ = Deferred.any def_results in helper def_results
                end
         in
-        let _, _, (_, mod_spec), _, _ = problem.unprocessed in
-        let types = List.fold_left mod_spec ~init:[]
-                                   ~f:(fun acc (_, t) -> Type.(fold t ~arr_f:(fun a b -> a @ b)
-                                                                      ~tuple_f:(fun l -> List.concat l)
-                                                                      ~mu_f:(fun _ _ -> [])
-                                                                      ~variant_f:(fun _ -> [])
-                                                                      ~name_f:(fun n -> match n with
-                                                                                        | "t" | "bool" -> []
-                                                                                        | _ -> [n]))
-                                                       @ acc) in
-        let types = let open Worker.T.Input
-                     in (ExistingType Type._unit)
-                     :: (List.fold_left (List.dedup_and_sort ~compare:String.compare types)
-                                        ~init:[]
-                                        ~f:(fun acc n -> ExistingType (Type.mk_named n) 
-                                                      :: DerivedVariant (
-                                                          "__" ^ n ^ "_option__",
-                                                          Variant [
-                                                            ("D__None_" ^ n, Type._unit) ;
-                                                            ("D__Some_" ^ n, Named n)
-                                                         ])
-                                                      :: acc))
+        let _, _, (mod_type, mod_vals), _, _ = problem.unprocessed in
+        let type_names =
+          List.fold_left mod_vals ~init:[]
+                         ~f:(fun acc (_, t) -> Type.(fold t ~arr_f:List.append
+                                                            ~tuple_f:List.concat
+                                                            ~mu_f:(fun _ _ -> [])
+                                                            ~variant_f:(fun _ -> [])
+                                                            ~name_f:(function "bool" -> []
+                                                                            | n -> if n = mod_type
+                                                                                   then []
+                                                                                   else [n]))
+                                             @ acc)
         in
-        Log.info (lazy ("Spinning " ^ (Int.to_string (List.length types))
+        let type_names =
+          match Context.find_exn problem.tc mod_type with
+          | Named n -> n :: type_names
+          | _ -> failwith "Module type `t` must be a single Named type."
+        in
+        let type_names =
+          let open Worker.T.Input
+           in (ExistingType Type._unit)
+           :: (List.fold_left
+                 ~init:[]
+                 (List.dedup_and_sort ~compare:String.compare type_names)
+                 ~f:(fun acc n -> ExistingType (Type.mk_named n) 
+                               :: DerivedVariant (
+                                    "__" ^ n ^ "_option__",
+                                    Variant [
+                                      ("D__None_" ^ n, Type._unit) ;
+                                      ("D__Some_" ^ n, Type.mk_named n)
+                                    ])
+                               :: DerivedVariant (
+                                    "__" ^ n ^ "_pair_option__",
+                                    Variant [
+                                      ("D__P_None_" ^ n, Type._unit) ;
+                                      ("D__P_Some_" ^ n, Type.(mk_tuple [mk_named n ; mk_named n]))
+                                    ])
+                               :: acc))
+        in
+        Log.info (lazy ("Spinning " ^ (Int.to_string (List.length type_names))
                        ^ " workers for accumulator types:")) ;
-        List.iter types ~f:(fun t -> Log.info (lazy ("  > "
-                                                    ^ (Worker.T.Input.show_t_acc t)))) ;
+        List.iter type_names ~f:(fun t -> Log.info (lazy ("  > "
+                                                         ^ (Worker.T.Input.show_t_acc t)))) ;
         let conns_procs_def_results =
-              List.map types
+              List.map type_names
                 ~f:(fun t -> let%map conn, proc =
                                Worker.spawn_in_foreground_exn
                                  ~shutdown_on:Disconnect

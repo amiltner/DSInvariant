@@ -137,11 +137,7 @@ let process (unprocessed : t_unprocessed) : t =
     let full_ec = Map.merge_skewed ec m_ec ~combine:(fun ~key:_ v1 _ -> v1) in
     let full_tc = Map.merge_skewed tc m_tc ~combine:(fun ~key:_ v1 _ -> v1) in
     let full_vc = Map.merge_skewed vc m_vc ~combine:(fun ~key:_ v1 _ -> v1) in
-    let type_instantiation =
-      Context.find_exn
-        full_tc
-        (fst mods)
-    in
+    let type_instantiation = Context.find_exn full_tc (fst mods) in
     let eval_context =
       (List.concat_map
          ~f:(fun cts ->

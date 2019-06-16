@@ -1,8 +1,8 @@
-struct
-  type natnatoption =
-    | None
-    | Some of nat * nat
+type natnatoption =
+  | None
+  | Some of nat * nat
 
+struct
   type t = natnatoption
 
   let empty = None ;;
@@ -53,9 +53,6 @@ sig
   val contains : t -> nat -> bool
 
   val expand : t -> nat -> t
-
-  (*val union : t -> t -> t
-  val inter : t -> t -> t*)
 end
 
 maintains
@@ -66,5 +63,3 @@ forall (r : t) .
       (and
         (contains (expand r i) i)
         (not (contains empty i)))
-
-accumulating unit

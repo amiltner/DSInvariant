@@ -25,10 +25,22 @@ open DSInvGen
 module EMIG = MIG.Make (EnumerativeVerifier.T) (ParSynthesizer.T)
 module QCMIG = MIG.Make (QuickCheckVerifier.T) (ParSynthesizer.T)
 
-let main (* nworkers *) filename () =
+let read_accum = function
+  | None -> "", ""
+  | Some filename
+    -> let file_chan = Utils.get_in_channel filename in
+       let file_data = Stdio.In_channel.input_all file_chan
+        in match String.split file_data ~on:'#' with
+           | [ accum_types ; accum_annot ] -> (accum_types , accum_annot)
+           | _ -> raise (DSInvGen.Exceptions.Parse_Exn "bad accumulating annotation")
+
+let main (* nworkers *) accum_file filename () =
   Log.enable ~msg:"DSInfer" (Some "_log") ;
   let file_chan = Utils.get_in_channel filename in
-  let problem_string = Prelude.prelude_string ^ (Stdio.In_channel.input_all file_chan)
+  let accum_types, accum_annot = read_accum accum_file in
+  let problem_string = Prelude.prelude_string ^ accum_types
+                     ^ (Stdio.In_channel.input_all file_chan)
+                     ^ accum_annot
    in Stdio.In_channel.close file_chan
     ; let unprocessed_problem = Parser.unprocessed_problem
                                   Lexer.token
@@ -39,6 +51,8 @@ let spec =
   Command.Spec.(
     empty
     (* +> flag "nworkers" (optional_with_default 4 int) ~doc:" Number of workers" *)
+    +> flag "-a" (optional string)
+            ~doc:"FILENAME accumulating annotation file"
     +> anon ("filename" %: file)
   )
 
