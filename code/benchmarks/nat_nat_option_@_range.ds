@@ -10,8 +10,8 @@ struct
   let is_empty =
     fun (r : t) ->
       (match r binding r with
-       | None -> (True)
-       | Some -> (False))
+       | None -> True
+       | Some -> False)
   ;;
 
   let contains =
@@ -62,4 +62,8 @@ forall (r : t) .
     forall (j : nat) .
       (and
         (contains (expand r i) i)
-        (not (contains empty i)))
+        (and
+          (not (contains empty i))
+          (implies
+            (contains r i)
+            (contains (expand r j) i))))
