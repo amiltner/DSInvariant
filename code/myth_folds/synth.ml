@@ -102,7 +102,6 @@ let execute_synth_step
   (*Timing.record
     ~label:"synth::saturate_guesses"
     ~action:(fun _ -> List.iter ~f:(fun t -> saturate_guesses 0.25 ~short_circuit:false s env t) ts);*)
-  print_endline (string_of_int (List.length ts));
   let es =
     Timing.record
       ~label:"synth::propogate_exps"
@@ -111,8 +110,6 @@ let execute_synth_step
             ~f:(fun i es t ->
                 begin match es with
                   | [] ->
-                    print_endline "number";
-                    print_endline (string_of_int i);
                     magic_num := i;
                     saturate_guesses 0.5 ~short_circuit:false s env t;
                     propogate_exps ~short_circuit:false false tests_outputs ~search_matches:true extractor replacer t
@@ -165,7 +162,7 @@ let rec execute_synth_plan
   | st :: plan ->
     begin match execute_synth_step s env ts st tests_outputs extractor replacer with
       | ([],ts) -> execute_synth_plan s env ts plan tests_outputs extractor replacer
-      | (es,_) -> print_endline (string_of_int (List.length es)); es
+      | (es,_) -> es
     end
 
 let synthesize
