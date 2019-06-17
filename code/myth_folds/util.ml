@@ -410,21 +410,37 @@ module List = struct
     let dedup = core_deduper ~compare ~to_size in
     let ans =
       rev
-        (fold
-           l1
-           ~init:[]
-           ~f:(fun acc a ->
-               let partial_result =
-                 fold
-                   l2
-                   ~init:acc
-                   ~f:(fun acc b -> match f a b with
-                       | None -> acc
-                       | Some c -> c :: acc)
-               in
-               dedup partial_result))
+        (snd
+           (fold
+              l1
+              ~init:(0,[])
+              ~f:(fun (size,acc) a ->
+                  let (size,partial_result) =
+                    fold
+                      l2
+                      ~init:(size,acc)
+                      ~f:(fun (size,acc) b -> match f a b with
+                          | None -> (size,acc)
+                          | Some c -> (size+1,c :: acc))
+                  in
+                  if size > 100000 then
+                    let partial_result = dedup partial_result in
+                    (List.length partial_result,partial_result)
+                  else
+                    (size,partial_result))))
     in
     dedup ans
+
+  let distribute_option (l:('a option) list) : 'a list option =
+    (fold_left
+       ~f:(fun acc x ->
+           begin match (acc,x) with
+             | (None, _) -> None
+             | (_, None) -> None
+             | (Some acc', Some x') -> Some (x'::acc')
+           end)
+       ~init:(Some [])
+       (rev l))
 end
 
 let pair_compare

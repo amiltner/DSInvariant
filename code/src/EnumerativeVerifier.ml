@@ -3,7 +3,8 @@ open Core
 open Utils
 
 module T : Verifier.t = struct
-  let _MAX_SIZE_ = 30
+  let _MAX_SIZE_T_ = 35
+  let _MAX_SIZE_NON_T = 10
 
   (*module TypeToGeneratorDict =
   struct
@@ -196,7 +197,6 @@ module T : Verifier.t = struct
 
   let make_evaluators_to_size
       (type a)
-      ~(size:int)
       ~(generator:Type.t -> int -> (a * Expr.t) list)
       ~(problem:Problem.t)
       ~(eval:Expr.t)
@@ -206,6 +206,7 @@ module T : Verifier.t = struct
     let args_sizes =
       List.map
         ~f:(fun a ->
+            let size = if Type.equal a Type._t then _MAX_SIZE_T_ else _MAX_SIZE_NON_T in
             List.map
               ~f:(fun s -> (a,s))
               (List.range 1 size))
@@ -272,7 +273,6 @@ module T : Verifier.t = struct
 
   let fully_eval_exp_to_size
       (type a)
-      ~(size:int)
       ~(generator:Type.t -> int -> (a * Expr.t) list)
       ~(problem:Problem.t)
       ~(eval:Expr.t)
@@ -281,7 +281,6 @@ module T : Verifier.t = struct
     (* Eagerly returning all expressions till size "size" ... *)
     let (args,_) = extract_args eval_t in
     make_evaluators_to_size
-      ~size
       ~generator
       ~problem
       ~eval
@@ -302,7 +301,6 @@ module T : Verifier.t = struct
      try Sequence.fold
            (fully_eval_exp_to_size
               ~generator:(elements_of_type_and_size_unit problem.tc)
-              ~size:_MAX_SIZE_
               ~problem
               ~eval:cond
               ~eval_t:cond_t)
@@ -330,7 +328,6 @@ module T : Verifier.t = struct
 
   let ensure_uf_to_size
       (type a)
-      ~(size:int)
       ~(generator:Type.t -> int -> (a * Expr.t) list)
       ~(problem:Problem.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
@@ -344,7 +341,6 @@ module T : Verifier.t = struct
     in
     let evaled =
       make_evaluators_to_size
-        ~size
         ~generator
         ~problem
         ~eval
@@ -394,7 +390,6 @@ module T : Verifier.t = struct
       in
       let results =
         fully_eval_exp_to_size
-          ~size:_MAX_SIZE_
           ~generator
           ~problem
           ~eval
@@ -430,7 +425,6 @@ module T : Verifier.t = struct
       in
       let negative_example_o =
         ensure_uf_to_size
-          ~size:_MAX_SIZE_
           ~generator
           ~problem
           ~post
@@ -552,7 +546,7 @@ module T : Verifier.t = struct
               None
             else
               failwith "incorrect evaluation")
-        (elements_of_type_to_size problem.tc desired_t _MAX_SIZE_)
+        (elements_of_type_to_size problem.tc desired_t _MAX_SIZE_T_)
     in
     let results =
       true_on_examples_full

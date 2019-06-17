@@ -4,12 +4,12 @@ module IdSet = Set.Make(Id)
 module MythLang = Myth_folds.Lang
 
 module TypeMap = Map.Make(Type)
-type type_to_type = MythLang.Type.t TypeMap.t
+type type_to_type = MythLang.MType.t TypeMap.t
 
 let merge_tts tt1 tt2 =
   Map.merge_skewed tt1 tt2
                    ~combine:(fun ~key:_ v1 v2
-                             -> if MythLang.Type.equal v1 v2 then
+                             -> if MythLang.MType.equal v1 v2 then
                                   v1
                                 else
                                   failwith "conflict")

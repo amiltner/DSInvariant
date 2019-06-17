@@ -71,6 +71,8 @@ let execute_synth_step
     (ts:rtree list)
     (_:synth_step)
     (tests_outputs:exp tests_outputs)
+    (extractor:exp -> exp list)
+    (replacer:exp -> exp list -> exp)
   : exp list * rtree list =
   (*reset_timeouts t;
   begin match st with
@@ -113,13 +115,13 @@ let execute_synth_step
                     print_endline (string_of_int i);
                     magic_num := i;
                     saturate_guesses 0.5 ~short_circuit:false s env t;
-                    propogate_exps ~short_circuit:false false tests_outputs ~search_matches:true t
+                    propogate_exps ~short_circuit:false false tests_outputs ~search_matches:true extractor replacer t
                   | _ -> es
                 end)
             ~init:[]
             ts)
   in
-  assert (List.for_all ~f:(has_passing_capabilities tests_outputs) es);
+  (*assert (List.for_all ~f:(has_passing_capabilities tests_outputs) es);*)
   (*let es =
     List.filter
       ~f:(has_passing_capabilities tests_outputs)
@@ -155,12 +157,14 @@ let rec execute_synth_plan
     (ts:rtree list)
     (plan:synth_plan)
     (tests_outputs:exp tests_outputs)
+    (extractor:exp -> exp list)
+    (replacer:exp -> exp list -> exp)
   : exp list =
   match plan with
   | [] -> []
   | st :: plan ->
-    begin match execute_synth_step s env ts st tests_outputs with
-      | ([],ts) -> execute_synth_plan s env ts plan tests_outputs
+    begin match execute_synth_step s env ts st tests_outputs extractor replacer with
+      | ([],ts) -> execute_synth_plan s env ts plan tests_outputs extractor replacer
       | (es,_) -> print_endline (string_of_int (List.length es)); es
     end
 
@@ -169,7 +173,9 @@ let synthesize
     (env:env)
     (t:rtree)
     (tests_outputs:exp tests_outputs)
+    (extractor:exp -> exp list)
+    (replacer:exp -> exp list -> exp)
   : exp list =
   verbose_mode := true;
   eval_lookup_tables := false;
-  execute_synth_plan s env [t] standard_synth_plan tests_outputs
+  execute_synth_plan s env [t] standard_synth_plan tests_outputs extractor replacer

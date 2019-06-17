@@ -19,7 +19,7 @@ let rec find_first_branch (c:id) (bs:branch list) : branch =
   | ((c', x), e)::bs -> if c = c' then ((c', x), e) else find_first_branch c bs
 
 let rec extract_values_from_pattern (v:value) (p:pattern) : (id * value) list =
-  match (p, v.node) with
+  match (p, (node v)) with
   | (PWildcard, _) -> []
   | (PVar x,    _) -> [(x, v)]
   | (PTuple ps, VTuple vs) ->
@@ -169,7 +169,7 @@ let rec eval (env:env) (e:exp) : value =
         | EVar x -> lookup_env env x
         | EApp (e1, e2) ->
           let (v1, v2) = (eval env e1, eval env e2) in
-          begin match v1.node with
+          begin match (node v1) with
             | VFun (x, e, closure) ->
               let closure = insert_env closure x v2 in
               eval closure e
@@ -220,7 +220,7 @@ let rec eval (env:env) (e:exp) : value =
         | ERcd _       -> failwith "ah" (*(List.map ~f:(fun (l,e) -> (l,eval env e)) es)*)
         | EMatch (e, bs) ->
           let v = eval env e in
-          begin match v.node with
+          begin match (node v) with
             | VCtor (c, v) ->
               let ((_, p_opt), e) = find_first_branch c bs in
               begin match p_opt with
@@ -245,14 +245,14 @@ let rec eval (env:env) (e:exp) : value =
           let v = vfix f x e closure in
           v
         | EProj (n, e) ->
-          begin match (eval env e).node with
+          begin match (node (eval env e)) with
             | VTuple vs -> List.nth_exn vs (n - 1)
             | _ -> raise_eval_error @@
               sprintf "Non-tuple value found in projection: %s" (Pp.pp_exp e)
           end
         | ERcdProj (l, e) ->
           let v = eval env e in
-          begin match v.node with
+          begin match (node v) with
             | VRcd vs -> begin match Util.lookup l vs with
                 | Some v' -> v'
                 | None -> raise_eval_error @@

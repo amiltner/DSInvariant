@@ -21,6 +21,12 @@ type typ =
   | TUnit
 [@@deriving eq, hash, ord, show]
 
+module MType =
+struct
+  type t = typ
+  [@@deriving eq, hash, ord, show]
+end
+
 let get_base_exn (t:typ)
   : string =
   begin match t with
@@ -76,11 +82,16 @@ let hashcons_exp = HashConsTable.hashcons hash_e_node compare_e_node exp_table
 let create_exp enode = hashcons_exp enode
 
 type decl =
-    | DData of id * ctor list
+  | DData of id * ctor list
   | DLet  of id * bool * arg list * typ * exp
 
 type value =
-  v_node hash_consed
+  v_label hash_consed
+and v_label =
+  {
+    node : v_node ;
+    mutable exp_form : (exp option) [@hash.ignore] ;
+  }
 and v_node =
   | VCtor  of id * value
   | VFun   of id * exp * env
@@ -91,7 +102,87 @@ and v_node =
   | VUnit
 
 and env = (id * value) list
-[@@deriving hash, ord, show]
+[@@deriving hash, show]
+
+let rec compare_value
+    (v1:value)
+    (v2:value)
+  : int =
+  compare_hash_consed
+    compare_v_label
+    v1
+    v2
+and compare_v_label
+    (l1:v_label)
+    (l2:v_label)
+  : int =
+  compare_v_node
+    l1.node
+    l2.node
+and compare_v_node
+    (v1:v_node)
+    (v2:v_node)
+  : int =
+  begin match (v1,v2) with
+    | (VCtor (i1,v1), VCtor (i2,v2)) ->
+      Util.pair_compare String.compare compare_value (i1,v1) (i2,v2)
+    | (VCtor _, _) -> -1
+    | (_, VCtor _) -> 1
+    | (VFun (i1,e1,env1), VFun (i2,e2,env2)) ->
+      Util.triple_compare
+        String.compare
+        compare_exp
+        compare_env
+        (i1,e1,env1)
+        (i2,e2,env2)
+    | (VFun _, _) -> -1
+    | (_, VFun _) -> 1
+    | (VFix (i11,i12,e1,env1), VFix (i21,i22,e2,env2)) ->
+      Util.quad_compare
+        String.compare
+        String.compare
+        compare_exp
+        compare_env
+        (i11,i12,e1,env1)
+        (i21,i22,e2,env2)
+    | (VFix _, _) -> -1
+    | (_, VFix _) -> 1
+    | (VTuple vs1, VTuple vs2) ->
+      List.compare
+        compare_value
+        vs1
+        vs2
+    | (VTuple _, _) -> -1
+    | (_, VTuple _) -> 1
+    | (VUnit, VUnit) -> 0
+    | _ -> failwith "shouldnt"
+  end
+and compare_env (env1:env) (env2:env) =
+  List.compare
+    (Util.pair_compare String.compare compare_value)
+    env1
+    env2
+
+let node (v:value) = v.node.node
+
+let rec value_to_exp (v:value) =
+  begin match v.node.exp_form with
+    | Some e -> e
+    | None ->
+      let ans =
+        begin match (node v) with
+          | VCtor(i,v) -> create_exp (ECtor (i,value_to_exp v))
+          | VTuple vs -> create_exp (ETuple (List.map ~f:value_to_exp vs))
+          | VUnit -> create_exp (EUnit)
+          | VFun _
+          | VFix _
+          | VRcd _
+          | VPFun _ -> failwith "shouldnt happen"
+        end
+      in
+      v.node.exp_form <- Some ans;
+      ans
+  end
 
 let rec compare_v_node
  (v1:v_node) (v2:v_node) : int =
@@ -130,11 +221,6 @@ and compare_env (env1:env) (env2:env) : int =
     (Util.pair_compare String.compare compare_val)
     env1
     env2
-
-module Type = struct
-  type t = typ
-  [@@deriving eq, ord, show]
-end
 
 (*let rec compare_val (v1:value) (v2:value) : int =
   begin match (v1,v2) with
@@ -202,8 +288,8 @@ and hash_env env =
   and hash_value v = v.hkey*)
 
 let value_table = HashConsTable.create 10000
-let hashcons_value = HashConsTable.hashcons hash_v_node compare_v_node value_table
-let create_value vnode = hashcons_value vnode
+let hashcons_value = HashConsTable.hashcons hash_v_label compare_v_label value_table
+let create_value vnode = hashcons_value ({ node = vnode; exp_form = None })
 let vctor i v = create_value (VCtor (i,v))
 let vfun i e env = create_value (VFun (i,e,env))
 let vfix f i e env = create_value (VFix (f,i,e,env))
@@ -307,7 +393,7 @@ let rec size (e:exp) : int =
   | EUnit -> 1
 
 let rec examples_count (v:value) : int =
-  match v.node with
+  match (node v) with
   | VPFun ios ->
       List.fold_left ~f:(fun n (_, v) -> n + examples_count v) ~init:0 ios
   | _ -> 1

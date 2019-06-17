@@ -62,9 +62,9 @@ let prec_of_exp (e:exp) : int =
   | _              -> 1000
 
 let prec_of_value (v:value) : int =
-  match v.node with
+  match (node v) with
   | VFun _ | VPFun _ | VFix _ -> 100
-  | VCtor (_, v) -> (match v.node with VUnit -> 1000 | _ -> 600)
+  | VCtor (_, v) -> (match (node v) with VUnit -> 1000 | _ -> 600)
   | VTuple _ -> 700
   | VRcd _ -> 800
   | VUnit    -> 1000
@@ -292,9 +292,9 @@ and fpf_value_pairs ppf ((lvl, vps):int * (value * value) list) =
 and fpf_value ppf ((lvl, v):int * value) =
   let this_lvl = prec_of_value v in
   (if this_lvl < lvl then fpf ppf "(");
-  begin match v.node with
+  begin match (node v) with
     | VCtor (c, v') ->
-      begin match v'.node with
+      begin match (node v') with
         | VUnit -> fpf ppf "@[<2>%a@]" ident c
         | VTuple _ -> fpf ppf "@[<2>%a %a@]" ident c fpf_value (this_lvl, v')
         | _     -> fpf ppf "@[<2>%a %a@]" ident c fpf_value (this_lvl, v')

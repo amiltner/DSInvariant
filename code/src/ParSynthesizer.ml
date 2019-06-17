@@ -62,21 +62,25 @@ module T : Synthesizer.t = struct
       let env = Myth_folds.Eval.gen_init_env decls in
       (*let env = Myth_folds.Sigma.Sigma.add_ctors_env env sigma in
         let gamma = Myth_folds.Gamma.Gamma.add_ctors gamma sigma in*)
-      let desired_t = Type.mk_arrow (Type._t) (Type._bool)
-      in
+      let desired_t = Type.mk_arrow (Type._t) (Type._bool) in
+      let (extractor,replacer) = Context.convert_foldable_and_res_to_folded_myth problem.tc in
       let tests_outputs : Myth_folds.Lang.exp Myth_folds.Rtree.tests_outputs =
         List.map
           ~f:(fun (input,expected_output) ->
+              let replacer = replacer input in
+              let expected_output_value = Myth_folds.Eval.eval env expected_output in
               (input
               ,expected_output
-              ,(fun e ->
-                 let evaler = Myth_folds.Lang.create_exp (Myth_folds.Lang.EApp (Myth_folds.Lang.create_exp (EVar "convert"), e)) in
+              ,(fun e vs ->
+                 let es = List.map ~f:Myth_folds.Lang.value_to_exp vs in
+                 let input = replacer es in
+                 (*let evaler = Myth_folds.Lang.create_exp (Myth_folds.Lang.EApp (Myth_folds.Lang.create_exp (EVar "convert"), e)) in*)
                  let (output,is_real) =
                    try
                      let ans =
                        Myth_folds.Eval.eval
                          env
-                         ((Myth_folds.Lang.create_exp (Myth_folds.Lang.EApp(evaler,input))))
+                         ((Myth_folds.Lang.create_exp (Myth_folds.Lang.EApp(e,input))))
                      in
                      (Some ans,true)
                    with
@@ -88,10 +92,9 @@ module T : Synthesizer.t = struct
                    begin match output with
                      | None -> false
                      | Some v ->
-                       begin match v.node with
+                       begin match (Myth_folds.Lang.node v) with
                          | (Myth_folds.Lang.VTuple vs) ->
-                           let ans = Myth_folds.Eval.eval env expected_output in
-                           ans = List.hd_exn vs
+                           0 = Myth_folds.Lang.compare_value expected_output_value (List.hd_exn vs)
                          | _ -> false
                        end
                    end
@@ -186,7 +189,9 @@ module T : Synthesizer.t = struct
               (TArr (t,end_type_myth))
               0
               true)
-           tests_outputs)
+           tests_outputs
+           extractor
+           replacer)
 
   module Worker = struct
     module T = struct
