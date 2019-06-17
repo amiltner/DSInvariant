@@ -1754,9 +1754,6 @@ and propagate_enforced_matches
                 pnts
             in
             let completed_pnts = newly_completed_pnts@completed_pnts in
-            print_endline (string_of_int (List.length completed_pnts));
-            print_endline (string_of_int (List.length incompleted_pnts));
-            print_endline (string_of_int (List.length remaining_indices));
             if List.is_empty incompleted_pnts then
               Right (List.map ~f:fst completed_pnts)
             else
@@ -1771,9 +1768,6 @@ and propagate_enforced_matches
                       ~f:passes_path
                       pnts
                   in
-                  print_endline (string_of_int (List.length possible_branches));
-                  print_endline (string_of_int (List.length nonpassing_pnts));
-                  print_endline (string_of_int (List.length passing_pnts));
                   let updated_pnts_with_outputs =
                     List.cartesian_filter_map_dedup
                       ~f:(fun (p,e) old_pnt ->

@@ -221,7 +221,6 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
            else
              let new_neg_example = List.hd_exn model in
              negs := new_neg_example::!negs;
-             print_endline ("Add negative example: " ^ (Value.show new_neg_example));
              Log.info (lazy ("Add negative example: " ^ (Value.show new_neg_example)));
              helper
                (attempt+1)

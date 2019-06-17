@@ -202,8 +202,6 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                 ~positives:[]
                 ~attempt:0
     in
-    print_endline "utilization";
-    print_endline (string_of_int !Myth_folds.Consts.utilization);
     DSToMyth.full_to_pretty_myth_string inv
       ~problem
 end
