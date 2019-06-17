@@ -1,21 +1,8 @@
-type natnatoption =
-  | None
-  | Some of nat * nat
-
-let is_lt =
-  fun (x : nat) ->
-    fun (y : nat) ->
-    match cmp_nat x y binding c with
-    | LT -> True
-    | EQ -> False
-    | GT -> False
-;;
+type bst = mu bst .
+  | Leaf
+  | Node of (bst * nat * bst)
 
 struct
-  type bst = mu bst .
-    | Leaf
-    | Node of (bst * nat * bst)
-
   type t = bst
 
   let empty = Leaf ;;
@@ -82,6 +69,7 @@ struct
                 | GT -> Node (bp.0, bp.1, (delete bp.2 x)))
   ;;
 
+(*
   let union =
     fix (union : t -> t -> t) =
       fun (bx : t) ->
@@ -101,6 +89,7 @@ struct
                      | True -> insert (union (inter bx.0 by) (inter bx.2 by)) bx.1
                      | False -> union (inter bx.0 by) (inter bx.2 by))
   ;;
+*)
 end
 :
 sig
@@ -114,8 +103,10 @@ sig
   val insert : t -> nat -> t
   val delete : t -> nat -> t
 
-  (*val union : t -> t -> t
-  val inter : t -> t -> t*)
+(*
+  val union : t -> t -> t
+  val inter : t -> t -> t
+*)
 end
 
 maintains
@@ -127,5 +118,3 @@ forall (s : t) .
         (not (lookup (delete s i) i))
         (implies (lookup (delete s i) j)
                  (lookup s j)))
-
-accumulating natnatoption

@@ -1,8 +1,8 @@
-struct
-  type natoption =
-    | None
-    | Some of nat
+type natoption =
+  | None
+  | Some of nat
 
+struct
   type natoptionpair = natoption * natoption
 
   type t = natoptionpair
@@ -93,9 +93,6 @@ sig
   val insert : t -> nat -> t
 
   val delete : t -> nat -> t
-
-  (*val union : t -> t -> t
-  val inter : t -> t -> t*)
 end
 
 maintains
@@ -105,5 +102,3 @@ forall (r : t) .
     (and
       (contains (insert r i) i)
       (not (contains (delete r i) i)))
-
-accumulating unit

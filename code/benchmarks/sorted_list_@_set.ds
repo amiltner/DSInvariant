@@ -10,44 +10,49 @@ struct
   let length =
     fix (length : t -> nat) =
       fun (l : t) ->
-        match l binding lp with
+        match l binding l with
         | Nil -> O
-        | Cons -> S (length lp.1)
+        | Cons -> S (length l.1)
   ;;
 
   let lookup =
     fix (lookup : t -> nat -> bool) =
-      fun (l : t) -> fun (x : nat) ->
-        match l binding l with
-        | Nil -> False
-        | Cons ->
-          (match cmp_nat l.0 x binding c with
-           | EQ -> True
-           | LT -> lookup l.1 x
-           | GT -> lookup l.1 x)
+      fun (l : t) ->
+        fun (x : nat) ->
+          match l binding l with
+          | Nil -> False
+          | Cons -> match cmp_nat l.0 x binding c with
+                    | EQ -> True
+                    | LT -> lookup l.1 x
+                    | GT -> False
   ;;
 
   let insert =
-    fun (l : t) ->
-      fun (x : nat) ->
-        match lookup l x binding b with
-        | True -> l
-        | False -> Cons(x,l)
+    fix (insert : t -> nat -> t) =
+      fun (l : t) ->
+        fun (x : nat) ->
+          match l binding lp with
+          | Nil -> Cons (x, Nil)
+          | Cons -> (match cmp_nat x lp.0 binding c with
+                     | LT -> Cons (x, l)
+                     | EQ -> l
+                     | GT -> Cons (lp.0, (insert lp.1 x)))
   ;;
 
   let delete =
     fix (delete : t -> nat -> t) =
-      fun (l : t) -> fun (x : nat) ->
+      fun (l : t) ->
+        fun (x : nat) ->
           match l binding lp with
           | Nil -> Nil
-          | Cons ->
-            (match cmp_nat lp.0 x binding c with
-             | LT -> Cons(lp.0, delete lp.1 x)
-             | EQ -> lp.1
-             | GT -> Cons(lp.0, delete lp.1 x))
+          | Cons -> (match cmp_nat x lp.0 binding c with
+                     | LT -> l
+                     | EQ -> lp.1
+                     | GT -> Cons (lp.0, (delete lp.1 x)))
   ;;
 
-  (*let union =
+(*
+  let union =
     fix (union : t -> t -> t) =
       fun (la : t) ->
         fun (lb : t) ->
@@ -65,7 +70,8 @@ struct
           | Cons -> (match lookup lb la.0 binding r with
                      | True -> Cons (la.0, (inter la.1 lb))
                      | False -> inter la.1 lb)
-  ;;*)
+  ;;
+*)
 end
 :
 sig
@@ -79,8 +85,10 @@ sig
   val insert : t -> nat -> t
   val delete : t -> nat -> t
 
-  (*val union : t -> t -> t
-  val inter : t -> t -> t*)
+(*
+  val union : t -> t -> t
+  val inter : t -> t -> t
+*)
 end
 
 maintains
@@ -89,11 +97,6 @@ forall (s : t) .
   forall (i : nat) .
     forall (j : nat) .
       (and
-        (implies
-          (and
-            (not (is_eq (cmp_nat i j)))
-            (lookup s j))
-          (lookup (delete s i) j))
-        (not (lookup (delete s i) i)))
-
-accumulating list
+        (not (lookup (delete s i) i))
+        (implies (lookup (delete s i) j)
+                 (lookup s j)))
