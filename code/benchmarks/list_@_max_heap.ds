@@ -19,7 +19,7 @@ struct
         | Cons -> S (length l.1)
   ;;
 
-  let maximum =
+  let top =
     fun (l : t) ->
       match l binding l with
       | Nil -> None
@@ -44,6 +44,19 @@ struct
       | Nil -> (None, l)
       | Cons -> (Some (lp.0), lp.1)
   ;;
+
+  let max =
+    fix (max : t -> nat_option) =
+      fun (l : t) ->
+        match l binding l with
+        | Nil -> None
+        | Cons -> (match l.1 binding lt with
+                   | Nil -> Some (l.0)
+                   | Cons -> (match cmp_nat l.0 lt.0 binding u with
+                              | LT -> max l.1
+                              | EQ -> max l.1
+                              | GT -> max (Cons (l.0, lt.1))))
+  ;;
 end
 :
 sig
@@ -52,10 +65,13 @@ sig
   val empty : t
 
   val length : t -> nat
-  val maximum : t -> nat_option
+  val top : t -> nat_option
 
   val insert : t -> nat -> t
   val pop : t -> nat_option * t
+
+  (* helper function *)
+  val max : t -> nat_option
 end
 
 maintains
@@ -63,12 +79,12 @@ maintains
 forall (h : t) .
   forall (j : nat) .
     (implies
-      (match maximum h binding m with
+      (match max h binding m with
        | None -> True
-       | Some -> (match cmp_nat m j binding g with
+       | Some -> (match cmp_nat m j binding u with
                   | LT -> True
                   | EQ -> True
                   | GT -> False))
-      (match maximum (insert h j) binding m with
+      (match top (insert h j) binding m with
        | None -> False
        | Some -> is_eq (cmp_nat m j)))
