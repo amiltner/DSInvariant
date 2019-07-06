@@ -7,23 +7,24 @@ open Sigma
 type synth_step =
   | SynthSaturate of float      (* Try to saturate e-guesses *)
   | SynthGrowMatches            (* Increase the depth of matches *)
-  | SynthGrowScrutinees of int  (* Grow the scrutinees of all matches *)
+  | SynthGrowScrutinees  (* Grow the scrutinees of all matches *)
 
 type synth_plan = synth_step list
 
 let standard_synth_plan : synth_plan =
-  [ SynthSaturate 0.25
+  [
+    SynthGrowMatches
   ; SynthGrowMatches
-  ; SynthGrowScrutinees 4
+  ; SynthSaturate 0.25
+  ; SynthGrowScrutinees
   ; SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthGrowScrutinees 4
   ; SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthGrowScrutinees 4
+  ; SynthGrowScrutinees
   ; SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthGrowScrutinees 3
+  ; SynthGrowScrutinees
   ; SynthSaturate 0.24
   ; SynthSaturate 0.25
   ; SynthGrowMatches
@@ -31,23 +32,23 @@ let standard_synth_plan : synth_plan =
   ; SynthSaturate 0.25
   ; SynthGrowMatches
   ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
+  ; SynthGrowScrutinees
   ; SynthSaturate 0.25
   ; SynthGrowMatches
   ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
+  ; SynthGrowScrutinees
   ; SynthSaturate 0.25
   ; SynthGrowMatches
   ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
+  ; SynthGrowScrutinees
   ; SynthSaturate 0.25
   ; SynthGrowMatches
   ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
+  ; SynthGrowScrutinees
   ; SynthSaturate 0.25
   ; SynthGrowMatches
   ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
+  ; SynthGrowScrutinees
   ; SynthSaturate 0.25
   ]
 
@@ -69,7 +70,7 @@ let execute_synth_step
     (s:Sigma.t)
     (env:env)
     (ts:rtree list)
-    (_:synth_step)
+    (ss:synth_step)
     (tests_outputs:exp tests_outputs)
     (extractor:exp -> exp list)
     (replacer:exp -> exp list -> exp)
@@ -111,6 +112,7 @@ let execute_synth_step
                 begin match es with
                   | [] ->
                     magic_num := i;
+                    do_if_verbose (fun _ -> print_endline ("number " ^ string_of_int i));
                     saturate_guesses 0.5 ~short_circuit:false s env t;
                     propogate_exps ~short_circuit:false false tests_outputs ~search_matches:true extractor replacer t
                   | _ -> es
@@ -128,8 +130,19 @@ let execute_synth_step
     List.map ~f:app_capital_to_ctor es
     in*)
   if List.is_empty es then
-    (es, (do_if_verbose (fun _ -> printf "Growing matches...\n%!");
-          List.concat_map ~f:(fun t -> generate_matches tests_outputs s env t) ts))
+    begin match ss with
+      | SynthGrowMatches ->
+        (es, (do_if_verbose (fun _ -> printf "Growing matches...\n%!");
+              ts@(List.concat_map ~f:(fun t -> generate_matches tests_outputs s env t) ts)))
+      | SynthSaturate _ ->
+        do_if_verbose (fun _ -> printf "Increasing EGuess Size...\n%!");
+        max_eguess_size := !max_eguess_size+2;
+        (es,  ts)
+      | SynthGrowScrutinees ->
+        do_if_verbose (fun _ -> printf "Increasing Scrutinee Size...\n%!");
+        scrutinee_size_lim := !scrutinee_size_lim+2;
+        (es, ts)
+    end
   else
     (do_if_verbose (fun _ -> printf "found...\n%!");
      (es,[]))

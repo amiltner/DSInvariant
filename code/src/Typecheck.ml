@@ -120,7 +120,8 @@ let rec typecheck_exp
       if type_equiv tc t_defined t then
         Type.mk_variant its
       else
-        failwith ("variant " ^ i ^ "expects different type")
+        failwith ("variant " ^ i ^ " expects different type: expected "
+                  ^ (Type.show t_defined) ^ " but got " ^ (Type.show t))
     | Match(e,i,branches) ->
       let t = concretify tc (typecheck_simple e) in
       let expected_branches = Type.destruct_variant_exn t in

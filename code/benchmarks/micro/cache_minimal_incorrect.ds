@@ -24,35 +24,34 @@ struct
       match r.0 binding z with
       | None -> False
       | Some ->
-        (match cmp_nat z n binding c with
-         | LT ->
+        (match nat_lt z n binding c with
+         | True ->
            (match r.1 binding z with
             | None -> False
             | Some ->
-              (match cmp_nat z n binding c with
-               | LT -> False
-               | EQ -> True
-               | GT -> False))
-         | EQ -> True
-         | GT ->
-           (match r.1 binding z with
-            | None -> False
-            | Some ->
-              (match cmp_nat z n binding c with
-               | LT -> False
-               | EQ -> True
-               | GT -> False)))
+              (match nat_eq z n binding c with
+               | True -> True
+               | False -> False))
+         | False ->
+           (match nat_eq z n binding c with
+            | True -> True
+            | False ->
+              (match r.1 binding z with
+               | None -> False
+               | Some ->
+                 (match nat_eq z n binding c with
+                  | False -> False
+                  | True -> True))))
   ;;
 
   let insert =
     fun (r : t) -> fun (n : nat) ->
       match r.0 binding z with
-      | None -> (Some n, None)
+      | None -> (Some n, Some n)
       | Some ->
-        (match cmp_nat z n binding c with
-         | LT -> (Some n,None)
-         | EQ -> (Some n,None)
-         | GT -> (Some n,Some z))
+        (match nat_lt n z binding c with
+         | True -> (Some z,Some n)
+         | False -> (Some n,Some n))
   ;;
 
   let delete =
@@ -62,22 +61,22 @@ struct
         (match r.1 binding z with
          | None -> r
          | Some ->
-           (match cmp_nat z n binding c with
-            | LT -> r
-            | EQ -> (None, None)
-            | GT -> r))
+           (match nat_eq z n binding c with
+            | True -> (None, None)
+            | False -> r))
       | Some ->
-        (match cmp_nat z n binding c with
-         | LT ->
+        (match nat_lt z n binding c with
+         | True ->
            (match r.1 binding z with
             | None -> r
             | Some ->
-              (match cmp_nat z n binding c with
-               | LT -> r
-               | EQ -> (r.0, None)
-               | GT -> r))
-         | EQ -> (None,r.1)
-         | GT -> r)
+              (match nat_eq z n binding c with
+               | True -> (None, None)
+               | False -> r))
+         | False ->
+           (match nat_eq z n binding c with
+            | True -> (None,r.1)
+            | False -> r))
   ;;
 end
 :

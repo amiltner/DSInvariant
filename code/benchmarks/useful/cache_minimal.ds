@@ -24,35 +24,23 @@ struct
       match r.0 binding z with
       | None -> False
       | Some ->
-        (match cmp_nat z n binding c with
-         | LT ->
+        (match nat_eq z n binding c with
+         | True -> True
+         | False ->
            (match r.1 binding z with
             | None -> False
             | Some ->
-              (match cmp_nat z n binding c with
-               | LT -> False
-               | EQ -> True
-               | GT -> False))
-         | EQ -> True
-         | GT ->
-           (match r.1 binding z with
-            | None -> False
-            | Some ->
-              (match cmp_nat z n binding c with
-               | LT -> False
-               | EQ -> True
-               | GT -> False)))
+              nat_eq z n))
   ;;
 
   let insert =
     fun (r : t) -> fun (n : nat) ->
       match r.0 binding z with
-      | None -> (Some n, Some n)
+      | None -> (Some n, None)
       | Some ->
-        (match cmp_nat z n binding c with
-         | LT -> (Some n,Some n)
-         | EQ -> (Some n,Some n)
-         | GT -> (Some z,Some n))
+        (match nat_lt n z binding c with
+         | True -> (Some n,Some z)
+         | False -> (Some n,None))
   ;;
 
   let delete =
@@ -62,22 +50,22 @@ struct
         (match r.1 binding z with
          | None -> r
          | Some ->
-           (match cmp_nat z n binding c with
-            | LT -> r
-            | EQ -> (None, None)
-            | GT -> r))
+           (match nat_eq z n binding c with
+            | True -> (None, None)
+            | False -> r))
       | Some ->
-        (match cmp_nat z n binding c with
-         | LT ->
-           (match r.1 binding z with
-            | None -> r
-            | Some ->
-              (match cmp_nat z n binding c with
-               | LT -> r
-               | EQ -> (None, None)
-               | GT -> r))
-         | EQ -> (None,r.1)
-         | GT -> r)
+        (match nat_eq z n binding c with
+         | True -> (None,r.1)
+         | False ->
+           (match nat_lt z n binding c with
+            | True ->
+              (match r.1 binding z with
+               | None -> r
+               | Some ->
+                 (match nat_eq z n binding c with
+                  | True -> (r.0, None)
+                  | False -> r))
+            | False -> r))
   ;;
 end
 :

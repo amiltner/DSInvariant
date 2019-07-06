@@ -1,7 +1,7 @@
 open Core
 
 module IdSet = Set.Make(Id)
-module MythLang = Myth_folds.Lang
+module MythLang = Myth.Lang
 
 module TypeMap = Map.Make(Type)
 type type_to_type = MythLang.MType.t TypeMap.t
@@ -77,7 +77,7 @@ let rec to_myth_exp
     (e:Expr.t)
   : MythLang.exp =
   let to_myth_exp = to_myth_exp tt in
-  MythLang.create_exp (begin match e with
+  (begin match e with
     | Var i -> MythLang.EVar i
     | App (e1,e2) -> MythLang.EApp (to_myth_exp e1, to_myth_exp e2)
     | Func ((i,t),e) ->
@@ -150,7 +150,7 @@ let to_myth_exp_with_problem ~(problem:Problem.t) (e:Expr.t) : MythLang.exp =
 
 let to_pretty_myth_string ~(problem:Problem.t) (e:Expr.t) : string =
   let me = to_myth_exp_with_problem ~problem e
-  in Myth_folds.Pp.pp_exp me
+  in Myth.Pp.pp_exp me
 
 let full_to_pretty_myth_string
     ~(problem:Problem.t)
@@ -170,10 +170,8 @@ in to_pretty_myth_string inv
 let convert_problem_examples_type_to_myth
     (p:Problem.t)
     (examples:(Expr.t * Expr.t) list)
-    (end_type_option:Type.t option)
   : MythLang.decl list
              * (MythLang.exp * MythLang.exp) list
-             * MythLang.typ
              * MythLang.typ =
   let (decls,modi,_,_,_) = p.unprocessed in
   let modi =
@@ -194,13 +192,5 @@ let convert_problem_examples_type_to_myth
       ~f:(fun (e1,e2) -> (to_myth_exp tt e1, to_myth_exp tt e2))
       examples
   in
-  let (t,t_end) =
-    begin match end_type_option with
-      | None ->
-        (MythLang.TBase "x",MythLang.TBase "x")
-      | Some te ->
-        (to_myth_type_basic tt (Type.mk_named "t'")
-        ,to_myth_type_basic tt te)
-    end
-  in
-  (ds,examples,t,t_end)
+  let t = to_myth_type_basic tt (Type.mk_named "t") in
+  (ds,examples,t)

@@ -24,6 +24,7 @@ open DSInvGen
 
 module EMIG = MIG.Make (EnumerativeVerifier.T) (ParSynthesizer.T)
 module QCMIG = MIG.Make (QuickCheckVerifier.T) (ParSynthesizer.T)
+module MythMIG = MIG.Make (EnumerativeVerifier.T) (MythSynthesizer.T)
 
 let read_accum = function
   | None -> "", ""
@@ -34,7 +35,11 @@ let read_accum = function
            | [ accum_types ; accum_annot ] -> (accum_types , accum_annot)
            | _ -> raise (DSInvGen.Exceptions.Parse_Exn "bad accumulating annotation")
 
-let main (* nworkers *) accum_file filename () =
+let main (* nworkers *) accum_file use_myth prelude_context gat ndd filename () =
+  Consts.use_myth := use_myth;
+  Consts.prelude_context := prelude_context;
+  Myth_folds.Consts.generate_and_test := gat;
+  Myth_folds.Consts.no_dedup := ndd;
   Log.enable ~msg:"DSInfer" (Some "_log") ;
   let file_chan = Utils.get_in_channel filename in
   let accum_types, accum_annot = read_accum accum_file in
@@ -45,7 +50,14 @@ let main (* nworkers *) accum_file filename () =
     ; let unprocessed_problem = Parser.unprocessed_problem
                                   Lexer.token
                                   (Lexing.from_string problem_string)
-      in print_endline (EMIG.learnInvariant ~unprocessed_problem)
+      in
+      let inv =
+        if use_myth then
+          (MythMIG.learnInvariant ~unprocessed_problem)
+        else
+          (EMIG.learnInvariant ~unprocessed_problem)
+      in
+      print_endline inv
 
 let spec =
   Command.Spec.(
@@ -53,6 +65,14 @@ let spec =
     (* +> flag "nworkers" (optional_with_default 4 int) ~doc:" Number of workers" *)
     +> flag "-a" (optional string)
             ~doc:"FILENAME accumulating annotation file"
+    +> flag "-use-myth" no_arg
+      ~doc:"Use MYTH as the underlying synthesizer"
+    +> flag "-prelude-context" no_arg
+      ~doc:"Use only Prelude as the underlying context"
+    +> flag "-gat" no_arg
+      ~doc:"Generate and test the synthesized programs"
+    +> flag "-no-dedup" no_arg
+      ~doc:"Do not perform observational equivalence deduplication"
     +> anon ("filename" %: file)
   )
 

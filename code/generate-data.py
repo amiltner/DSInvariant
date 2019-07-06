@@ -20,7 +20,7 @@ def stddev(lst):
 TEST_EXT = '.ds'
 BASELINE_EXT = '.out'
 BASE_FLAGS = []
-TIMEOUT_TIME = 300
+TIMEOUT_TIME = 3600
 STILL_WORK_TIMEOUT_TIME = 120
 GENERATE_EXAMPLES_TIMEOUT_TIME = 600000
 
@@ -43,7 +43,8 @@ def find_tests(root):
 
 def gather_datum(prog, path, base, additional_flags, timeout):
     start = time.time()
-    process_output = EasyProcess([prog] + BASE_FLAGS + additional_flags + [join(path, base + TEST_EXT)]).call(timeout=timeout)
+    flags = map(lambda t: t(path,base),additional_flags)
+    process_output = EasyProcess([prog] + BASE_FLAGS + flags + [join(path, base + TEST_EXT)]).call(timeout=timeout)
     end = time.time()
     return ((end - start), process_output.stdout,process_output.stderr)
 
@@ -95,7 +96,14 @@ def gather_data(rootlength, prog, path, base):
 	    return int(sum(example_number_col)/len(example_number_col))
 
 
-    gather_col([],ctime_combiner,"SS",TIMEOUT_TIME,REPETITION_COUNT)
+    #gather_col([],ctime_combiner,"SS",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col([],ctime_combiner,"Full",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-prelude-context"],ctime_combiner,"FullP",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col([lambda p, b: "-use-myth"],ctime_combiner,"Myth",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col([lambda p, b: "-use-myth", lambda p, b: "-prelude-context"],ctime_combiner,"MythP",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-gat"],ctime_combiner,"GAT",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-ndd"],ctime_combiner,"NDD",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum")],ctime_combiner,"PAT",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col(["-noCS"],ctime_combiner,"SSNC",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col(["-bijSynth"],ctime_combiner,"BS",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col(["-bijSynth","-noCS"],ctime_combiner,"BSNC",TIMEOUT_TIME,REPETITION_COUNT)

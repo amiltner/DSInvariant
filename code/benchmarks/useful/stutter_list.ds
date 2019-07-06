@@ -10,49 +10,47 @@ struct
   let length =
     fix (length : t -> nat) =
       fun (l : t) ->
-        match l binding l with
+        match l binding lp with
         | Nil -> O
-        | Cons -> S (length l.1)
+        | Cons ->
+          (match lp.1 binding lp with
+           | Nil -> O
+           | Cons -> S (length lp.1))
   ;;
 
   let lookup =
     fix (lookup : t -> nat -> bool) =
-      fun (l : t) ->
-        fun (x : nat) ->
-          match l binding l with
-          | Nil -> False
-          | Cons -> match cmp_nat l.0 x binding c with
-                    | EQ -> True
-                    | LT -> lookup l.1 x
-                    | GT -> False
+      fun (l : t) -> fun (x : nat) ->
+        match l binding l with
+        | Nil -> False
+        | Cons ->
+          (match nat_eq l.0 x binding c with
+           | True -> True
+           | False -> lookup l.1 x)
   ;;
 
   let insert =
-    fix (insert : t -> nat -> t) =
-      fun (l : t) ->
-        fun (x : nat) ->
-          match l binding lp with
-          | Nil -> Cons (x, Nil)
-          | Cons -> (match cmp_nat x lp.0 binding c with
-                     | LT -> Cons (x, l)
-                     | EQ -> l
-                     | GT -> Cons (lp.0, (insert lp.1 x)))
+    fun (l : t) ->
+      fun (x : nat) ->
+        Cons(x, Cons(x, l))
   ;;
 
   let delete =
     fix (delete : t -> nat -> t) =
-      fun (l : t) ->
-        fun (x : nat) ->
+      fun (l : t) -> fun (x : nat) ->
           match l binding lp with
           | Nil -> Nil
-          | Cons -> (match cmp_nat x lp.0 binding c with
-                     | LT -> l
-                     | EQ -> lp.1
-                     | GT -> Cons (lp.0, (delete lp.1 x)))
+          | Cons ->
+            (match lp.1 binding lp with
+             | Nil -> Nil
+             | Cons ->
+               (match nat_eq lp.0 x binding c with
+                | True -> delete lp.1 x
+                | False -> Cons(lp.0, Cons(lp.0, delete lp.1 x))))
   ;;
 
 (*
-  let union =
+let union =
     fix (union : t -> t -> t) =
       fun (la : t) ->
         fun (lb : t) ->
@@ -96,7 +94,8 @@ maintains
 forall (s : t) .
   forall (i : nat) .
     forall (j : nat) .
-      (and
-        (not (lookup (delete s i) i))
-        (implies (lookup (delete s i) j)
-                 (lookup s j)))
+      (implies
+        (and
+          (not (nat_eq i j))
+          (lookup s j))
+        (lookup (delete s i) j))

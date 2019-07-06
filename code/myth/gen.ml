@@ -78,7 +78,7 @@ type rel_gen_sig = Sigma.t -> Gamma.t -> (exp * typ)
                 -> typ -> metric -> exp Rope.t
 
 let rec gen_eexp (tmo:Timeout.t) (s:Sigma.t)
-    (g:Gamma.t) (t:typ) (met:metric) : exp Rope.t =
+                 (g:Gamma.t) (t:typ) (met:metric) : exp Rope.t =
   Timeout.check_timeout tmo;
   if met.size <= 0 then Rope.empty else
   fetch_or_calculate memo_eexp_tbl (GTS.make_key g t met)
@@ -137,8 +137,8 @@ and gen_eexp_rel_proj (tmo:Timeout.t) (s:Sigma.t)
   let rec project_path_on_exp (path:proj list) (e:exp) : exp =
     begin match path with
     | [] -> e
-    | (TupleProj i) :: path' -> create_exp (EProj (i, project_path_on_exp path' e))
-    | (RcdProj l) :: path' -> create_exp (ERcdProj (l, project_path_on_exp path' e))
+    | (TupleProj i) :: path' -> EProj (i, project_path_on_exp path' e)
+    | (RcdProj l) :: path' -> ERcdProj (l, project_path_on_exp path' e)
     end
   in
 
@@ -191,7 +191,7 @@ and gen_eexp_rel_app (tmo:Timeout.t) (s:Sigma.t)
   (* Generates applications using the two exp-generations functions to create
    * the left- and right-hand sides of the applications, respectively. *)
   let gen_apps (ts:typ list) (met:metric)
-               (e1s_fn:rel_gen_sig) (e2s_fn:rel_gen_sig) : exp Rope.t =
+               (e1s_fn:rel_gen_sig) (e2s_fn:rel_gen_sig) =
     ts |> Rope.of_list |> Rope.concat_map ~f:(fun t ->
       begin match t with
       | TArr (t1, _) ->
@@ -221,13 +221,13 @@ and gen_eexp_rel_app (tmo:Timeout.t) (s:Sigma.t)
                       if n1 <> 1 || n2 <> 1 then Rope.empty else
                       (* Filter out all invalid applications.                             *)
                       Rope.filter ~f:(fun e2 -> Gamma.is_valid_app e1 e2 g) e2s |>
-                      Rope.map    ~f:(fun e2 -> create_exp (EApp (e1, e2)))
+                      Rope.map    ~f:(fun e2 -> EApp (e1, e2))
                     end (Rope.of_list e1s_rec)
                   in
                   let es_nonrec = Rope.cartesian_product [Rope.of_list e1s; e2s]
                     |> Rope.map ~f:begin fun pair ->
                         begin match pair with
-                          | [e1; e2] -> create_exp (EApp (e1, e2))
+                        | [e1; e2] -> EApp (e1, e2)
                         | _ -> failwith "(gen_eexp_rel_app) invalid part found"
                         end
                       end
@@ -276,8 +276,8 @@ and gen_iexp (tmo:Timeout.t) (s:Sigma.t) (g:Gamma.t)
 
   let gen_ctor_one (s:Sigma.t) (g:Gamma.t) ((c, (c_typ, _)):id * (typ * id))
                    (met:metric) : exp Rope.t =
-    let sub_exps = gen_iexp tmo s g c_typ { met with size = met.size - 2 } in
-    Rope.map ~f:(fun sub_exp -> create_exp (ECtor (c, sub_exp))) sub_exps
+    let sub_exps = gen_iexp tmo s g c_typ { met with size = met.size - 1 } in
+    Rope.map ~f:(fun sub_exp -> ECtor (c, sub_exp)) sub_exps
   in
 
   let gen_ctors (s:Sigma.t) (g:Gamma.t) (dt:id) : exp Rope.t =
@@ -293,7 +293,7 @@ and gen_iexp (tmo:Timeout.t) (s:Sigma.t) (g:Gamma.t)
            List.map ~f:(fun (t, n) ->
              gen_iexp tmo s g t { met with size = n }) part
              |> Rope.cartesian_product
-             |> Rope.map ~f:(fun es -> create_exp (ETuple es))
+             |> Rope.map ~f:(fun es -> ETuple es)
          end)
   in
 
@@ -306,15 +306,15 @@ and gen_iexp (tmo:Timeout.t) (s:Sigma.t) (g:Gamma.t)
              gen_iexp tmo s g t { met with size = n }) part
              |> Rope.cartesian_product
              |> Rope.map ~f:(fun es ->
-                 create_exp (ERcd (List.zip_exn (Util.fst_assoc ts) es)))
+               ERcd (List.zip_exn (Util.fst_assoc ts) es))
          end)
   in
 
   let gen_abs (s:Sigma.t) (g:Gamma.t) (t1:typ) (t2:typ) : exp Rope.t =
     let x = Gamma.fresh_id (gen_var_base t1) g in
-    gen_iexp tmo s (Gamma.insert x t1 true g) t2
+    gen_iexp tmo s (Gamma.insert x t1 g) t2
       { size = met.size; lambdas = met.lambdas - 1 }
-    |> Rope.map ~f:(fun e -> create_exp (EFun ((x, t1), e)))
+      |> Rope.map ~f:(fun e -> EFun ((x, t1), e))
   in
 
   (***** }}} *****)
@@ -330,7 +330,7 @@ and gen_iexp (tmo:Timeout.t) (s:Sigma.t) (g:Gamma.t)
           | TArr (t1, t2) -> gen_abs s g t1 t2
           | TTuple ts -> gen_tuple s g ts
           | TRcd ts -> gen_record s g ts
-          | TUnit     -> Rope.cons (create_exp EUnit) Rope.empty
+          | TUnit     -> Rope.cons EUnit Rope.empty
           end
       | Some ((erel, trel), g) ->
         let weakened = gen_iexp tmo s g t met in
@@ -346,16 +346,16 @@ and gen_iexp_rel (tmo:Timeout.t) (s:Sigma.t)
   (***** gen_iexp_rel helpers {{{ *****)
 
   let gen_ctor_one (s:Sigma.t) (g:Gamma.t) ((c, (c_typ, _)):id * (typ * id))
-      (met:metric) : exp Rope.t =
+                   (met:metric) : exp Rope.t =
     let sub_exps =
-      gen_iexp_rel tmo s (erel, trel) g c_typ { met with size = met.size - 2 }
+      gen_iexp_rel tmo s (erel, trel) g c_typ { met with size = met.size - 1 }
     in
-    Rope.map ~f:(fun sub_exp -> create_exp (ECtor (c, sub_exp))) sub_exps
+    Rope.map ~f:(fun sub_exp -> ECtor (c, sub_exp)) sub_exps
   in
 
   let gen_ctors (s:Sigma.t) (g:Gamma.t) (dt:id) : exp Rope.t =
     Sigma.ctors dt s |> Rope.of_list
-    |> Rope.concat_map ~f:(fun ctor -> gen_ctor_one s g ctor met)
+      |> Rope.concat_map ~f:(fun ctor -> gen_ctor_one s g ctor met)
   in
 
   let gen_tuple (s:Sigma.t) (g:Gamma.t) (ts:typ list) : exp Rope.t =
@@ -376,7 +376,7 @@ and gen_iexp_rel (tmo:Timeout.t) (s:Sigma.t)
                  gen_iexp tmo s (Gamma.insert_exp erel trel g) t met
              end) part
              |> Rope.cartesian_product
-             |> Rope.map ~f:(fun es -> create_exp (ETuple es))
+             |> Rope.map ~f:(fun es -> ETuple es)
          end)
   in
 
@@ -400,15 +400,15 @@ and gen_iexp_rel (tmo:Timeout.t) (s:Sigma.t)
              end) part
              |> Rope.cartesian_product
              |> Rope.map ~f:(fun es ->
-                 create_exp (ERcd (List.zip_exn (Util.fst_assoc lts) es)))
+               ERcd (List.zip_exn (Util.fst_assoc lts) es))
          end)
   in
 
   let gen_abs (s:Sigma.t) (g:Gamma.t) (t1:typ) (t2:typ) =
     let x = Gamma.fresh_id (gen_var_base t1) g in
-    gen_iexp_rel tmo s (erel, trel) (Gamma.insert x t1 true g)
+    gen_iexp_rel tmo s (erel, trel) (Gamma.insert x t1 g)
       t2 { size = met.size; lambdas = met.lambdas - 1 }
-    |> Rope.map ~f:(fun e -> create_exp (EFun ((x, t1), e)))
+      |> Rope.map ~f:(fun e -> EFun ((x, t1), e))
   in
 
   (***** }}} *****)
@@ -419,7 +419,7 @@ and gen_iexp_rel (tmo:Timeout.t) (s:Sigma.t)
     (GTS.make_key (Gamma.insert_exp erel trel g) t met)
     begin fun _ ->
       begin match t with
-        | TBase dt -> gen_ctors s g dt
+      | TBase dt -> gen_ctors s g dt
       | TArr (t1, t2) -> gen_abs s g t1 t2
       | TTuple ts -> gen_tuple s g ts
       | TRcd ts -> gen_record s g ts

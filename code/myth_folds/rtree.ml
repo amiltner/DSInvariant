@@ -35,6 +35,7 @@ type 'a test = 'a -> bool list
 
   type 'a tests_outputs = (('a test_output_retriever)) list*)
 
+let desired_magic_num = 1000
 
 type output = value option
 [@@deriving ord, show, hash]
@@ -966,6 +967,7 @@ type test_output_result_tree = (pnode test_output * test_output_result_lazy) tre
 type deps = int list
 type pnt_sub = (pnode test_output * deps * test_output_result_lazy) Array.t
 type pnt = pnode * pnt_sub
+type pnt_backtrack_node = (int * pnt list)
 
 type output_tree = value option tree list
 [@@deriving ord, show, hash]
@@ -1058,6 +1060,33 @@ let rec contains_path
   end
 
 
+let integrate_path_exn
+    (pp:ppath)
+    (pn:pnode)
+    (e_base:exp)
+  : pnode =
+  let rec integrate_path_internal
+      (pp:ppath)
+      (pn:pnode)
+    : pnode =
+    begin match (pn,pp) with
+      | (Node (e,ppns), (_,p)::t) ->
+        let p_update =
+          fun (p',pn') ->
+            if p = p' then
+              Some (p',integrate_path_internal t pn')
+            else
+              None
+        in
+        begin match update_first ~f:p_update ppns with
+          | None -> Node (e,(p,ppath_to_pnode t e_base)::ppns)
+          | Some ppns -> Node (e,ppns)
+        end
+      | _ -> failwith "shouldn't happen"
+    end
+  in
+  (integrate_path_internal pp pn)
+
 let integrate_path
     (pp:ppath)
     (pn:pnode)
@@ -1091,18 +1120,23 @@ let integrate_path
 let valid_pnt
     ((_,tests_outputs_results):pnt)
   : bool =
+  (*if !magic_num = desired_magic_num then print_endline "pnt start";
+    if !magic_num = desired_magic_num then print_endline ("PNT" ^ (Pp.pp_exp (pnode_to_exp pn)));*)
   let valid_test_output_result_lazy
       (res:test_output_result_lazy)
     : bool =
     let (b,vo) = Lazy.force_val res in
     begin match vo with
       | None -> true
-      | Some _ -> b
+      | Some _ -> (*if b && !magic_num = desired_magic_num then print_endline "OMG WHAT"; if not b && !magic_num = desired_magic_num then print_endline ("didnt work, here's pnt" ^ (Pp.pp_exp (pnode_to_exp pn)));*) b
     end
   in
-  Array.for_all
+  let b = Array.for_all
     ~f:(valid_test_output_result_lazy % trd3)
     tests_outputs_results
+  in
+  (*if !magic_num = desired_magic_num && b then print_endline "THIS WAS VALID WHAT";*)
+  b
   (*let rec valid_test_output_result_trees
       (tests_outputs_results:test_output_result_tree list)
     : bool =
@@ -1166,6 +1200,7 @@ let passes_index
     ((_,tests_outputs_results):pnt)
   : bool =
   let (_,_,res) = tests_outputs_results.(i) in
+  (*if !magic_num = desired_magic_num then (let fres = (Lazy.force_val res) in if Option.is_some (snd fres) then print_endline "GETS HERE BABY"; if Option.is_some (snd fres) then print_endline (Pp.pp_value (Option.value_exn (snd fres))));*)
   fst (Lazy.force_val res)
 
 (*let updated_tests_pnt
@@ -1254,9 +1289,9 @@ let update_pnt
     ,completed_test_output_results tests_outputs_results)
   in
   if (condition new_pnt) && (valid_pnt new_pnt) then
-    Some new_pnt
+    ((*if !magic_num = desired_magic_num then print_endline "SHOULD CONTINUE";*) Some new_pnt)
   else
-    None
+    ((*if !magic_num = desired_magic_num then print_endline "WHY NOT";*) None)
 
 type empty_solution_cache_key = rtree * (exp * exp) list
 (*type partition_solution_cache_value_component = pnode
@@ -1340,17 +1375,18 @@ let update_solution_cache
 
 
 let has_no_solution_via_cache
-    (t:rtree)
-    (ios:(exp * exp) list)
+    (_:rtree)
+    (_:(exp * exp) list)
   : bool =
-  List.exists
+  false
+  (*List.exists
     ~f:(fun (t',ios') ->
         rtree_equal t t' &&
         List.contains_as_multiset
           ~compare:(pair_compare compare_exp compare_exp)
           ios
           ios')
-    !solution_cache
+    !solution_cache*)
   (*let minimal_partitions_tests_outputs =
     split_into_minimal_partitions
       ~compare:(fun (e1,_,_) (e2,_,_) -> contains e1 e2)
@@ -1680,23 +1716,18 @@ and propagate_enforced_matches
              above_adder
              condition)*)
     in
-    let _ =
-      Array.of_list
-        (List.map
-           ~f:(fun e ->
-               let subcomponents = extractor e in
-               List.map
-                 ~f:(fun subc ->
-                     fst (Option.value_exn (List.findi ~f:(fun _ e -> 0 = compare_exp subc e) inputs)))
-                 subcomponents)
-           inputs)
-    in
-(*print_endline (List.to_string ~f:(fun (e,_,_) -> Pp.pp_exp e) tests_outputs);*)
+    (*if !magic_num = desired_magic_num  then List.iter
+      ~f:(fun (pp,_) -> print_endline (show_ppath pp))
+      ppaths;*)
+    (*print_endline (List.to_string ~f:(fun (e,_,_) -> Pp.pp_exp e) tests_outputs);*)
     (*List.iter
       ~f:(fun pp -> print_endline (show_ppath (fst pp)))
       ppaths;*)
+    (*List.iter
+      ~f:(fun (pp,_) -> print_endline (show_ppath pp))
+      ppaths;*)
     let possible_branches =
-      List.concat_map
+      List.map
         ~f:(fun (p,t) ->
             let es =
               propogate_exps
@@ -1708,9 +1739,11 @@ and propagate_enforced_matches
                 replacer
                 t
             in
-            List.map
+            let es = List.dedup_and_sort ~compare:compare_exp es in
+            (p,es)
+            (*List.map
               ~f:(fun e -> (p,e))
-              es)
+              es*))
         ppaths
     in
     let tests_outputs = tests_outputs_update pnode_to_exp tests_outputs in
@@ -1735,35 +1768,176 @@ and propagate_enforced_matches
                (tout,deps,Lazy.from_val (false,None)))
            tests_outputs)
     in
+    let test_size = Array.length initial_tests_results in
     let initial_pnt : pnt =
       (Node (retrieve_match_exp_exn t,[])
       ,initial_tests_results)
     in
+    let initial_pnt_node : pnt_backtrack_node =
+      (0,[initial_pnt])
+    in
+    if !generate_and_test then
+      List.fold_until_completion
+        ~f:(fun pns ->
+            let new_pns =
+              List.concat
+                (List.cartesian_filter_map
+                   ~f:(fun (p,es) pn ->
+                       if contains_path pn p then
+                         None
+                       else
+                         Some
+                           (List.map
+                              ~f:(integrate_path_exn p pn)
+                              es))
+                   possible_branches
+                   pns)
+            in
+            if List.is_empty new_pns then
+              Right
+                (List.map
+                   ~f:(pnode_to_exp % fst)
+                   (List.filter_map
+                      ~f:(fun pn ->
+                          let pnt = (pn,initial_tests_results) in
+                          update_pnt
+                            pnt
+                            pn
+                            (fun pnt ->
+                               List.for_all
+                                 ~f:(fun i ->
+                                     passes_index
+                                       i
+                                       pnt)
+                                 (range (List.length tests_outputs))))
+                      pns))
+            else
+              Left (List.dedup_and_sort ~compare:compare_pnode new_pns))
+        [Node (retrieve_match_exp_exn t,[])]
+    else
+      (*print_endline (string_of_int !magic_num);
+      print_endline (string_of_int desired_magic_num);*)
     let pns =
       List.fold_until_completion
-        ~f:(fun (remaining_indices,pnts,completed_pnts) ->
-            (*List.iter
-              ~f:(fun p -> print_endline (List.to_string ~f:Int.to_string p))
-              remaining_paths;
-              List.iter
-              ~f:(fun pnt -> print_endline (Pp.pp_exp (pnode_to_exp (fst pnt))))
-              pnts;*)
-            let (newly_completed_pnts,incompleted_pnts) =
-              List.partition_tf
-                ~f:completed_pnt
-                pnts
-            in
-            let completed_pnts = newly_completed_pnts@completed_pnts in
-            if List.is_empty incompleted_pnts then
-              Right (List.map ~f:fst completed_pnts)
-            else
-              begin match remaining_indices with
-                | [] -> Right (List.map ~f:fst pnts)
-                | current_index::remaining_indices ->
-                  let passes_path = passes_index current_index in
-                  (*let path_element = fst3 (fst (extract_path_element current_path (snd (List.hd_exn pnts)))) in
-                    print_endline (Pp.pp_exp path_element);*)
+        ~f:(fun (pnt_backtrack_nodes : pnt_backtrack_node list)(*(remaining_indices,pnts,completed_pnts)*) ->
+            begin match pnt_backtrack_nodes with
+              | [] -> Right []
+              | (i,pnts)::pnt_backtrack_nodes ->
+                if !magic_num = desired_magic_num then print_endline "START";
+                if !magic_num = desired_magic_num then print_endline (string_of_int i);
+                if !magic_num = desired_magic_num then print_endline (string_of_int (List.length pnts));
+                if !magic_num = desired_magic_num && List.length pnts < 50 then List.iter ~f:(fun (pn,_) -> print_endline (Pp.pp_exp (pnode_to_exp pn))) pnts;
+                if i = test_size && (not (List.is_empty pnts)) then
+                  Right (List.map ~f:fst pnts)
+                else
+                  let passes_path = passes_index i in
+                  (*if !magic_num = desired_magic_num then print_endline (Pp.pp_exp (fst3 (List.nth_exn tests_outputs i)));*)
                   let (passing_pnts,nonpassing_pnts) =
+                    List.partition_tf
+                      ~f:passes_path
+                      pnts
+                  in
+                  if (not (List.is_empty passing_pnts)) then
+                    Left ((i+1,passing_pnts)::(i,nonpassing_pnts)::pnt_backtrack_nodes)
+                  else
+                  (*if not (List.is_empty passing_pnts) then
+                    let pnt_backtrack_nodes =
+                      if List.is_empty nonpassing_pnts then
+                        pnt_backtrack_nodes
+                      else
+                        (i,nonpassing_pnts)::pnt_backtrack_nodes
+                    in
+                    let pnt_backtrack_nodes = (i+1,passing_pnts)::pnt_backtrack_nodes in
+                    Left (pnt_backtrack_nodes)
+                    else*)
+                    let (first_grouping,second_grouping) =
+                      List.split_n
+                        nonpassing_pnts
+                        1
+                  in
+                  let pnt_backtrack_nodes =
+                    if List.is_empty second_grouping then
+                      pnt_backtrack_nodes
+                    else
+                      (i,second_grouping)::pnt_backtrack_nodes
+                  in
+                    (*if not (List.is_empty second_grouping) then
+                      let pnt_backtrack_nodes =
+                        (i,first_grouping)::(i,second_grouping)::pnt_backtrack_nodes
+                      in
+                      Left pnt_backtrack_nodes
+                      else*)
+                  let updated_pnts =
+                    List.concat
+                        (List.cartesian_filter_map
+                           ~f:(fun (p,es) old_pnt ->
+                              let old_pn = fst old_pnt in
+                              if contains_path old_pn p then
+                                None
+                              else
+                                Some (
+                                  List.filter_map
+                                    ~f:(fun e ->
+                                        let pn =
+                                          integrate_path_exn
+                                            p
+                                            old_pn
+                                            e
+                                        in
+                                        update_pnt old_pnt pn passes_path)
+                                    es))
+                           possible_branches
+                           first_grouping)
+                  in
+                  let updated_pnts =
+                    if !no_dedup then
+                      updated_pnts
+                    else
+                      let updated_pnts_with_outputs =
+                        List.map
+                          ~f:(fun npt -> (npt,force_output_array (snd npt)))
+                          updated_pnts
+                      in
+                      let updated_pnts_with_outputs =
+                        core_deduper
+                          (fun (_,output_tree1) (_,output_tree2) ->
+                             Array.compare compare_output output_tree1 output_tree2)
+                          (size % pnode_to_exp % fst % fst)
+                          updated_pnts_with_outputs
+                      in
+                      List.map ~f:fst updated_pnts_with_outputs
+                  in
+                  let pnts = passing_pnts@updated_pnts in
+                  let pnt_backtrack_nodes =
+                    if (List.is_empty pnts) then
+                      pnt_backtrack_nodes
+                        else
+                          (i+1,pnts)::pnt_backtrack_nodes
+                      in
+                      Left pnt_backtrack_nodes
+
+              (*List.iter
+                ~f:(fun p -> print_endline (List.to_string ~f:Int.to_string p))
+                remaining_paths;
+                List.iter
+                ~f:(fun pnt -> print_endline (Pp.pp_exp (pnode_to_exp (fst pnt))))
+                pnts;*)
+              (*let (newly_completed_pnts,incompleted_pnts) =
+                List.partition_tf
+                  ~f:completed_pnt
+                  pnts
+                in
+                let completed_pnts = newly_completed_pnts@completed_pnts in*)
+              (*if List.is_empty incompleted_pnts then
+                Right (List.map ~f:fst completed_pnts)
+                else
+                begin match remaining_indices with
+                  | [] -> Right (List.map ~f:fst pnts)
+                  | current_index::remaining_indices ->
+                    let passes_path = passes_index current_index in
+                    (*let path_element = fst3 (fst (extract_path_element current_path (snd (List.hd_exn pnts)))) in
+                      print_endline (Pp.pp_exp path_element);*)
+                    let (passing_pnts,nonpassing_pnts) =
                     List.partition_tf
                       ~f:passes_path
                       pnts
@@ -1791,8 +1965,9 @@ and propagate_enforced_matches
                       updated_pnts_with_outputs
                   in
                   Left (remaining_indices,passing_pnts@updated_pnts,completed_pnts)
-              end)
-        (List.range 0 (Array.length initial_tests_results),[initial_pnt],[])
+              end*)
+            end)
+        [initial_pnt_node](*(List.range 0 (Array.length initial_tests_results),[initial_pnt],[])*)
     in
     if List.is_empty pns then update_solution_cache t ios;
     let ppeos =

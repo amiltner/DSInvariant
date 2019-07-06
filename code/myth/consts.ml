@@ -11,16 +11,16 @@ let include_directories : string list ref = ref ["."]
 let match_count : int ref = ref 0
 
 (* The maximum size of match scrutinees *)
-let scrutinee_size_lim : int ref = ref 5
+let scrutinee_size_lim : int ref = ref 1
 
 (* The maximum size of E-guessed terms *)
-let max_eguess_size : int ref = ref 5
+let max_eguess_size : int ref = ref 13
 
 (* Enables caching of generated E-terms *)
 let eterm_lookup_tables : bool ref = ref true
 
 (* Enables caching of evaluation results *)
-let eval_lookup_tables : bool ref = ref false
+let eval_lookup_tables : bool ref = ref true
 
 (* Enables pretty printed constructors (e.g., nats as numbers) *)
 let pretty_ctors : bool ref = ref true
@@ -45,10 +45,3 @@ let incomplete_constraints_flag : bool ref = ref false
 (* Enables verbose mode *)
 let verbose_mode : bool ref = ref false
 let do_if_verbose (f:unit -> unit) = if !verbose_mode then f () ;;
-
-let utilization : int ref = ref 0
-
-let magic_num : int ref = ref 0
-
-let generate_and_test : bool ref = ref false
-let no_dedup : bool ref = ref false

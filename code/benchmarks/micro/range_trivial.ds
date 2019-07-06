@@ -19,13 +19,15 @@ struct
       match r binding r with
       | None -> False
       | Some ->
-        (match cmp_nat r.0 n binding c with
-         | LT -> (match cmp_nat r.1 n binding c with
-                  | LT -> False
-                  | EQ -> True
-                  | GT -> True)
-         | EQ -> True
-         | GT -> False)
+        (match nat_eq r.0 n binding c with
+         | True -> True
+         | False ->
+           (match nat_lt r.0 n binding c with
+            | True ->
+              (match nat_lt r.1 n binding c with
+                  | True -> False
+                  | False -> True)
+            | False -> False))
   ;;
 
   let expand =
@@ -33,13 +35,16 @@ struct
       match r binding rp with
       | None -> Some (n,n)
       | Some ->
-        (match cmp_nat rp.0 n binding c with
-         | LT -> (match cmp_nat rp.1 n binding c with
-                  | LT -> Some (rp.0,n)
-                  | EQ -> r
-                  | GT -> r)
-         | EQ -> r
-         | GT -> Some (n,rp.1))
+        (match nat_lt rp.0 n binding c with
+         | True ->
+           (match nat_lt rp.1 n binding c with
+            | True -> Some (rp.0,n)
+            | False -> r)
+         | False ->
+           (match nat_eq rp.0 n binding c with
+            | True -> r
+            | False -> Some (n,rp.1)))
+         
   ;;
 end
 :

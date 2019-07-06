@@ -10,7 +10,6 @@ exception Type_error of string
 module type Typecheck_Sig = sig
     val typecheck : prog -> Sigma.t * Gamma.t
     val check_decls : Sigma.t -> Gamma.t -> decl list -> Sigma.t * Gamma.t
-    val check_exp : Sigma.t -> Gamma.t -> exp -> typ
 end
 
 module Typecheck : Typecheck_Sig = struct
@@ -18,7 +17,7 @@ module Typecheck : Typecheck_Sig = struct
 
     (***** Typecheck expressions {{{ *****)
     let rec check_exp (s:Sigma.t) (g:Gamma.t) (e:exp) : typ =
-      match e.node with
+      match e with
       (* Variable: Retrieve its type from the context.                                    *)
       | EVar x -> begin match Gamma.lookup_type x g with
           | Some t -> t
@@ -64,12 +63,12 @@ module Typecheck : Typecheck_Sig = struct
            | _ -> type_error (sprintf "Non-record type for record projection: %s" (Pp.pp_typ t))
            end
        (* Function: Add the function argument to the context and check the body.          *)
-       | EFun ((x, t1), e) -> TArr (t1, check_exp s (Gamma.insert x t1 false g) e)
+       | EFun ((x, t1), e) -> TArr (t1, check_exp s (Gamma.insert x t1 g) e)
        (* Let: Distinguish between value and function bindings.                           *)
        | ELet (f, is_rec, xs, t_expected, e1, e2) ->
            (* Value binding.                                                              *)
            if List.length xs = 0 then
-               check_exp s (Gamma.insert f (check_exp s g e1) false g) e2
+               check_exp s (Gamma.insert f (check_exp s g e1) g) e2
            (* Function binding.                                                           *)
            else
               let f_type = (List.map ~f:snd xs) @ [t_expected] |> types_to_arr in
@@ -79,15 +78,15 @@ module Typecheck : Typecheck_Sig = struct
                   (sprintf "Type mismatch in function body.  Expected %s, found %s"
                   (Pp.pp_typ t_expected) (Pp.pp_typ t_actual))
               else
-                check_exp s (Gamma.insert f f_type false g) e2
+                check_exp s (Gamma.insert f f_type g) e2
        (* Constructor: Check that it contains a properly typed expression.               *)
        | ECtor (c, e) -> begin match Sigma.lookup_ctor c s with
             | Some (t_expected, d) ->
                 let t_actual = check_exp s g e in
                 if t_expected <> t_actual then
                   type_error (sprintf
-                    "Type mismatch in constructor %s: expected %s but found %s : %s"
-                    c (Pp.pp_typ t_expected) (Pp.pp_exp e) (Pp.pp_typ t_actual))
+                    "Type mismatch in constructor: expected %s but found %s : %s"
+                    (Pp.pp_typ t_expected) (Pp.pp_exp e) (Pp.pp_typ t_actual))
                 else TBase d
             | None ->
                 type_error (sprintf "%s: Constructor not found: %s" (Pp.pp_exp e) c)
@@ -120,8 +119,8 @@ module Typecheck : Typecheck_Sig = struct
            else
              List.hd_exn ts
        | EFix (f, (x, t1), t2, e) ->
-           let g = g |> Gamma.insert f (TArr (t1, t2)) false
-                     |> Gamma.insert x t1 false
+           let g = g |> Gamma.insert f (TArr (t1, t2))
+                     |> Gamma.insert x t1
                      |> Gamma.mark_as_rec_fun_with_arg f x
                      |> Gamma.mark_as_arg_of_fun x f
            in
@@ -173,7 +172,7 @@ module Typecheck : Typecheck_Sig = struct
                | Some p -> extract_types_from_pattern arg_type p 
              end in
              let g = List.fold_left
-                 ~f:(fun g (x, t) -> Gamma.insert x t false g)
+               ~f:(fun g (x, t) -> Gamma.insert x t g)
                ~init:g
                extracted_types
              in
@@ -193,14 +192,14 @@ module Typecheck : Typecheck_Sig = struct
        (* Create context for checking function body.                                      *)
        let g_body = (* (1) Add arguments.                                                 *)
            List.fold_left
-             ~f:(fun g (x, t) -> g |> Gamma.insert x t false |> Gamma.mark_as_arg_of_fun x f)
+               ~f:(fun g (x, t) -> g |> Gamma.insert x t |> Gamma.mark_as_arg_of_fun x f)
                ~init:g
                xs
        in
        let g_body = (* 2) Add f to the context if it is recursive.                        *)
            if is_rec then List.fold_left
                ~f:(fun g (x, _) -> Gamma.mark_as_rec_fun_with_arg f x g)
-               ~init:(Gamma.insert f f_type false g_body)
+               ~init:(Gamma.insert f f_type g_body)
                xs
            else g_body
        in
@@ -219,7 +218,7 @@ module Typecheck : Typecheck_Sig = struct
           if List.length xs = 0 then
               let t_actual = check_exp s g e in
               if t_actual = t_expected then
-                (s, Gamma.insert f t_actual false g)
+                  (s, Gamma.insert f t_actual g)
               else
                   type_error (sprintf "Type mismatch in let: %s expected, but %s found"
                       (Pp.pp_typ t_expected) (Pp.pp_typ t_actual))
@@ -232,7 +231,7 @@ module Typecheck : Typecheck_Sig = struct
                   (sprintf "Type mismatch in let function body.  Expected %s, found %s"
                   (Pp.pp_typ t_expected) (Pp.pp_typ t_actual))
               else
-                (s, Gamma.insert f func_type false g)
+                (s, Gamma.insert f func_type g)
 
     (* Typecheck a list of declarations.                                                  *)
     let check_decls (s:Sigma.t) (g:Gamma.t) (ds:decl list) : Sigma.t * Gamma.t =

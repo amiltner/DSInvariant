@@ -88,7 +88,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
              in
              Log.info (lazy "testbed");
              Log.info (lazy (TestBed.show testbed));
-             List.map ~f:Expr.simplify (snd (S.synth ~problem ~testbed:testbed))
+             List.map ~f:(fun e -> assert (satisfies_testbed ~problem testbed e); Expr.simplify e) (snd (S.synth ~problem ~testbed:testbed))
            | pres ->
              pres
          end

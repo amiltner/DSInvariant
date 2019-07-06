@@ -201,12 +201,13 @@ module T : Verifier.t = struct
       ~(problem:Problem.t)
       ~(eval:Expr.t)
       ~(args:Type.t list)
+      ~(size:int)
     : ((a * Expr.t * Type.t) list * Value.t) Sequence.t =
     (* Eagerly returning all expressions till size "size" ... *)
     let args_sizes =
       List.map
         ~f:(fun a ->
-            let size = if Type.equal a Type._t then _MAX_SIZE_T_ else _MAX_SIZE_NON_T in
+            let size = if Type.equal a Type._t then size else _MAX_SIZE_NON_T in
             List.map
               ~f:(fun s -> (a,s))
               (List.range 1 size))
@@ -277,6 +278,7 @@ module T : Verifier.t = struct
       ~(problem:Problem.t)
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
+      ~(size:int)
     : ((a * Expr.t * Type.t) list * Value.t) Sequence.t =
     (* Eagerly returning all expressions till size "size" ... *)
     let (args,_) = extract_args eval_t in
@@ -285,6 +287,7 @@ module T : Verifier.t = struct
       ~problem
       ~eval
       ~args
+      ~size
 
   let equiv_false
       ~(problem:Problem.t)
@@ -303,7 +306,8 @@ module T : Verifier.t = struct
               ~generator:(elements_of_type_and_size_unit problem.tc)
               ~problem
               ~eval:cond
-              ~eval_t:cond_t)
+              ~eval_t:cond_t
+              ~size:_MAX_SIZE_T_)
            ~init:true
            ~f:(fun _ (_,res) -> if Value.equal res Value.mk_true
                 then true else raise Caml.Exit)
@@ -331,6 +335,7 @@ module T : Verifier.t = struct
       ~(generator:Type.t -> int -> (a * Expr.t) list)
       ~(problem:Problem.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
+      ~(size:int)
     : (a * Expr.t * Type.t) list option =
     let args = List.map ~f:snd post_quants in
     let eval =
@@ -345,6 +350,7 @@ module T : Verifier.t = struct
         ~problem
         ~eval
         ~args
+        ~size
     in
     Sequence.find_map
       ~f:(fun (e,v) ->
@@ -362,6 +368,7 @@ module T : Verifier.t = struct
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
       ~(post:UniversalFormula.t)
+      ~(size:int)
     : ((Expr.t * Type.t) list * Value.t) list option =
     let desired_t = Type._t in
     let (args_t,result_t) = extract_args eval_t in
@@ -394,6 +401,7 @@ module T : Verifier.t = struct
           ~problem
           ~eval
           ~eval_t
+          ~size
       in
       let split_sized_results =
         Sequence.concat_map
@@ -412,6 +420,8 @@ module T : Verifier.t = struct
                       res)))
           results
       in
+      let res = Sequence.to_list split_sized_results in
+      let res = List.dedup_and_sort ~compare:(fun (_,e1,_) (_,e2,_) -> Expr.compare e1 e2) res in
       let generator
           (t:Type.t)
           (size:int)
@@ -419,7 +429,7 @@ module T : Verifier.t = struct
         if Type.equal t desired_t then
           List.filter_map
             ~f:(fun (etv,e,s) -> if s = size then Some (Some etv,e) else None)
-            (Sequence.to_list split_sized_results)
+            res
         else
           List.map ~f:(fun x -> (None,x)) (elements_of_type_and_size problem.tc t size)
       in
@@ -428,6 +438,7 @@ module T : Verifier.t = struct
           ~generator
           ~problem
           ~post
+          ~size
       in
       Option.map
         ~f:(fun negative_example ->
@@ -521,7 +532,8 @@ module T : Verifier.t = struct
          ~examples
          ~eval
          ~eval_t
-         ~post)
+         ~post
+         ~size:_MAX_SIZE_T_)
 
   let implication_counter_example
       ~problem:(problem:Problem.t)
@@ -531,371 +543,56 @@ module T : Verifier.t = struct
       ~(post:UniversalFormula.t)
     : Value.t list option =
     let desired_t = Type._t in
-    let examples =
-      List.filter_map
-        ~f:(fun e ->
-            let pre_e_app =
-              Expr.mk_app
-                pre
-                e
-            in
-            let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
-            if Value.equal v Value.mk_true then
-              Some (Value.from_exp_exn e)
-            else if Value.equal v Value.mk_false then
-              None
-            else
-              failwith "incorrect evaluation")
-        (elements_of_type_to_size problem.tc desired_t _MAX_SIZE_T_)
-    in
-    let results =
-      true_on_examples_full
-        ~problem
-        ~examples
-        ~eval
-        ~eval_t
-        ~post
-    in
-    Option.map
-      ~f:(List.concat_map
-            ~f:(fun (ets,_) ->
-                List.filter_map
-                  ~f:(fun (e,t) ->
-                      if Type.equal t desired_t then
-                        Some (Value.from_exp_exn e)
-                      else
-                        None)
-                  ets))
-      results
-  (*let generator
-        (t:Type.t)
-        (size:int)
-      : (unit * Expr.t) list =
-      let anses =
-        if is_equal (Type.compare desired_t t) then
-          List.filter
-            ~f:(fun e ->
-                let pre_e_app =
-                  Expr.mk_app
-                    pre
-                    e
-                in
-                let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
-                is_equal (Value.compare v (Value.mk_ctor "True" (Value.mk_tuple []))))
-            (elements_of_type_to_size problem.tc t size)
-        else
-          elements_of_type_to_size problem.tc t size
-      in
-      List.map ~f:(fun a -> ((),a)) anses
-    in
-    let values =
-      fully_eval_exp_to_size
-        ~size:_MAX_SIZE_
-        ~generator
-        ~problem
-        ~eval
-        ~eval_t
-    in
-  (*let generators
-            (t:Type.t)
-          : Expr.t Sequence.t =
-          let g = generator_of_type problem.tc t in
-          let seq = QC.g_to_seq g in
-          if is_equal (Type.compare desired_t t) then
-            Sequence.filter
-              ~f:(fun e ->
-                  let pre_e_app =
-                    Expr.mk_app
-                      pre
-                      e
-                  in
-                  let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
-                  is_equal (Value.compare v (Value.mk_ctor "True" (Value.mk_tuple []))))
-              seq
-          else
-            seq
-          in*)
-        (*let gen = TypeToGeneratorDict.create generators in*)
-         let result_list =
-           fold_until_completion
-             ~f:(fun (resultant,i) ->
-                 if i > num_checks then
-                   Right resultant
-                 else
-                   let (args,res) =
-                     make_evaluators_upto_size
-                       ~size:2
-                       ~problem
-                       ~eval
-                       ~eval_t
-                       ~gen
-                   in
-                   let split_res =
-                     extract_typed_subcomponents
-                       problem.tc
-                       desired_t
-                       result_t
-                       res
-                   in
-                   let arged_split_res =
-                     List.map
-                       ~f:(fun r -> (args,Value.to_exp r))
-                       split_res
-                   in
-                   let i = i + List.length split_res in
-                   Left (arged_split_res@resultant,i,gen))
-             ([],0,gen)
-         in
-         let result_gen = QC.of_list result_list in
-         let uf_types_seqs
-           : ((Expr.t * Type.t) list * Expr.t * string * Type.t) Sequence.t list =
-           List.map
-             ~f:(fun (i,t) ->
-                 let gen =
-                   if is_equal (Type.compare (Type.mk_var "t") t) then
-                     result_gen
-                   else
-                     QC.map ~f:(fun g -> ([],g)) (generator_of_type problem.tc t)
-                 in
-                 let seq = QC.g_to_seq gen in
-                 Sequence.map
-                   ~f:(fun (ts,e) -> (ts,e,i,t))
-                   seq)
-             post_quants
-        in
-        let ce_option =
-          fold_until_completion
-            ~f:(fun (uf_types_seqs,i) ->
-                if i = 100 then
-                  Right None
-                else
-                  let (args_exps_names_types,uf_types_seqs) =
-                    List.fold_right
-                      ~f:(fun seq (exps_names,uf_types_seqs) ->
-                          let (exp_name,seq) = Option.value_exn (Sequence.next seq) in
-                          (exp_name::exps_names,seq::uf_types_seqs))
-                      ~init:([],[])
-                      uf_types_seqs
-                  in
-                  let (args_l,names_exps) =
-                    List.unzip @$
-                    List.map
-                      ~f:(fun (args,exp,name,_) -> (args,(name,exp)))
-                      args_exps_names_types
-                  in
-                  let args = List.concat args_l in
-                  let post_held =
-                    is_equal @$
-                    Value.compare
-                      true_val
-                      (Eval.evaluate_with_holes ~eval_context:(problem.eval_context@names_exps) post_expr)
-                  in
-                  if post_held then
-                    Left (uf_types_seqs,i+1)
-                  else
-                    let relevant =
-                      List.filter_map
-                        ~f:(fun (e,t) ->
-                            if Type.equal desired_t t then
-                              Some e
-                            else
-                              None)
-                        args
-                    in
-                    Right (Some relevant))
-            (uf_types_seqs,0)
-        in
-        Option.map
-          ~f:(List.map ~f:Value.from_exp_exn)
-          ce_option*)
-
-  (*let synth_core
-      ~(problem:Problem.t)
-      ~(testbed:TestBed.t)
-      ~(accumulator:Type.t)
-    : Expr.t list =
-    let end_type = Type.mk_tuple [Type.mk_bool_var ; accumulator] in
-    let pos_examples = List.map ~f:(fun v -> (Value.to_exp v,Expr.mk_true_exp)) testbed.pos_tests in
-    let neg_examples = List.map ~f:(fun v -> (Value.to_exp v,Expr.mk_false_exp)) testbed.neg_tests in
-    let examples = pos_examples@neg_examples in
-    let (decls,_,_,_) =
-      DSToMyth.convert_problem_examples_type_to_myth
-        problem
-        examples
-        None
-    in
-    let (_,gamma) =
-      Myth_folds.Typecheck.Typecheck.check_decls
-        Myth_folds.Sigma.Sigma.empty
-        Myth_folds.Gamma.Gamma.empty
-        decls
-    in
-    let foldable_t = get_foldable_t problem.tc end_type in
-    let fold_creater =
-      convert_foldable_to_full
-        problem.tc
-        end_type
-    in
-    let (ds,mi,ms,uf,acc) = problem.unprocessed in
-    let unprocessed =
-      (ds
-      ,mi @ [ Declaration.type_dec (Id.mk_prime "t") foldable_t
-            ; Declaration.expr_dec "convert" fold_creater ]
-      ,ms
-      ,uf
-      ,acc)
-    in
-    let problem = ProcessFile.process_full_problem unprocessed in
-    if (List.length examples = 0) then
-      [(Expr.mk_constant_true_func (Type.mk_var "t"))]
+    let (args_t,result_t) = extract_args eval_t in
+    if not (contains_any problem.tc desired_t result_t) then
+      None
     else
-      let (decls,myth_examples,t,end_type_myth) =
-        DSToMyth.convert_problem_examples_type_to_myth
-          problem
-          examples
-          (Some end_type)
-      in
-      let (sigma,_) =
-        Myth_folds.Typecheck.Typecheck.check_decls
-          Myth_folds.Sigma.Sigma.empty
-          Myth_folds.Gamma.Gamma.empty
-          decls
-      in
-      let env = Myth_folds.Eval.gen_init_env decls in
-      let env = Myth_folds.Sigma.Sigma.add_ctors_env env sigma in
-      let gamma = Myth_folds.Gamma.Gamma.add_ctors gamma sigma in
-      let desired_t =
-        Type.mk_arr
-          (Type.mk_var "t")
-          (Type.mk_var "bool")
-      in
-      let tests_outputs : Myth_folds.Lang.exp Myth_folds.Rtree.tests_outputs =
-        List.map
-          ~f:(fun (input,expected_output) ->
-              (true
-              ,input
-              ,expected_output
-              ,(fun e ->
-                 let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
-                 let (output,is_real) =
-                   try
-                     let ans =
-                       Myth_folds.Eval.eval
-                         env
-                         (Myth_folds.Lang.EApp(evaler,input))
-                     in
-                     (Some ans,true)
-                   with
-                   | Myth_folds.Eval.Eval_error _ -> (None,true)
-                   | Myth_folds.Eval.Extr_error v -> (Some v,false)
-                 in
-                 let correct =
-                   is_real &&
-                   begin match output with
-                     | None -> false
-                     | Some (Myth_folds.Lang.VTuple vs) ->
-                       let ans = Myth_folds.Eval.eval env expected_output in
-                       ans = List.hd_exn vs
-                     | _ -> false
-                   end
-                 in
-                 Myth_folds.Rtree.ExistantLeaf (correct, output))))
-          myth_examples
-      in
-      (*Some [(
-                     let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
-                     let (real_output,output) =
-                       try
-                         (true
-                         ,Some (Myth_folds.Eval.eval
-                                  env
-                                  (Myth_folds.Lang.EApp(evaler,input))))
-                       with
-                         Myth_folds.Eval.Eval_error _ -> (true,None)
-                       | Myth_folds.Eval.Extr_error v -> (false, Some v)
-                     in
-                     let correct =
-                       real_output &&
-                       begin match output with
-                         | Some (Myth_folds.Lang.VTuple vs) ->
-                           print_endline (Myth_folds.Pp.pp_value (Myth_folds.Lang.VTuple vs));
-                           let expected_value = Myth_folds.Eval.eval env expected_output in
-                           print_endline (Myth_folds.Pp.pp_value expected_value);
-                           List.hd_exn vs = Myth_folds.Eval.eval env expected_output
-                         | None -> false
-                         | _ -> failwith "unexpected"
-                       end
-                     in
-                     (output,correct)
-                  )])
-            )
-          myth_examples
-                  in*)
-      (*let correct_check =
-        List.map
-          ~f:(fun (e1,e2) ->
-              (e1,fun e ->
-                let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
-                try
-                   let ans =
-                     Myth_folds.Eval.eval
-                       env
-                       (Myth_folds.Lang.EProj
-                          (1
-                          ,Myth_folds.Lang.EApp(evaler,e1)))
-                   in
-                   ans = Myth_folds.Eval.eval env e2
-                 with
-                 | Myth_folds.Eval.Eval_error _ -> false
-                ))
-          myth_examples
-          (*let total_correct = List.fold_left ~f:(+) ~init:0 corrects in
-              let total = List.length corrects in
-              (*print_endline (Float.to_string ((Float.of_int total_correct) /. (Float.of_int total)));*)
-                (Float.of_int total_correct) /. (Float.of_int total)*)
-        in*)
-      (*let to_outputs =
-        fun e ->
-          let evaler = Myth_folds.Lang.EApp (EVar "convert", e) in
-          Myth_folds.Rtree.Output.create
-            [Some (List.map
-                     ~f:(fun (input,_) ->
-                         try
-                           Some
-                             (Myth_folds.Eval.eval
-                                env
-                                (Myth_folds.Lang.EApp(evaler,input)))
-                         with
-                           Myth_folds.Eval.Eval_error _ -> None
-                         | Myth_folds.Eval.Extr_error v -> Some v)
-                     myth_examples)]
-        in*)
-      List.map
-        ~f:(fun me ->
-            let e = MythToDS.convert_expr me in
-            let e = Typecheck.align_types desired_t e in
-            let full_e = Expr.mk_app fold_creater e in
-            Expr.mk_func
-              ("x",Type.mk_t_var)
-              (Expr.mk_proj 0
-                 (Expr.mk_app full_e (Expr.mk_var "x"))))
-        (Myth_folds.Synth.synthesize
-           sigma
-           env
-           (Myth_folds.Rtree.create_rtree
-              sigma
-              gamma
-              env
-              (TArr (t,end_type_myth))
-              0
-              true)
-           tests_outputs)
-
-  let synth
-      ~(problem:Problem.t)
-      ~(testbed:TestBed.t)
-    : Expr.t list =
-    match problem.accumulator with
-    | Some accumulator -> synth_core ~problem ~testbed ~accumulator
-    | None -> raise (Exceptions.Internal_Exn "TODO")*)
+      List.fold
+        ~f:(fun ans_o s ->
+            begin match ans_o with
+              | Some ans -> Some ans
+              | None ->
+                let examples =
+                  if List.mem ~equal:Type.equal args_t desired_t then
+                    List.filter_map
+                      ~f:(fun e ->
+                          let pre_e_app =
+                            Expr.mk_app
+                              pre
+                              e
+                          in
+                          let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
+                          if Value.equal v Value.mk_true then
+                            Some (Value.from_exp_exn e)
+                          else if Value.equal v Value.mk_false then
+                            None
+                          else
+                            failwith "incorrect evaluation")
+                      (elements_of_type_to_size problem.tc desired_t s)
+                  else
+                    []
+                in
+                let results =
+                  true_on_examples_full
+                    ~problem
+                    ~examples
+                    ~eval
+                    ~eval_t
+                    ~post
+                    ~size:s
+                in
+                Option.map
+                  ~f:(List.concat_map
+                        ~f:(fun (ets,_) ->
+                            List.filter_map
+                              ~f:(fun (e,t) ->
+                                  if Type.equal t desired_t then
+                                    Some (Value.from_exp_exn e)
+                                  else
+                                    None)
+                              ets))
+                  results
+            end)
+        ~init:None
+        [_MAX_SIZE_T_ / 2; Float.to_int (Float.of_int (_MAX_SIZE_T_) /. 1.25) ; _MAX_SIZE_T_]
 end

@@ -21,10 +21,11 @@ struct
         fun (x : nat) ->
           match b binding b with
           | Leaf -> False
-          | Node -> match cmp_nat x b.1 binding c with
-                    | EQ -> True
-                    | LT -> lookup b.0 x
-                    | GT -> lookup b.2 x
+          | Node -> (match nat_eq x b.1 binding c with
+                    | True -> True
+                    | False -> (match nat_lt x b.1 binding c with
+                                | True -> lookup b.0 x
+                                | False -> lookup b.2 x))
   ;;
 
   let insert =
@@ -33,10 +34,11 @@ struct
         fun (x : nat) ->
           match b binding bp with
           | Leaf -> Node (Leaf, x, Leaf)
-          | Node -> (match cmp_nat x bp.1 binding c with
-                     | LT -> Node ((insert bp.0 x), bp.1, bp.2)
-                     | EQ -> b
-                     | GT -> Node (bp.0, bp.1, (insert bp.2 x)))
+          | Node -> (match nat_lt x bp.1 binding c with
+                     | True -> Node ((insert bp.0 x), bp.1, bp.2)
+                     | False -> (match nat_eq x bp.1 binding c with
+                                 | True -> b
+                                 | False -> Node (bp.0, bp.1, (insert bp.2 x))))
   ;;
 
   let min_val =
@@ -56,9 +58,8 @@ struct
           match b binding bp with
           | Leaf -> Leaf
           | Node ->
-              (match cmp_nat x bp.1 binding c with
-               | LT -> Node ((delete bp.0 x), bp.1, bp.2)
-               | EQ -> (match bp.0 binding bl with
+              (match nat_eq x bp.1 binding c with
+               | True -> (match bp.0 binding bl with
                         | Leaf -> bp.2
                         | Node ->
                             (match bp.2 binding br with
@@ -66,7 +67,9 @@ struct
                              | Node -> (fun (m : nat) ->
                                           Node (bp.0, m, (delete bp.2 m)))
                                        (min_val bp.2)))
-                | GT -> Node (bp.0, bp.1, (delete bp.2 x)))
+               | False -> (match nat_lt x bp.1 binding c with
+                           | True -> Node ((delete bp.0 x), bp.1, bp.2)
+                           | False -> Node (bp.0, bp.1, (delete bp.2 x))))
   ;;
 
 (*

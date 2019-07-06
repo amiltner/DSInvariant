@@ -34,35 +34,9 @@ let implies =
       (or (not b1) b2)
 ;;
 
-type cmp =
-  | LT
-  | EQ
-  | GT
-
-let is_eq =
-  fun (c:cmp) ->
-    match c binding c with
-    | LT -> False
-    | EQ -> True
-    | GT -> False
-;;
-
 type nat = mu nat .
   | O
   | S of nat
-
-let cmp_nat =
-  fix (cmp_nat : nat -> nat -> cmp) =
-    fun (x1 : nat) ->
-      fun (x2 : nat) ->
-        match x1 binding x1 with
-        | O -> (match x2 binding x2 with
-                | O -> EQ
-                | S -> LT)
-        | S -> (match x2 binding x2 with
-                | O -> GT
-                | S -> cmp_nat x1 x2)
-;;
 
 let add =
   fix (add : nat -> nat -> nat) =
@@ -71,6 +45,32 @@ let add =
         match x1 binding x1 with
         | O -> x2
         | S -> add x1 (S x2)
+;;
+
+let nat_eq =
+  fix (nat_eq : nat -> nat -> bool) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 binding x1 with
+        | O -> (match x2 binding x2 with
+                | O -> True
+                | S -> False)
+        | S -> (match x2 binding x2 with
+                | O -> False
+                | S -> nat_eq x1 x2)
+;;
+
+let nat_lt =
+  fix (nat_lt : nat -> nat -> bool) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 binding x1 with
+        | O -> (match x2 binding x2 with
+                | O -> False
+                | S -> True)
+        | S -> (match x2 binding x2 with
+                | O -> False
+                | S -> nat_lt x1 x2)
 ;;
 
 (* END_PRELUDE *)
