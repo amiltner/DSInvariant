@@ -280,7 +280,11 @@ module T : Synthesizer.t = struct
                                 : (Type.t option * Expr.t list) Deferred.t =
                    if List.for_all def_results ~f:(fun dr -> Deferred.is_determined dr
                                                           && Or_error.is_error (Deferred.value_exn dr))
-                   then return (None, []) else begin
+                   then begin
+                     List.iter def_results ~f:(fun [@warning "-8"] dr -> match Deferred.value_exn dr with Error e -> Log.error (lazy Error.to_string_hum)) ;
+                     return (None, [])
+                   end
+                   else begin
                      let determined, undetermined = List.partition_tf def_results ~f:Deferred.is_determined
                       in match List.filter_map determined ~f:(Or_error.ok % Deferred.value_exn) with
                          | [] -> let%bind _ = Deferred.any undetermined in helper undetermined
