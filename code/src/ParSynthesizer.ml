@@ -281,7 +281,7 @@ module T : Synthesizer.t = struct
                    if List.for_all def_results ~f:(fun dr -> Deferred.is_determined dr
                                                           && Or_error.is_error (Deferred.value_exn dr))
                    then begin
-                     List.iter def_results ~f:(fun [@warning "-8"] dr -> match Deferred.value_exn dr with Error e -> Log.error (lazy Error.to_string_hum)) ;
+                     List.iter def_results ~f:(fun [@warning "-8"] dr -> match Deferred.value_exn dr with Error e -> Log.error (lazy (Error.to_string_hum e))) ;
                      return (None, [])
                    end
                    else begin
