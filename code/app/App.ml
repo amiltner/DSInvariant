@@ -80,7 +80,7 @@ let () =
   Rpc_parallel.start_app
      ~rpc_heartbeat_config:(
        Async.Rpc.Connection.Heartbeat_config.create
-         ~timeout:(Time_ns.Span.of_min 3.0)
+         ~timeout:(Time_ns.Span.of_min 5.0)
          ~send_every:(Time_ns.Span.of_sec 15.0)
     )
     (Command.basic_spec spec main

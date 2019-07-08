@@ -300,9 +300,9 @@ module T : Synthesizer.t = struct
                          ~f:(fun acc (_, t) -> Type.(fold t ~arr_f:List.append
                                                             ~tuple_f:List.concat
                                                             ~mu_f:(fun _ _ -> [])
-                                                            ~variant_f:(fun _ -> [])
+                                                            ~variant_f:(List.concat % (List.map ~f:snd))
                                                             ~name_f:(function "bool" -> []
-                                                                            | n -> if n = mod_type
+                                                                            | n -> if n = mod_type || String.is_suffix ~suffix:"option" n
                                                                                    then []
                                                                                    else [n]))
                                              @ acc)
