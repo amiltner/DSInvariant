@@ -2,6 +2,10 @@ type tree = mu tree .
   | Leaf
   | Node of (tree * nat * tree)
 
+type nat_option =
+  | None
+  | Some of nat 
+
 struct
   type t = tree
 

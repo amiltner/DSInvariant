@@ -47,17 +47,15 @@ let add =
         | S -> add x1 (S x2)
 ;;
 
-let nat_eq =
-  fix (nat_eq : nat -> nat -> bool) =
+let nat_lte =
+  fix (nat_lte : nat -> nat -> bool) =
     fun (x1 : nat) ->
       fun (x2 : nat) ->
         match x1 binding x1 with
-        | O -> (match x2 binding x2 with
-                | O -> True
-                | S -> False)
+        | O -> True
         | S -> (match x2 binding x2 with
                 | O -> False
-                | S -> nat_eq x1 x2)
+                | S -> nat_lte x1 x2)
 ;;
 
 let nat_lt =
@@ -71,6 +69,19 @@ let nat_lt =
         | S -> (match x2 binding x2 with
                 | O -> False
                 | S -> nat_lt x1 x2)
+;;
+
+let nat_eq =
+  fix (nat_eq : nat -> nat -> bool) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 binding x1 with
+        | O -> (match x2 binding x2 with
+                | O -> True
+                | S -> False)
+        | S -> (match x2 binding x2 with
+                | O -> False
+                | S -> nat_eq x1 x2)
 ;;
 
 (* END_PRELUDE *)
