@@ -1,0 +1,103 @@
+Evaluation -- keep track of how many uses of the module are used in evaluation
+
+
+
+e =>_s^i v
+
+With i uses of the values in the set s, e evaluates to v
+
+
+
+
+v \not\in s
+====================================== (non module usage)
+v =>_s^0 v
+
+
+
+v \in s
+====================================== (module usage)
+v =>_s^1 v
+
+
+
+e1 =>_s^i v1
+e2 =>_s^j v2
+====================================== (structural pair)
+(e1,e2) =>_s^{i+j} (v1,v2)
+
+
+
+e =>_s^i v
+====================================== (structural sum1)
+inl e =>_s^i inl v
+
+
+
+e =>_s^i v
+====================================== (structural sum2)
+inr e =>_s^i inr v
+
+
+
+e1 =>_s^i (\x.e)
+e2 =>_s^j v1
+f[v/x] =>_s^k v2
+====================================== (function application)
+e1 e2 =>_s^{i+j+k} v2
+
+
+
+e =>_s1^i v
+e =>_s2^j v
+====================================== (module structural pair)
+e =>_{(s1,s2)}^{i+j} v
+
+
+
+e =>_s^i v
+====================================== (module structural sum1)
+e =>_{inl s1}^i v
+
+
+
+e =>_s^i v
+====================================== (module structural sum2)
+e =>_{inr s1}^i v
+
+
+
+e =>_s^i v
+====================================== (module structural sum2)
+e =>_{inr s1}^i v
+
+
+
+forall i in I. e =>_{s_i}^{i_i} v
+====================================== (module union)
+e =>_{U_{i in I}s_i}^{\Sigma_{i in I}i_i} v
+
+
+
+
+
+Possible issue: There may be ways to avoid being counted, for example
+
+insert :: int -> alpha -> alpha
+
+let ins' = insert 1 in
+ins' (ins' (ins' (ins' empty)))
+
+I'm doing 4 ins', but it would only count one instance of insert. Maybe I could
+get around this by delaying evaluation of things using the module until the last
+possible chance?
+
+
+
+
+Relationship with triangle_pre^post
+
+I'm thinking it could be something like
+
+triangle_pre^post if, for all v of type alpha, such that there exists some e,
+where e =>_{pre U {module}}^1 v, post(v)
