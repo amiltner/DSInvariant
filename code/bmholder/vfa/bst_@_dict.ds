@@ -79,6 +79,7 @@ struct
                | False -> (match nat_lt x bp.1 binding c with
                            | True -> Node ((delete bp.0 x), bp.1, bp.2, bp.3)
                            | False -> Node (bp.0, bp.1, bp.2, (delete bp.3 x))))
+;;
 end
 :
 sig

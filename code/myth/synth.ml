@@ -13,37 +13,41 @@ type synth_step =
 type synth_plan = synth_step list
 
 let standard_synth_plan : synth_plan =
-  [ SynthSaturate 0.25
+  [ SynthSaturate 10.00
   ; SynthGrowMatches
+  ; SynthSaturate 10.00
   ; SynthGrowMatches
-  ; SynthSaturate 0.25
-  ; SynthSaturate 0.24
-  ; SynthGrowScrutinees 5
-  ; SynthSaturate 0.25
+  ; SynthSaturate 10.00
   ; SynthGrowMatches
-  ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
-  ; SynthSaturate 0.25
+  ; SynthSaturate 10.00
+  ; SynthGrowScrutinees 10
+  ; SynthSaturate 10.00
   ; SynthGrowMatches
-  ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
-  ; SynthSaturate 0.25
+  ; SynthSaturate 10.00
   ; SynthGrowMatches
-  ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
-  ; SynthSaturate 0.25
+  ; SynthSaturate 10.00
+  ; SynthGrowScrutinees 10
+  ; SynthSaturate 10.00
   ; SynthGrowMatches
-  ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
-  ; SynthSaturate 0.25
+  ; SynthSaturate 10.00
+  ; SynthGrowScrutinees 10
+  ; SynthSaturate 10.00
   ; SynthGrowMatches
-  ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
-  ; SynthSaturate 0.25
+  ; SynthSaturate 10.00
+  ; SynthGrowScrutinees 10
+  ; SynthSaturate 10.00
   ; SynthGrowMatches
-  ; SynthSaturate 0.25
-  ; SynthGrowScrutinees 5
-  ; SynthSaturate 0.25
+  ; SynthSaturate 10.00
+  ; SynthGrowScrutinees 10
+  ; SynthSaturate 10.00
+  ; SynthGrowMatches
+  ; SynthSaturate 10.00
+  ; SynthGrowScrutinees 10
+  ; SynthSaturate 10.00
+  ; SynthGrowMatches
+  ; SynthSaturate 10.00
+  ; SynthGrowScrutinees 10
+  ; SynthSaturate 10.00
   ]
 
 let saturate_guesses (timeout:float) (s:Sigma.t) (env:env) (t:rtree) =
@@ -60,7 +64,7 @@ let saturate_guesses (timeout:float) (s:Sigma.t) (env:env) (t:rtree) =
   in
     update 1
 
-let execute_synth_step (s:Sigma.t) (env:env) (t:rtree) (st:synth_step) : exp option =
+let execute_synth_step (s:Sigma.t) (env:env) (t:rtree) (st:synth_step) : exp list option =
   reset_timeouts t;
   begin match st with
   | SynthSaturate timeout -> begin
@@ -71,7 +75,7 @@ let execute_synth_step (s:Sigma.t) (env:env) (t:rtree) (st:synth_step) : exp opt
         ~action:(fun _ -> saturate_guesses timeout s env t)
     end
   | SynthGrowMatches -> begin
-      do_if_verbose (fun _ -> printf "Growing matches...\n%!");
+      printf "Growing matches...\n%!";
       Timing.record
         ~label:"synth::grow_matches"
         ~action:(fun _ -> grow_matches s env t)
@@ -87,25 +91,26 @@ let execute_synth_step (s:Sigma.t) (env:env) (t:rtree) (st:synth_step) : exp opt
   let es =
     Timing.record
       ~label:"synth::propogate_exps"
-      ~action:(fun _ -> propogate_exps t)
+      ~action:(fun _ -> propogate_exps ~short_circuit:true t)
   in
+  print_endline "done";
   begin match es with
   | [] -> None
-  | e :: _ -> Some e
+  | es -> Some es
   end
 
 let rec execute_synth_plan
     (s:Sigma.t)
     (env:env)
     (t:rtree)
-    (plan:synth_plan) : exp option =
+    (plan:synth_plan) : exp list =
   match plan with
-  | [] -> None
+  | [] -> failwith "couldn't find"
   | st :: plan -> begin
     match execute_synth_step s env t st with
-    | Some e -> Some e
+    | Some es -> es
     | None -> execute_synth_plan s env t plan
     end
 
-let synthesize (s:Sigma.t) (env:env) (t:rtree) : exp option =
+let synthesize (s:Sigma.t) (env:env) (t:rtree) : exp list =
   execute_synth_plan s env t standard_synth_plan

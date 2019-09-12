@@ -9,11 +9,9 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
       ~(eval_t : Type.t)
       ~post:(post : UniversalFormula.t)
       ~positives:(positives : Value.t list)
-    : Value.t option =
+    : Value.t list =
     Log.info
       (lazy ("Checking boundary for:" ^ (DSToMyth.full_to_pretty_myth_string ~problem eval)));
-    Option.map
-      ~f:(List.hd_exn)
       (V.true_on_examples
          ~problem
          ~examples:positives
@@ -25,7 +23,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
       ~problem:(problem : Problem.t)
       ~invariant:(invariant : Expr.t)
       ~positives:(positives : Value.t list)
-    : ((Expr.t,Value.t) Either.t) =
+    : ((Expr.t,Value.t list) Either.t) =
     let create_invariant_post
         (invariant:Expr.t)
       : UniversalFormula.t =
@@ -36,26 +34,26 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
     in
     let check_boundary
         (invariant:Expr.t)
-      : Value.t option =
+      : Value.t list =
       let post = create_invariant_post invariant in
       List.fold_left
         ~f:(fun acc (eval,eval_t) ->
             begin match acc with
-              | None ->
+              | [] ->
                 push_boundary
                   ~problem
                   ~eval
                   ~eval_t
                   ~post
                   ~positives
-              | Some _ -> acc
+              | _ -> acc
             end)
-        ~init:None
+        ~init:[]
         problem.mod_vals
     in
     let rec helper
         (invariant : Expr.t)
-      : ((Expr.t,Value.t) Either.t) =
+      : ((Expr.t,Value.t list) Either.t) =
       let post = create_invariant_post invariant in
       let pre_or_ce =
         VPIE.learnVPreCondAll
@@ -80,7 +78,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
           Log.info
             (lazy ("Boundary Not Satisfied, counterexample:"
                    ^ (Log.indented_sep 4)
-                   ^ (Value.show m))) ;
+                   ^ (List.to_string ~f:Value.show m))) ;
           Second m
       end
     in
@@ -92,12 +90,12 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
       ~eval:(eval : Expr.t)
       ~eval_t:(eval_t : Type.t)
       ~positives:(positives : Value.t list)
-    : ((Expr.t,Value.t) Either.t) =
+    : ((Expr.t,Value.t list) Either.t) =
     Log.info
       (lazy ("Checking Satisfy Transitivity for: " ^ (DSToMyth.full_to_pretty_myth_string ~problem eval)));
     let rec helper
         (invariant : Expr.t)
-      : ((Expr.t,Value.t) Either.t) =
+      : ((Expr.t,Value.t list) Either.t) =
       let app_var = "x" in
       let invariant_applied = Expr.mk_app invariant (Expr.mk_var app_var) in
       let applied_arg = (app_var, Type._t) in
@@ -111,13 +109,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
           ~positives
       in
       begin match boundary_validity with
-        | Some m ->
-          Log.info
-            (lazy ("Boundary Not Satisfied, counterexample:"
-                   ^ (Log.indented_sep 4)
-                   ^ (Value.show m))) ;
-          Second m
-        | None ->
+        | [] ->
           Log.info
             (lazy ("IND >> Strengthening for inductiveness:"
                    ^ (Log.indented_sep 4)
@@ -137,6 +129,12 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
           else
             let new_inv = Expr.and_predicates pre_inv invariant in
             helper new_inv
+        | m ->
+          Log.info
+            (lazy ("Boundary Not Satisfied, counterexample:"
+                   ^ (Log.indented_sep 4)
+                   ^ (List.to_string ~f:Value.show m))) ;
+          Second m
       end
     in
     helper invariant
@@ -147,7 +145,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
       ~(attempt:int)
     : Expr.t =
     let restart_with_new_positives
-        (positive : Value.t)
+        (positive : Value.t list)
       : Expr.t =
       begin
         Log.warn (lazy ("Restarting inference engine. Attempt was "
@@ -155,7 +153,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                         ^ ".")) ;
         learnInvariant_internal
           ~problem
-          ~positives:(positive::positives)
+          ~positives:(positive@positives)
           ~attempt:(attempt+1)
       end
     in
@@ -198,7 +196,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                      : string =
     let problem = Problem.process unprocessed_problem in
     let inv = learnInvariant_internal
-                ~problem
+        ~problem
                 ~positives:[]
                 ~attempt:0
     in

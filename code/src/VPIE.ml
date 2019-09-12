@@ -39,13 +39,13 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
       ~(pre : Expr.t)
       ~(post : UniversalFormula.t)
       ~(positives : Value.t list)
-      ~(checker : Expr.t -> Value.t option)
-    : (Expr.t,Value.t) Either.t =
+      ~(checker : Expr.t -> Value.t list)
+    : (Expr.t,Value.t list) Either.t =
     let rec helper
         (attempt:int)
         (testbed:TestBed.t)
         (pres:Expr.t list)
-      : (Expr.t,Value.t) Either.t =
+      : (Expr.t,Value.t list) Either.t =
       (Log.info (lazy ("VPIE Attempt "
                        ^ (Int.to_string attempt)
                        ^ "."));
@@ -69,13 +69,14 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
              let testbed =
                List.fold_left
                  ~f:(fun tb e ->
-                     if Option.is_some
-                         (V.true_on_examples
-                            ~problem
-                            ~examples:[e]
-                            ~eval:(Expr.mk_identity_func (Type._t))
-                            ~eval_t:(Type.mk_arrow (Type._t) (Type._t))
-                            ~post:post) then
+                     if not
+                         (List.is_empty
+                            (V.true_on_examples
+                               ~problem
+                               ~examples:[e]
+                               ~eval:(Expr.mk_identity_func (Type._t))
+                               ~eval_t:(Type.mk_arrow (Type._t) (Type._t))
+                               ~post:post)) then
                        TestBed.add_neg_test ~testbed:tb e
                      else
                        (if TestBed.contains_test ~testbed:tb e then
@@ -100,13 +101,12 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
          checker full_pre
        in
        begin match boundary_ce with
-         | Some ce -> Second ce
-         | None ->
+         | [] ->
            let model_o =
              List.fold_left
                ~f:(fun acc (eval,eval_t) ->
                    begin match acc with
-                     | None ->
+                     | [] ->
                        Log.info (lazy (DSToMyth.full_to_pretty_myth_string ~problem eval));
                        V.implication_counter_example
                          ~problem
@@ -114,28 +114,25 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
                          ~eval
                          ~eval_t
                          ~post
-                     | Some _ -> acc
+                     | _ -> acc
                    end)
-               ~init:None
+               ~init:[]
                problem.mod_vals
            in
            begin match model_o with
-             | None ->
+             | [] ->
                Log.info (lazy ("Verified Precondition: " ^ (DSToMyth.full_to_pretty_myth_string ~problem synthed_pre)));
                First synthed_pre
-             | Some model ->
-               if (List.length model <> 1) then
-                 failwith ("cannot do such functions yet: " ^ (List.to_string ~f:Value.show model))
-               else
-                 let new_neg_example = List.hd_exn model in
-                 Log.info (lazy ("Add negative example: " ^ (Value.show new_neg_example)));
+             | model ->
+                 Log.info (lazy ("Add negative examples: " ^ (List.to_string ~f:Value.show model)));
                  helper
                    (attempt+1)
-                   (TestBed.add_neg_test
+                   (TestBed.add_neg_tests
                       ~testbed
-                      new_neg_example)
+                      model)
                    pres
            end
+         | ce -> Second ce
        end)
     in
     let testbed = TestBed.create_positive positives in
@@ -174,13 +171,14 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
              let testbed =
                List.fold_left
                  ~f:(fun tb e ->
-                     if Option.is_some
-                         (V.true_on_examples
-                            ~problem
-                            ~examples:[e]
-                            ~eval:(Expr.mk_identity_func (Type._t))
-                            ~eval_t:(Type.mk_arrow (Type._t) (Type._t))
-                            ~post:post) then
+                     if not
+                         (List.is_empty
+                            (V.true_on_examples
+                               ~problem
+                               ~examples:[e]
+                               ~eval:(Expr.mk_identity_func (Type._t))
+                               ~eval_t:(Type.mk_arrow (Type._t) (Type._t))
+                               ~post:post)) then
                        TestBed.add_neg_test ~testbed:tb e
                      else
                        TestBed.add_pos_test ~testbed:tb e
@@ -212,10 +210,10 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
            ~post
        in
        begin match model_o with
-         | None ->
+         | [] ->
            Log.info (lazy ("Verified Precondition: " ^ (DSToMyth.full_to_pretty_myth_string ~problem synthed_pre)));
            synthed_pre
-         | Some model ->
+         | model ->
            if (List.length model <> 1) then
              failwith ("cannot do such functions yet: " ^ (List.to_string ~f:Value.show model))
            else

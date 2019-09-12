@@ -102,7 +102,7 @@ def gather_data(rootlength, prog, path, base):
     gather_col([lambda p, b: "-use-myth"],ctime_combiner,"Myth",TIMEOUT_TIME,REPETITION_COUNT)
     gather_col([lambda p, b: "-use-myth", lambda p, b: "-prelude-context"],ctime_combiner,"MythP",TIMEOUT_TIME,REPETITION_COUNT)
     gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-gat"],ctime_combiner,"GAT",TIMEOUT_TIME,REPETITION_COUNT)
-    gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-ndd"],ctime_combiner,"NDD",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-no-dedup"],ctime_combiner,"NDD",TIMEOUT_TIME,REPETITION_COUNT)
     gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum")],ctime_combiner,"PAT",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col(["-noCS"],ctime_combiner,"SSNC",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col(["-bijSynth"],ctime_combiner,"BS",TIMEOUT_TIME,REPETITION_COUNT)
@@ -202,6 +202,7 @@ def main(args):
                 print(join(path, base + TEST_EXT).replace("_","-")[rootlength:])
                 current_data = gather_data(rootlength,prog, path, base)
                 data.append(current_data)
+	        print_data(data)
             #data = sort_data(data)
 	    print_data(data)
         else:

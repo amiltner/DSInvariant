@@ -51,6 +51,17 @@ struct
                    | Node -> min_val b.0)
   ;;
 
+  (* added *)
+  let max_val =
+    fix (max_val : t -> nat) =
+      fun (b : t) ->
+        match b binding b with
+        | Leaf -> O
+        | Node -> (match b.2 binding br with
+                   | Leaf -> b.1
+                   | Node -> max_val b.2)
+  ;;
+
   let delete =
     fix (delete : t -> nat -> t) =
       fun (b : t) ->

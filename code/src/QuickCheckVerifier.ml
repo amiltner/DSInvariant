@@ -215,7 +215,7 @@ module T : Verifier.t = struct
       ~eval:(eval:Expr.t)
       ~(eval_t:Type.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
-    : Value.t list option =
+    : Value.t list =
     let desired_t = Type.mk_named"t" in
     if equiv_false ~problem ~cond:pre
     && List.exists
@@ -224,13 +224,13 @@ module T : Verifier.t = struct
     then
       begin
         print_endline "SKIP OUT FAST";
-        None
+        []
       end
     else
       let num_checks = _NUM_CHECKS_ in
       let (_,result_t) = extract_args eval_t in
       if not (contains_any problem.tc desired_t result_t) then
-        None
+        []
       else
         (let generators (t:Type.t) : Expr.t Sequence.t =
           let g = generator_of_type problem.tc t in
@@ -335,9 +335,11 @@ module T : Verifier.t = struct
                     Second (Some relevant))
             (uf_types_seqs,0)
         in
-        Option.map
-          ~f:(List.map ~f:Value.from_exp_exn)
-          ce_option)
+        Option.value
+          ~default:[]
+          (Option.map
+             ~f:(List.map ~f:Value.from_exp_exn)
+             ce_option))
 
   let true_on_examples
       ~(problem:Problem.t)
@@ -345,14 +347,14 @@ module T : Verifier.t = struct
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
       ~post:((post_quants,post_expr):UniversalFormula.t)
-    : Value.t list option =
+    : Value.t list =
     let num_checks = _NUM_CHECKS_ in
     let desired_t = Type.mk_named"t" in
     let (args_t,result_t) = extract_args eval_t in
     if (List.length examples = 0
         && List.mem ~equal:Type.equal args_t desired_t)
     || not (contains_any problem.tc desired_t result_t) then
-      None
+      []
     else
       let generators
           (t:Type.t)
@@ -437,9 +439,11 @@ module T : Verifier.t = struct
                   in Second (Some relevant))
           (uf_types_seqs,0)
       in
-      Option.map
-        ~f:(List.map ~f:Value.from_exp_exn)
-        ce_option
+      Option.value
+        ~default:[]
+        (Option.map
+           ~f:(List.map ~f:Value.from_exp_exn)
+           ce_option)
 
   (*let convert_foldable_to_full
       (tc:Context.Types.t)

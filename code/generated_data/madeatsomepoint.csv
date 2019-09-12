@@ -1,0 +1,10 @@
+Test,SS
+/sized-list,317.04659605026245
+/sorted-list-set,329.39790892601013
+/cache-minimal-incorrect,[-1]
+/binary-search-tree-set,[-1]
+/range-trivial,34.67000603675842
+/cache-minimal,67.60247588157654
+/range,26.80794095993042
+/unique-list,170.2248170375824
+/stutter-list,68.9239239692688

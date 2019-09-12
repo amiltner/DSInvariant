@@ -524,16 +524,18 @@ module T : Verifier.t = struct
       ~(eval:Expr.t)
       ~(eval_t:Type.t)
       ~(post:UniversalFormula.t)
-    : Value.t list option =
-    Option.map
-      ~f:(List.map ~f:snd)
-      (true_on_examples_full
-         ~problem
-         ~examples
-         ~eval
-         ~eval_t
-         ~post
-         ~size:_MAX_SIZE_T_)
+    : Value.t list =
+    Option.value
+      ~default:[]
+      (Option.map
+         ~f:(List.map ~f:snd)
+         (true_on_examples_full
+            ~problem
+            ~examples
+            ~eval
+            ~eval_t
+            ~post
+            ~size:_MAX_SIZE_T_))
 
   let implication_counter_example
       ~problem:(problem:Problem.t)
@@ -541,58 +543,60 @@ module T : Verifier.t = struct
       ~eval:(eval:Expr.t)
       ~(eval_t:Type.t)
       ~(post:UniversalFormula.t)
-    : Value.t list option =
+    : Value.t list =
     let desired_t = Type._t in
     let (args_t,result_t) = extract_args eval_t in
     if not (contains_any problem.tc desired_t result_t) then
-      None
+      []
     else
-      List.fold
-        ~f:(fun ans_o s ->
-            begin match ans_o with
-              | Some ans -> Some ans
-              | None ->
-                let examples =
-                  if List.mem ~equal:Type.equal args_t desired_t then
-                    List.filter_map
-                      ~f:(fun e ->
-                          let pre_e_app =
-                            Expr.mk_app
-                              pre
-                              e
-                          in
-                          let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
-                          if Value.equal v Value.mk_true then
-                            Some (Value.from_exp_exn e)
-                          else if Value.equal v Value.mk_false then
-                            None
-                          else
-                            failwith "incorrect evaluation")
-                      (elements_of_type_to_size problem.tc desired_t s)
-                  else
-                    []
-                in
-                let results =
-                  true_on_examples_full
-                    ~problem
-                    ~examples
-                    ~eval
-                    ~eval_t
-                    ~post
-                    ~size:s
-                in
-                Option.map
-                  ~f:(List.concat_map
-                        ~f:(fun (ets,_) ->
-                            List.filter_map
-                              ~f:(fun (e,t) ->
-                                  if Type.equal t desired_t then
-                                    Some (Value.from_exp_exn e)
-                                  else
-                                    None)
-                              ets))
-                  results
-            end)
-        ~init:None
-        [_MAX_SIZE_T_ / 2; Float.to_int (Float.of_int (_MAX_SIZE_T_) /. 1.25) ; _MAX_SIZE_T_]
+      Option.value
+        ~default:[]
+        (List.fold
+           ~f:(fun ans_o s ->
+               begin match ans_o with
+                 | Some ans -> Some ans
+                 | None ->
+                   let examples =
+                     if List.mem ~equal:Type.equal args_t desired_t then
+                       List.filter_map
+                         ~f:(fun e ->
+                             let pre_e_app =
+                               Expr.mk_app
+                                 pre
+                                 e
+                             in
+                             let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
+                             if Value.equal v Value.mk_true then
+                               Some (Value.from_exp_exn e)
+                             else if Value.equal v Value.mk_false then
+                               None
+                             else
+                               failwith "incorrect evaluation")
+                         (elements_of_type_to_size problem.tc desired_t s)
+                     else
+                       []
+                   in
+                   let results =
+                     true_on_examples_full
+                       ~problem
+                       ~examples
+                       ~eval
+                       ~eval_t
+                       ~post
+                       ~size:s
+                   in
+                   Option.map
+                     ~f:(List.concat_map
+                           ~f:(fun (ets,_) ->
+                               List.filter_map
+                                 ~f:(fun (e,t) ->
+                                     if Type.equal t desired_t then
+                                       Some (Value.from_exp_exn e)
+                                     else
+                                       None)
+                                 ets))
+                     results
+               end)
+           ~init:None
+           [_MAX_SIZE_T_ / 2; Float.to_int (Float.of_int (_MAX_SIZE_T_) /. 1.25) ; _MAX_SIZE_T_])
 end

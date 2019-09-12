@@ -33,3 +33,9 @@ let add_neg_test ~(testbed : t) (test : Value.t) : t =
                           ^ Value.show test ^ ") already already exists in POS set!"))
   else { testbed with
          neg_tests = test :: testbed.neg_tests }
+
+let add_neg_tests ~(testbed : t) (tests : Value.t list) : t =
+  List.fold
+    ~f:(fun testbed test -> add_neg_test ~testbed test)
+    ~init:testbed
+    tests

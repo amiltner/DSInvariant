@@ -186,6 +186,6 @@ let synthesize
     (extractor:exp -> exp list)
     (replacer:exp -> exp list -> exp)
   : exp list =
-  verbose_mode := false;
+  verbose_mode := true;
   eval_lookup_tables := false;
   execute_synth_plan s env [t] standard_synth_plan tests_outputs extractor replacer

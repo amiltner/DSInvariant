@@ -29,7 +29,7 @@ let rec to_myth_type
           if IdSet.mem real_vars v then
             ([],MythLang.TBase v,tt)
           else
-            failwith ("non-real var: " ^ v)
+            ([],MythLang.TBase v,tt)(*failwith ("non-real var: " ^ v)*)
         | Arrow (t1,t2) ->
           let (ds1,mt1,tt1) = to_myth_type_simple t1 in
           let (ds2,mt2,tt2) = to_myth_type_simple t2 in
@@ -163,9 +163,8 @@ in
 let t' = Context.get_foldable_t problem.tc full_ret in
 let (a,modi,c,d,e) = problem.unprocessed in
 let modi = modi @ [Declaration.TypeDeclaration (Id.mk_prime "t", t')] in
-let problem' = Problem.process (a,modi,c,d,e)
-in to_pretty_myth_string inv
-  ~problem:problem'
+let problem' = Problem.process (a,modi,c,d,e) in
+to_pretty_myth_string inv ~problem:problem'
 
 let convert_problem_examples_type_to_myth
     (p:Problem.t)

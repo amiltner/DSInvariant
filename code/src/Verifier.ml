@@ -10,7 +10,7 @@ module type t = sig
     eval:Expr.t ->
     eval_t:Type.t ->
     post:UniversalFormula.t ->
-    (Value.t list) option
+    Value.t list
 
   val true_on_examples :
     problem:Problem.t ->
@@ -18,5 +18,5 @@ module type t = sig
     eval:Expr.t ->
     eval_t:Type.t ->
     post:UniversalFormula.t ->
-    (Value.t list) option
+    Value.t list
 end

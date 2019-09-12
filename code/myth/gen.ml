@@ -276,7 +276,7 @@ and gen_iexp (tmo:Timeout.t) (s:Sigma.t) (g:Gamma.t)
 
   let gen_ctor_one (s:Sigma.t) (g:Gamma.t) ((c, (c_typ, _)):id * (typ * id))
                    (met:metric) : exp Rope.t =
-    let sub_exps = gen_iexp tmo s g c_typ { met with size = met.size - 1 } in
+    let sub_exps = gen_iexp tmo s g c_typ { met with size = met.size - 2 } in
     Rope.map ~f:(fun sub_exp -> ECtor (c, sub_exp)) sub_exps
   in
 
@@ -348,7 +348,7 @@ and gen_iexp_rel (tmo:Timeout.t) (s:Sigma.t)
   let gen_ctor_one (s:Sigma.t) (g:Gamma.t) ((c, (c_typ, _)):id * (typ * id))
                    (met:metric) : exp Rope.t =
     let sub_exps =
-      gen_iexp_rel tmo s (erel, trel) g c_typ { met with size = met.size - 1 }
+      gen_iexp_rel tmo s (erel, trel) g c_typ { met with size = met.size - 2 }
     in
     Rope.map ~f:(fun sub_exp -> ECtor (c, sub_exp)) sub_exps
   in

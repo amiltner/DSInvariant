@@ -11,7 +11,6 @@ module T : Synthesizer.t = struct
       ~(problem:Problem.t)
       ~(testbed:TestBed.t)
     : (Type.t option) * (Expr.t list) =
-    Myth.Consts.verbose_mode := true;
     let pos_examples = List.map ~f:(fun v -> (Value.to_exp v,Expr.mk_true_exp)) testbed.pos_tests in
     let neg_examples = List.map ~f:(fun v -> (Value.to_exp v,Expr.mk_false_exp)) testbed.neg_tests in
     let examples = pos_examples@neg_examples in
@@ -28,14 +27,14 @@ module T : Synthesizer.t = struct
       let env = Myth.Eval.gen_init_env decls in
       let w = Myth.Eval.gen_init_world env [Myth.Lang.EPFun examples] in
       (None,
-       [MythToDSBasic.convert_expr
-         (Option.value_exn
-            (Myth.Synth.synthesize
+       List.map
+         ~f:MythToDSBasic.convert_expr
+         (Myth.Synth.synthesize
+            sigma
+            env
+            (Myth.Rtree.create_rtree
                sigma
+               gamma
                env
-               (Myth.Rtree.create_rtree
-                  sigma
-                  gamma
-                  env
-                  (TArr (t,TBase "bool")) w 0)))])
+               (TArr (t,TBase "bool")) w 0)))
 end

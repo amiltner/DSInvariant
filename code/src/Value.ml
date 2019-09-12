@@ -96,3 +96,9 @@ let rec subvalues (v:t) : t list =
 
 let strict_subvalues (e:t) : t list =
   List.tl_exn (subvalues e)
+
+let size : t -> int =
+  fold
+    ~func_f:(fun (_,t) e -> 1 + (Type.size t) + (Expr.size e))
+    ~ctor_f:(fun _ i -> i+1)
+    ~tuple_f:(fun is -> List.fold ~f:(+) ~init:1 is)

@@ -117,20 +117,20 @@ let collect_data (p:prog) : prog =
     (x, List.map ~f:snd vs, Synth.synthesize s env tree))
   in
     begin match e with
-    | Some e ->
+    | e :: _ ->
       Printf.printf "%s,%d,%d,%.3f\n%!"
         x (List.fold_left ~f:(fun n v -> n + examples_count v) ~init:0 vs)
         (size e) time
-    | None ->
+    | [] ->
       Printf.printf "<<< %s: error during synthesis >>>\n%!" x
     end; p
 
 let synthesize_prog (p:prog) : prog =
   let (s, _, env, x, t, _, _, tree) = process_preamble p in
   begin match Synth.synthesize s env tree with
-  | Some e ->
+  | e::_ ->
       Printf.printf "%s\n" (Translate.to_top_level x t e |> Pp.pp_decl)
-  | None -> begin
+  | [] -> begin
       Printf.printf "No expression found!\n";
       Printf.printf "final rtree size = %d\n" (Rtree.rtree_size tree)
     end
