@@ -11,10 +11,10 @@ let include_directories : string list ref = ref ["."]
 let match_count : int ref = ref 0
 
 (* The maximum size of match scrutinees *)
-let scrutinee_size_lim : int ref = ref 10
+let scrutinee_size_lim : int ref = ref 1
 
 (* The maximum size of E-guessed terms *)
-let max_eguess_size : int ref = ref 10
+let max_eguess_size : int ref = ref 13
 
 (* Enables caching of generated E-terms *)
 let eterm_lookup_tables : bool ref = ref true

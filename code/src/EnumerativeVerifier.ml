@@ -3,7 +3,7 @@ open Core
 open Utils
 
 module T : Verifier.t = struct
-  let _MAX_SIZE_T_ = 35
+  let _MAX_SIZE_T_ = 30
   let _MAX_SIZE_NON_T = 10
 
   (*module TypeToGeneratorDict =

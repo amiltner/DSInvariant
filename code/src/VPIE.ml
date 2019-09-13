@@ -218,7 +218,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) = struct
              failwith ("cannot do such functions yet: " ^ (List.to_string ~f:Value.show model))
            else
              let new_neg_example = List.hd_exn model in
-             negs := new_neg_example::!negs;
+             (*negs := new_neg_example::!negs;*)
              Log.info (lazy ("Add negative example: " ^ (Value.show new_neg_example)));
              helper
                (attempt+1)

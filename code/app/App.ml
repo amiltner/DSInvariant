@@ -22,9 +22,9 @@ open DSInvGen
     | Some anses -> print_endline (string_of_list Value.show anses)
   end*)
 
-module EMIG = MIG.Make (EnumerativeVerifier.T) (ParSynthesizer.T)
-module QCMIG = MIG.Make (QuickCheckVerifier.T) (ParSynthesizer.T)
-module MythMIG = MIG.Make (EnumerativeVerifier.T) (MythSynthesizer.T)
+module EMIG = MIG.Make (EnumerativeVerifier.T) (ParSynthesizer.T) (EnumerativeLR.T)
+module QCMIG = MIG.Make (QuickCheckVerifier.T) (ParSynthesizer.T) (EnumerativeLR.T)
+module MythMIG = MIG.Make (EnumerativeVerifier.T) (MythSynthesizer.T) (EnumerativeLR.T)
 
 let read_accum = function
   | None -> "", ""

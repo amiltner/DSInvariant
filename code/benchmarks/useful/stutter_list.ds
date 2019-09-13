@@ -32,7 +32,9 @@ struct
   let insert =
     fun (l : t) ->
       fun (x : nat) ->
-        Cons(x, Cons(x, l))
+        (match (lookup l x) binding c with
+         | True -> l
+         | False -> Cons(x, Cons(x, l)))
   ;;
 
   let delete =
@@ -49,7 +51,6 @@ struct
                 | False -> Cons(lp.0, Cons(lp.0, delete lp.1 x))))
   ;;
 
-(*
 let union =
     fix (union : t -> t -> t) =
       fun (la : t) ->
@@ -69,7 +70,6 @@ let union =
                      | True -> Cons (la.0, (inter la.1 lb))
                      | False -> inter la.1 lb)
   ;;
-*)
 end
 :
 sig
@@ -83,10 +83,8 @@ sig
   val insert : t -> nat -> t
   val delete : t -> nat -> t
 
-(*
   val union : t -> t -> t
   val inter : t -> t -> t
-*)
 end
 
 maintains

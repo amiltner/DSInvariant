@@ -1,6 +1,10 @@
 open Core
 
-module Make (V : Verifier.t) (S : Synthesizer.t) = struct
+module Make
+    (V : Verifier.t)
+    (S : Synthesizer.t)
+    (L : LR.t)
+  = struct
   module VPIE = VPIE.Make(V)(S)
 
   let push_boundary

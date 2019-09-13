@@ -13,41 +13,37 @@ type synth_step =
 type synth_plan = synth_step list
 
 let standard_synth_plan : synth_plan =
-  [ SynthSaturate 10.00
+  [ SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthSaturate 10.00
   ; SynthGrowMatches
-  ; SynthSaturate 10.00
+  ; SynthSaturate 0.25
+  ; SynthSaturate 0.24
+  ; SynthGrowScrutinees 5
+  ; SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthSaturate 10.00
-  ; SynthGrowScrutinees 10
-  ; SynthSaturate 10.00
+  ; SynthSaturate 0.25
+  ; SynthGrowScrutinees 5
+  ; SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthSaturate 10.00
+  ; SynthSaturate 0.25
+  ; SynthGrowScrutinees 5
+  ; SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthSaturate 10.00
-  ; SynthGrowScrutinees 10
-  ; SynthSaturate 10.00
+  ; SynthSaturate 0.25
+  ; SynthGrowScrutinees 5
+  ; SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthSaturate 10.00
-  ; SynthGrowScrutinees 10
-  ; SynthSaturate 10.00
+  ; SynthSaturate 0.25
+  ; SynthGrowScrutinees 5
+  ; SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthSaturate 10.00
-  ; SynthGrowScrutinees 10
-  ; SynthSaturate 10.00
+  ; SynthSaturate 0.25
+  ; SynthGrowScrutinees 5
+  ; SynthSaturate 0.25
   ; SynthGrowMatches
-  ; SynthSaturate 10.00
-  ; SynthGrowScrutinees 10
-  ; SynthSaturate 10.00
-  ; SynthGrowMatches
-  ; SynthSaturate 10.00
-  ; SynthGrowScrutinees 10
-  ; SynthSaturate 10.00
-  ; SynthGrowMatches
-  ; SynthSaturate 10.00
-  ; SynthGrowScrutinees 10
-  ; SynthSaturate 10.00
+  ; SynthSaturate 0.25
+  ; SynthGrowScrutinees 5
+  ; SynthSaturate 0.25
   ]
 
 let saturate_guesses (timeout:float) (s:Sigma.t) (env:env) (t:rtree) =
@@ -91,7 +87,7 @@ let execute_synth_step (s:Sigma.t) (env:env) (t:rtree) (st:synth_step) : exp lis
   let es =
     Timing.record
       ~label:"synth::propogate_exps"
-      ~action:(fun _ -> propogate_exps ~short_circuit:true t)
+      ~action:(fun _ -> propogate_exps ~short_circuit:false t)
   in
   print_endline "done";
   begin match es with
