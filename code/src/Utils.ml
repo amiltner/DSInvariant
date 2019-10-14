@@ -57,7 +57,29 @@ module List = struct
   let remove_at_exn (l : 'a list) (i : int) : 'a list =
     if i < 0 || i >= (length l) then l
     else let (first_i_1, i_onwards) = split_n l i
-          in first_i_1 @ (drop i_onwards 1)
+      in first_i_1 @ (drop i_onwards 1)
+
+  let rec zip3
+      (l1:'a list)
+      (l2:'b list)
+      (l3:'c list)
+    : ('a*'b*'c) list option =
+    begin match (l1,l2,l3) with
+      | (h1::t1,h2::t2,h3::t3) ->
+        Option.map
+          ~f:(fun tl ->
+              (h1,h2,h3)::tl)
+          (zip3 t1 t2 t3)
+      | _ ->
+        None
+    end
+
+  let zip3_exn
+      (l1:'a list)
+      (l2:'b list)
+      (l3:'c list)
+    : ('a * 'b * 'c) list =
+    Option.value_exn (zip3 l1 l2 l3)
 end
 
 let pair_compare

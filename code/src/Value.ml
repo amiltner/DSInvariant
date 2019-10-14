@@ -82,7 +82,9 @@ let rec from_exp (e:Expr.t) : t option =
     | App _
     | Proj _
     | Match _
-    | Fix _ -> None
+    | Fix _
+    | Tagged _
+      -> None
 
 let from_exp_exn (e:Expr.t) : t =
   Option.value_exn (from_exp e)

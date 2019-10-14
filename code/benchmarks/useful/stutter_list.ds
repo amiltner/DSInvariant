@@ -44,7 +44,7 @@ struct
           | Nil -> Nil
           | Cons ->
             (match lp.1 binding lp with
-             | Nil -> Nil
+             | Nil -> l
              | Cons ->
                (match nat_eq lp.0 x binding c with
                 | True -> delete lp.1 x

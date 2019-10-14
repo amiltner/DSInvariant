@@ -31,7 +31,8 @@ and rnode =
   | SUnit                                 (* IRefine-Unit.                                *)
 
 and rmatch = exp *                        (* The match scrutinee.                         *)
-            (pat * rtree) list            (* The branches of the match statement.         *)
+             (pat * rtree) list            (* The branches of the match statement.         *)
+             * (int list) list
 
 (* rtree_size: Determines the size of an rtree, which is defined as the number of rtrees  *)
 (*             contained in this and child trees.                                         *)
@@ -44,7 +45,7 @@ let rec rtree_size (t:rtree) : int =
     | SRcd ts -> List.fold_left ~f:(fun acc (_,t) -> rtree_size t + acc) ~init:0 ts
     | SUnit -> 0
   in
-  let match_size ((_, ls) : rmatch) =
+  let match_size ((_, ls,_) : rmatch) =
       List.fold_left ~f:(fun acc t -> acc + rtree_size t) ~init:0 (List.map ~f:snd ls)
   in
   let matches_size = function
@@ -84,7 +85,7 @@ let rec build_lines_rtree (k:int) (t:rtree) : pretty_line list =
     (Pp.pp_typ t.t) t.sz t.timed_out
     (List.length t.es) (stringify_rtree_matches t)) :: (matchlines @ childlines)
 
-and build_lines_match (k:int) (tt:typ) ((e, bs):rmatch) : pretty_line list =
+and build_lines_match (k:int) (tt:typ) ((e, bs,_):rmatch) : pretty_line list =
     let s = Printf.sprintf "match %s :: %s" (Pp.pp_exp e) (Pp.pp_typ tt) in
     (k, s) :: List.concat_map ~f:(fun (p, t) ->
       let s = sprintf "| %s ->" (Pp.pp_pat p) in
@@ -124,6 +125,7 @@ type eval_val      = {
     scrut_val   : value;         (* The value that the scrutinee evalutes to (no ctor). *)
     env:env;                     (* The environment for a particular world.             *)
     goal:value;                  (* The expected outcome of the larger match statement. *)
+    num: int;
 }
 
 (* Creates a rtree for the given synthesis problem. *)
@@ -146,8 +148,8 @@ let rec create_rtree (s:Sigma.t) (g:Gamma.t) (env:env) (t:typ)
 (* Distributes the examples according to the constructors that e evaluates to.
  * For each examles (env, v), if env(v) ~~> C (...), then (env, v) is filed
  * under the C bucket. *)
-and distribute_constraints (s:Sigma.t) (g:Gamma.t) (e:exp) (evs:eval_val list) : synth_branch list =
-  if List.length evs = 0 then [] else
+and distribute_constraints (s:Sigma.t) (g:Gamma.t) (e:exp) (evs:eval_val list) : synth_branch list  * (int list list) =
+  if List.length evs = 0 then ([],[]) else
   let dt = Sigma.ctor_datatype ((List.hd_exn evs).scrut_ctor) s in
   Sigma.ctors dt s |> List.map ~f:begin fun (c, (c_typ, _)) ->
     (* Generate a pattern.                                                                *)
@@ -170,12 +172,17 @@ and distribute_constraints (s:Sigma.t) (g:Gamma.t) (e:exp) (evs:eval_val list) :
       | None -> []
       | Some p -> Refine.pattern_to_env p v
     in
-    let worlds_for_c =
+    let (worlds_for_c,distribution) =
       List.filter ~f:(fun ev -> c = ev.scrut_ctor) evs |>
-      List.map ~f:(fun ev -> ((pattern_env ev.scrut_val) @ ev.env, ev.goal))
+      List.map ~f:(fun ev ->
+          (((pattern_env ev.scrut_val) @ ev.env, ev.goal), ev.num)
+        )
+    |> List.unzip
     in
-      (c, (c, p_opt), g, worlds_for_c)
-    end
+    ((c, (c, p_opt), g, worlds_for_c), List.sort ~compare:Int.compare distribution)
+  end
+  |> List.unzip
+  |> (fun (ev,dists) -> (ev,List.sort ~compare:(List.compare Int.compare) dists))
 
 (* Creates a single match for the given synthesis problem and scrutinee expression. *)
 (* If evaluation of the potential scrutinee results in no example generated         *)
@@ -195,12 +202,12 @@ and create_match (s:Sigma.t) (g:Gamma.t) (env:env) (t:typ)
       count = List.length bs
     in
     if List.length evs = 0 then None else
-    let branches = distribute_constraints s g e evs in
+      let (branches,dist) = distribute_constraints s g e evs in
     if not (is_adequate_distribution branches) then None else
     let trees = List.map ~f:(fun (_, p, g, ws) ->
       (p, create_rtree s g env t ws (matches-1))) branches
     in
-  Some (e, trees) 
+  Some (e, trees,dist) 
 
 (* Creates match nodes for the given synthesis problem.                                   *)
 and create_matches (s:Sigma.t) (g:Gamma.t) (env:env) (t:typ)
@@ -212,15 +219,15 @@ and create_matches (s:Sigma.t) (g:Gamma.t) (env:env) (t:typ)
       (* Evaluate a scrutinee candidate {e} to constructors in each example world,        *)
       (* creating a corresponding eval_val for each world.                                *)
       let eval_scrutinee (ws:world list) (e:exp) : exp * (eval_val list) =
-          let eval_fn (env', goal) =
+          let eval_fn i (env', goal) =
             try
               match Eval.eval (env @ env') e with
-              | VCtor (c, v) -> Some {scrut_ctor = c; scrut_val = v; env = env'; goal = goal}
+              | VCtor (c, v) -> Some {scrut_ctor = c; scrut_val = v; env = env'; goal = goal; num= i}
               | _ -> failwith "(eval_scrutinee) non-constructor encountered"
             with
               Eval.Eval_error _ -> None
           in
-          (e, List.filter_map ~f:eval_fn ws)
+          (e, List.filter_mapi ~f:eval_fn ws)
       in
 
       (* Generate scrutinees of size {size} of any type.                                  *)
@@ -318,11 +325,23 @@ let rec grow_matches (s:Sigma.t) (env:env) (t:rtree) =
   | None ->
     if List.length t.es = 0 then
       let ms = create_matches s t.g env t.t t.worlds 1 1 !scrutinee_size_lim in
+      (*print_endline ("before" ^ (string_of_int (List.length ms)));
+      let ms =
+        Util.core_deduper
+          ~compare:(fun (_,_,il1) (_,_,il2) ->
+              List.compare
+                (List.compare Int.compare)
+                il1
+                il2)
+          ~to_size:(fun (e,_,_) -> size e)
+          ms
+      in
+        print_endline ("after" ^ (string_of_int (List.length ms)));*)
       t.matches <- Some (ms);
       t.scrutinee_size <- !scrutinee_size_lim
   | Some ms ->
       List.iter
-        ~f:(fun (_, bs) -> List.iter ~f:(fun (_, t) -> grow_matches s env t) bs)
+        ~f:(fun (_, bs, _) -> List.iter ~f:(fun (_, t) -> grow_matches s env t) bs)
         ms
   end;
   List.iter ~f:(grow_matches_rnode s env) t.refinements
@@ -344,10 +363,20 @@ let rec grow_scrutinees (s:Sigma.t) (env:env) (k:int) (t:rtree) =
       let min = t.scrutinee_size+1 in
       let max = t.scrutinee_size+k in
       let ms' = create_matches s t.g env t.t t.worlds 1 min max in
-      t.matches <- Some (ms @ ms');
+      let ms =
+        (*Util.core_deduper
+          ~compare:(fun (_,_,il1) (_,_,il2) ->
+              List.compare
+                (List.compare Int.compare)
+                il1
+                il2)
+          ~to_size:(fun (e,_,_) -> size e)*)
+          (ms@ms')
+      in
+      t.matches <- Some (ms);
       t.scrutinee_size <- max;
       List.iter
-        ~f:(fun (_, bs) ->
+        ~f:(fun (_, bs, _) ->
           List.iter ~f:(fun (_, t) -> grow_scrutinees s env k t) bs)
         ms
   end;
@@ -398,7 +427,12 @@ let rec update_exps ?short_circuit:(sc = true) (timeout:float)
             Gen.gen_eexp
               (Timeout.create timeout) s t.g t.t (Gen.gen_metric t.sz 1)
           end
-          |> Rope.iter ~f:begin fun e ->
+        |> Rope.to_list
+        |> List.map ~f:(fun e -> (size e,e))
+        |> List.sort ~compare:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
+        |> List.map ~f:snd
+        |>
+        List.iter ~f:begin fun e ->
             (* TODO: probably want to short-circuit walking through gen_eexp
              * results as well... *)
             if sc then
@@ -435,7 +469,7 @@ and update_exps_matches ?short_circuit:(sc = true) (timeout:float) (s:Sigma.t)
 
 and update_exps_rmatch ?short_circuit:(sc = true) (timeout:float)
                        (s:Sigma.t) (env:env) (m:rmatch) =
-  let (_, bs) = m in
+  let (_, bs, _) = m in
   List.iter ~f:(fun (_, t) -> update_exps ~short_circuit:sc timeout s env t) bs
 
 and update_exps_node ?short_circuit:(sc = true) (timeout:float)
@@ -457,7 +491,7 @@ let rec reset_timeouts (t:rtree) = begin
   match t.matches with
   | None -> ()
   | Some ms -> begin
-    List.iter ~f:(fun (_, bs) ->
+    List.iter ~f:(fun (_, bs, _) ->
       List.iter ~f:(fun (_, t) -> reset_timeouts t) bs) ms
     end;
   List.iter ~f:reset_timeouts_refinements t.refinements
@@ -502,7 +536,7 @@ and propogate_exps_matches ?short_circuit:(sc = true) (mopt:rmatch list option) 
   | Some ms -> List.concat_map ~f:(propogate_exps_rmatch ~short_circuit:sc) ms
 
 and propogate_exps_rmatch ?short_circuit:(sc = true) (m:rmatch) : exp list =
-  let (e, bs)  = m in
+  let (e, bs, _)  = m in
   let (ps, ts) = List.unzip bs in
   List.map ~f:(propogate_exps ~short_circuit:sc) ts
     |> Util.combinations

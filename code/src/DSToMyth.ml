@@ -108,6 +108,7 @@ let rec to_myth_exp
         MythLang.ETuple (List.map ~f:to_myth_exp es)
     | Proj (i,e) ->
       MythLang.EProj (i+1, to_myth_exp e)
+    | Tagged _ -> failwith "shouldnt happen"
     end)
 
 let convert_decl_list_to_myth

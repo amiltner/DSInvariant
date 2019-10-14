@@ -71,7 +71,7 @@ let execute_synth_step (s:Sigma.t) (env:env) (t:rtree) (st:synth_step) : exp lis
         ~action:(fun _ -> saturate_guesses timeout s env t)
     end
   | SynthGrowMatches -> begin
-      printf "Growing matches...\n%!";
+      do_if_verbose (fun _ -> printf "Growing matches...\n%!");
       Timing.record
         ~label:"synth::grow_matches"
         ~action:(fun _ -> grow_matches s env t)
@@ -89,7 +89,6 @@ let execute_synth_step (s:Sigma.t) (env:env) (t:rtree) (st:synth_step) : exp lis
       ~label:"synth::propogate_exps"
       ~action:(fun _ -> propogate_exps ~short_circuit:false t)
   in
-  print_endline "done";
   begin match es with
   | [] -> None
   | es -> Some es
@@ -104,7 +103,18 @@ let rec execute_synth_plan
   | [] -> failwith "couldn't find"
   | st :: plan -> begin
     match execute_synth_step s env t st with
-    | Some es -> es
+      | Some es ->
+        let sized_es =
+          List.map
+            ~f:(fun e -> (size e,e))
+            es
+        in
+        let sorted_es =
+          List.sort
+            ~compare:(fun (i1,_) (i2,_) -> Int.compare i1 i2)
+            sized_es
+        in
+        List.map ~f:snd sorted_es
     | None -> execute_synth_plan s env t plan
     end
 

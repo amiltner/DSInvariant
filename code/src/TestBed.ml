@@ -15,6 +15,10 @@ let contains_test ~(testbed : t) (test : Value.t) : bool =
   List.exists testbed.pos_tests ~f:(Value.equal test) ||
   List.exists testbed.neg_tests ~f:(Value.equal test)
 
+let contains_neg_test
+    ~(testbed : t)
+  : Value.t -> bool =
+  List.mem ~equal:Value.equal testbed.neg_tests
 
 let add_pos_test ~(testbed : t) (test : Value.t) : t =
   if List.exists testbed.pos_tests ~f:(Value.equal test) then
@@ -39,3 +43,33 @@ let add_neg_tests ~(testbed : t) (tests : Value.t list) : t =
     ~f:(fun testbed test -> add_neg_test ~testbed test)
     ~init:testbed
     tests
+
+let add_pos_tests ~(testbed : t) (tests : Value.t list) : t =
+  List.fold
+    ~f:(fun testbed test -> add_pos_test ~testbed test)
+    ~init:testbed
+    tests
+
+let add_pos_tests_safe ~(testbed : t) (tests : Value.t list) : t option =
+  List.fold
+    ~f:(fun tbo p ->
+        begin match tbo with
+          | None -> None
+          | Some testbed ->
+            if contains_neg_test ~testbed p then
+              None
+            else
+              Some (add_pos_test ~testbed p)
+        end)
+    ~init:(Some testbed)
+    tests
+
+let merge (tb1 : t) (tb2 : t) : t =
+  let new_pos = List.dedup_and_sort ~compare:Value.compare (tb1.pos_tests@tb2.pos_tests) in
+  let new_neg = List.dedup_and_sort ~compare:Value.compare (tb1.neg_tests@tb2.neg_tests) in
+  {
+    pos_tests = new_pos ;
+    neg_tests = new_neg ;
+  }
+
+let positives ~(testbed : t) : Value.t list = testbed.pos_tests

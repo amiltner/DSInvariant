@@ -216,4 +216,54 @@ module Operators = struct
     let (>?>) (x : 'a option) (f : 'a -> 'b option) : 'b option = match x with
       | None -> None
       | Some v -> f v
-end
+  end
+
+open Core
+
+let sort_and_partition_with_indices ~(cmp : 'a -> 'a -> int)
+    (l:'a list)
+  : ('a * int) list list =
+  let rec merge_grouped_things (remaining:('a * int) list)
+      (currentacc:('a*int) list)
+      (accacc:('a*int) list list)
+    : ('a*int) list list =
+    begin match remaining with
+      | [] -> currentacc :: accacc
+      | (h,i)::t -> let currenthd = fst (List.hd_exn currentacc)
+        in match cmp h currenthd with
+        | 0 -> merge_grouped_things t ((h,i)::currentacc) accacc
+        | _ -> merge_grouped_things t [(h,i)] (currentacc::accacc)
+    end in
+  let sorted = List.sort ~compare:(fun (x,_) (y,_) -> cmp x y)
+      (List.mapi ~f:(fun i x -> (x,i)) l)
+  in begin match sorted with
+    | [] -> []
+    | h::t -> merge_grouped_things t [h] []
+  end
+
+let core_deduper
+    (type a)
+    ~(compare:a -> a -> int)
+    ~(to_size:a -> int)
+    (xs:a list)
+  : a list =
+  let sized_xs =
+    List.map
+      ~f:(fun x -> (x,to_size x))
+      xs
+  in
+  let sorted_parititioned_i =
+    sort_and_partition_with_indices
+      ~cmp:(fun (e1,_) (e2,_) -> compare e1 e2)
+      sized_xs
+  in
+  List.map
+    ~f:(fun esl ->
+        let ordered_by_size =
+          List.sort
+            ~compare:(fun ((_,s1),_) ((_,s2),_) -> Core.Int.compare s1 s2)
+            esl
+        in
+        let ((a,_),_) = List.hd_exn ordered_by_size in
+        a)
+    sorted_parititioned_i

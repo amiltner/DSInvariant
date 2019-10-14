@@ -262,13 +262,14 @@ module T : Verifier.t = struct
     Sequence.map
       ~f:(fun args ->
           (args,
-           Eval.evaluate_with_holes
+           fst (Eval.evaluate_with_holes
+                  ~tc:problem.tc
              ~eval_context:problem.eval_context
              (List.fold_left
                 ~f:(fun acc (_,e,_) -> Expr.mk_app acc e)
                 ~init:eval
                 args
-             )))
+             ))))
       all_args
 
 
@@ -565,7 +566,7 @@ module T : Verifier.t = struct
                                  pre
                                  e
                              in
-                             let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app in
+                             let v = fst (Eval.evaluate_with_holes ~tc:problem.tc ~eval_context:problem.eval_context pre_e_app) in
                              if Value.equal v Value.mk_true then
                                Some (Value.from_exp_exn e)
                              else if Value.equal v Value.mk_false then

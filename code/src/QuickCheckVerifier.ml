@@ -169,12 +169,13 @@ module T : Verifier.t = struct
         args_t
     in
     (args
-    ,Eval.evaluate_with_holes
+    ,fst (Eval.evaluate_with_holes
+       ~tc:problem.tc
         ~eval_context:problem.eval_context
         (List.fold_left
            ~f:(fun acc (e,_) -> Expr.mk_app acc e)
            ~init:eval
-           args)
+           args))
     ,d)
 
   let equiv_false
@@ -243,7 +244,7 @@ module T : Verifier.t = struct
                       pre
                       e
                   in
-                  let v = Eval.evaluate_with_holes ~eval_context:problem.eval_context pre_e_app
+                  let v = fst (Eval.evaluate_with_holes ~tc:problem.tc ~eval_context:problem.eval_context pre_e_app)
                    in Value.equal v (Value.mk_ctor "True" (Value.mk_tuple [])))
               seq
           else
@@ -318,7 +319,7 @@ module T : Verifier.t = struct
                     )
                   in
                   let args = List.concat args_l in
-                  let post_res = Eval.evaluate_with_holes ~eval_context:(problem.eval_context@names_exps) post_expr
+                  let post_res = fst (Eval.evaluate_with_holes ~tc:problem.tc ~eval_context:(problem.eval_context@names_exps) post_expr)
                   in
                   if Value.equal true_val post_res then
                     First (uf_types_seqs,i+1)
@@ -423,7 +424,7 @@ module T : Verifier.t = struct
                   )
                 in
                 let post_res =
-                  Eval.evaluate_with_holes ~eval_context:(problem.eval_context@names_exps) post_expr
+                  fst (Eval.evaluate_with_holes ~tc:problem.tc ~eval_context:(problem.eval_context@names_exps) post_expr)
                 in
                 if Value.equal true_val post_res then
                   First (uf_types_seqs,i+1)

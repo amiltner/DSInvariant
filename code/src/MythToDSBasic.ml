@@ -22,56 +22,94 @@ let rec convert_type : Myth.Lang.typ -> Type.t =
 let convert_arg ((id, typ) : Myth.Lang.arg) : Param.t =
   (id, convert_type typ)
 
-let _FRESH_VAR_COUNTER = ref 0
-let create_fresh_var () : Id.t =
-  _FRESH_VAR_COUNTER := !_FRESH_VAR_COUNTER + 1 ;
-  "N_fresh_var_" ^ Int.to_string (!_FRESH_VAR_COUNTER)
+let create_fresh_var (counter:int) : Id.t*int =
+  ("N_fresh_var_" ^ (string_of_int counter),counter+1)
 
-let  [@warning "-8"] rec convert_expr (e : Myth.Lang.exp) : Expr.t =
+let  [@warning "-8"] rec convert_expr (counter:int) (e : Myth.Lang.exp) : Expr.t * int =
   begin match e with
   | Myth.Lang.EUnit
-    -> Expr.Tuple []
+    -> (Expr.Tuple [],counter)
   | Myth.Lang.EVar id
-    -> Expr.Var id
+    -> (Expr.Var id,counter)
   | Myth.Lang.EApp (exp1, exp2)
-    -> Expr.App ((convert_expr exp1), (convert_expr exp2))
+    ->
+    let (e1,counter) = (convert_expr counter exp1) in
+    let (e2,counter) = (convert_expr counter exp2) in
+    (Expr.App (e1, e2),counter)
   | Myth.Lang.ECtor (id, exp)
-    -> Expr.Ctor (id, (convert_expr exp))
+    ->
+    let (e,counter) = (convert_expr counter exp) in
+    (Expr.Ctor (id, e),counter)
   | Myth.Lang.ETuple explist
-    -> Expr.Tuple (List.map ~f:convert_expr explist)
+    ->
+    let (es,counter) =
+      List.fold_right
+        ~f:(fun e (es,counter) ->
+            let (e,counter) = convert_expr counter e in
+            (e::es,counter))
+        ~init:([],counter)
+        explist
+    in
+    (Expr.Tuple es,counter)
   | Myth.Lang.EProj (int, exp)
-    -> Expr.Proj (int-1, (convert_expr exp))
+    ->
+    let (e,counter) = (convert_expr counter exp) in
+    (Expr.Proj (int-1, e),counter)
   | Myth.Lang.EFix (id, ((_, arg_typ) as arg), typ, body)
-    -> Expr.Fix (id, (convert_type (Myth.Lang.TArr (arg_typ, typ))),
-                 (Expr.Func ((convert_arg arg), (convert_expr body))))
+    ->
+    let (e,counter) = (convert_expr counter body) in
+    (Expr.Fix (id, (convert_type (Myth.Lang.TArr (arg_typ, typ))),
+               (Expr.Func ((convert_arg arg), e)))
+    ,counter)
   | Myth.Lang.EFun (arg, body)
-    -> Expr.Func ((convert_arg arg), (convert_expr body))
+    ->
+    let (e,counter) = (convert_expr counter body) in
+    (Expr.Func ((convert_arg arg), e),counter)
   | Myth.Lang.ELet (id, _, arglist, typ, exp, body)
-    -> let arglist = (List.map ~f:convert_arg arglist)
-        in Expr.App ((Expr.Fix (id,
+    ->
+    let (e,counter) = (convert_expr counter exp) in
+    let (body,counter) = (convert_expr counter body) in
+    let arglist = (List.map ~f:convert_arg arglist)
+        in (Expr.App ((Expr.Fix (id,
                                 (List.fold
                                   arglist
                                   ~init:(convert_type typ)
                                   ~f:(fun etyp (_, t) -> Type.Arrow (t, etyp))),
                                 (List.fold
                                    arglist
-                                   ~init:(convert_expr exp)
+                                   ~init:(e)
                                    ~f:(fun eacc arg -> Expr.Func (arg, eacc))))),
-                     (convert_expr body))
+                      (body)),counter)
   | Myth.Lang.EMatch (exp, branchlist)
-    -> let fresh_var = create_fresh_var ()
-        in Expr.Match ((convert_expr exp),
-                       fresh_var,
-                       (List.map ~f:(convert_branch fresh_var) branchlist))
-    end
+    -> let (fresh_var,counter) = create_fresh_var counter in
+    let (e,counter) = convert_expr counter exp in
+    let (branches,counter) =
+      List.fold_right
+        ~f:(fun b (bs,counter) ->
+            let (b,counter) = (convert_branch fresh_var counter b) in
+            (b::bs,counter))
+        ~init:([],counter)
+        branchlist
+    in
+    (Expr.Match (e,
+                fresh_var,
+                 branches),counter)
+  end
 
-and convert_branch (binder : Id.t) : Myth.Lang.branch -> (Id.t * Expr.t) =
+and convert_branch (binder : Id.t) (counter:int) : Myth.Lang.branch -> ((Id.t * Expr.t) * int) =
   function [@warning "-8"]
-  | ((id, None), exp) -> (id, convert_expr exp)
+         | ((id, None), exp) ->
+    let (e,counter) = convert_expr counter exp in
+    ((id, e),counter)
   | ((id, Some (Myth.Lang.PVar _id)), exp)
-    -> (id, (Expr.mk_let_in _id Type._unit (Expr.Var binder) (convert_expr exp)))
+    -> let (e,counter) = (convert_expr counter exp) in
+    ((id, (Expr.mk_let_in _id Type._unit (Expr.Var binder) e)),counter)
   | ((id, Some (Myth.Lang.PTuple _plist)), exp)
-    -> (id, (List.fold
+    -> let (e,counter) = (convert_expr counter exp) in
+    ((id, (List.fold
                (explode (Expr.Var binder) _plist)
-               ~init:(convert_expr exp)
-               ~f:(fun eacc (e, _id) -> Expr.mk_let_in _id Type._unit e eacc)))
+               ~init:e
+               ~f:(fun eacc (e, _id) -> Expr.mk_let_in _id Type._unit e eacc))),counter)
+
+let convert_expr (e : Myth.Lang.exp) : Expr.t =
+  fst (convert_expr 0 e)

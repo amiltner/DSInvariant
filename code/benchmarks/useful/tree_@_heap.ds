@@ -19,6 +19,29 @@ struct
         | Node -> S (add (length b.0) (length b.2))
   ;;
 
+  (* added function *)
+  let true_maximum =
+    fix (true_maximum : t -> nat) =
+      fun (b : t) ->
+        match b binding b with
+        | Leaf -> O
+        | Node ->
+          (fun (bml : nat) ->
+            (fun (bmr : nat) ->
+              (match nat_lt bml b.1 binding c with
+               | True ->
+                 (match nat_lt b.1 bmr binding c with
+                  | True -> bmr
+                  | False -> b.1)
+               | False ->
+                 (match nat_lt bml bmr binding c with
+                  | True -> bmr
+                  | False -> bml)))
+            (true_maximum b.2))
+          (true_maximum b.0)
+  ;;
+
+
   let maximum =
     fun (b : t) ->
       match b binding b with
@@ -55,7 +78,7 @@ struct
             (match h2 binding vs2 with
              | Leaf -> h1
              | Node ->
-               (match nat_lt (length h1) (length h2) binding c with
+               (match nat_lt vs1.1 vs2.1 binding c with
                 | True -> Node (h1,vs2.1,merge vs2.0 vs2.2)
                 | False -> Node (h2,vs1.1,merge vs1.0 vs1.2)))
   ;;
@@ -76,7 +99,7 @@ struct
           | Node ->
             (match nat_eq vs.1 n binding c with
              | True -> True
-             | False -> and (contains vs.0 n) (contains vs.2 n))
+             | False -> or (contains vs.0 n) (contains vs.2 n))
   ;;
 end
 :
