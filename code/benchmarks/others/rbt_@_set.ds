@@ -76,7 +76,6 @@ struct
                            | False -> Node (Black, bp.1, bp.2, (delete bp.3 x))))
   ;;
 
-(*
   let union =
     fix (union : t -> t -> t) =
       fun (bx : t) ->
@@ -96,7 +95,6 @@ struct
                      | True -> insert (union (inter bx.1 by) (inter bx.3 by)) bx.2
                      | False -> union (inter bx.1 by) (inter bx.3 by))
   ;;
-*)
 end
 :
 sig
@@ -110,10 +108,8 @@ sig
   val insert : t -> nat -> t
   val delete : t -> nat -> t
 
-(*
   val union : t -> t -> t
   val inter : t -> t -> t
-*)
 end
 
 maintains
