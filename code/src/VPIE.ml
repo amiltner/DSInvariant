@@ -13,10 +13,10 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
     List.for_all
       ~f:(fun p ->
           let ans =
-            fst (Eval.evaluate_with_holes
+            Eval.evaluate_with_holes_basic
               ~tc:problem.tc
               ~eval_context:problem.eval_context
-              (Expr.mk_app e (Value.to_exp p)))
+              (Expr.mk_app e (Value.to_exp p))
           in
           Value.equal
             ans
@@ -26,10 +26,10 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
       List.for_all
         ~f:(fun p ->
             let ans =
-              fst (Eval.evaluate_with_holes
+              Eval.evaluate_with_holes_basic
                      ~tc:problem.tc
                 ~eval_context:problem.eval_context
-                (Expr.mk_app e (Value.to_exp p)))
+                (Expr.mk_app e (Value.to_exp p))
             in
             Value.equal
               ans
@@ -56,7 +56,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
           eval_t
           post
           (LR.Set positives)
-          (fst (Eval.evaluate_with_holes ~tc:problem.tc ~eval_context:problem.eval_context eval))
+          (Eval.evaluate_with_holes_basic ~tc:problem.tc ~eval_context:problem.eval_context eval)
       in
       begin match m with
         | ([],[]) ->
@@ -79,12 +79,12 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
         (fun v ->
            Value.equal
              Value.mk_true
-             (fst (Eval.evaluate_with_holes
+             (Eval.evaluate_with_holes_basic
                      ~eval_context:problem.eval_context
                      ~tc:problem.tc
                      (Expr.mk_app
                         invariant
-                        (Value.to_exp v)))))
+                        (Value.to_exp v))))
     in
     snd
       (List.fold_left
@@ -226,12 +226,12 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
         (fun v ->
            Value.equal
              Value.mk_true
-             (fst (Eval.evaluate_with_holes
+             (Eval.evaluate_with_holes_basic
                      ~tc:problem.tc
                      ~eval_context:problem.eval_context
                      (Expr.mk_app
                         invariant
-                        (Value.to_exp v)))))
+                        (Value.to_exp v))))
     in
     List.fold_left
       ~f:(fun acc (eval,eval_t) ->
@@ -244,7 +244,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                    eval_t
                    invariant_pred
                    invariant_pred
-                   (fst (Eval.evaluate_with_holes ~tc:problem.tc ~eval_context:problem.eval_context eval)))
+                   (Eval.evaluate_with_holes_basic ~tc:problem.tc ~eval_context:problem.eval_context eval))
               in
               begin match model with
                 | ([],[]) -> Log.info (lazy ("Safe")); fst model
@@ -350,9 +350,10 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
           end
       end
     in
-    let invariant = Expr.mk_constant_true_func Type._t in
+    let true_invariant = Expr.mk_constant_true_func Type._t in
+    let false_invariant = Expr.mk_constant_false_func Type._t in
     let testbed = TestBed.create_positive [] in
-    let answer_lists = [(invariant,testbed,[])] in
+    let answer_lists = [(false_invariant,testbed,[]);(true_invariant,testbed,[])] in
     learnVPreCondTrueAllInternal
       ~answer_lists
 
@@ -440,13 +441,13 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                             (fun v ->
                                Value.equal
                                  Value.mk_true
-                                 (fst (Eval.evaluate_with_holes
+                                 (Eval.evaluate_with_holes_basic
                                          ~tc:problem.tc
                                     ~eval_context:problem.eval_context
                                     (Expr.mk_app
                                        full_pre
-                                       (Value.to_exp v))))))
-                         (fst (Eval.evaluate_with_holes ~tc:problem.tc ~eval_context:problem.eval_context eval)))
+                                       (Value.to_exp v)))))
+                         (Eval.evaluate_with_holes_basic ~tc:problem.tc ~eval_context:problem.eval_context eval))
                        (*V.implication_counter_example
                          ~problem
                          ~pre:full_pre

@@ -21,7 +21,7 @@ module Make
          eval_t
          post
          (LR.Set positives)
-         (fst (Eval.evaluate_with_holes ~tc:problem.tc ~eval_context:problem.eval_context eval)))
+         (Eval.evaluate_with_holes_basic ~tc:problem.tc ~eval_context:problem.eval_context eval))
 
   let satisfyTransAll
       ~problem:(problem : Problem.t)
@@ -44,12 +44,12 @@ module Make
           (fun v ->
              Value.equal
                Value.mk_true
-               (fst (Eval.evaluate_with_holes
+               (Eval.evaluate_with_holes_basic
                        ~eval_context:problem.eval_context
                        ~tc:problem.tc
                   (Expr.mk_app
                   invariant
-                  (Value.to_exp v)))))
+                  (Value.to_exp v))))
       in
       List.fold_left
         ~f:(fun acc (eval,eval_t) ->
@@ -74,12 +74,12 @@ module Make
           (fun v ->
              Value.equal
                Value.mk_true
-               (fst (Eval.evaluate_with_holes
+               (Eval.evaluate_with_holes_basic
                        ~tc:problem.tc
                   ~eval_context:problem.eval_context
                   (Expr.mk_app
                      invariant
-                     (Value.to_exp v)))))
+                     (Value.to_exp v))))
       in
       let pre_or_ce =
         VPIE.learnVPreCondAll

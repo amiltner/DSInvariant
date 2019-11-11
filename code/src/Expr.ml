@@ -1,5 +1,31 @@
 open Core
 
+
+module ContractArity =
+struct
+  type t =
+    | P
+    | Q
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
+
+  let switch_arity (c:t) : t =
+    begin match c with
+      | P -> Q
+      | Q -> P
+    end
+end
+
+module Contract =
+struct
+  type t =
+    | CoArr of t * t
+    | CoMatch of (Id.t * t) list
+    | CoTuple of t list
+    | CoAccept
+    | CoCheck
+  [@@deriving bin_io, eq, hash, ord, sexp, show]
+end
+
 type t =
   | Var of Id.t
   | App of t * t
@@ -9,7 +35,7 @@ type t =
   | Fix  of Id.t * Type.t * t
   | Tuple of t list
   | Proj of int * t
-  | Tagged of Type.t * t
+  | Obligation of Contract.t * ContractArity.t * t
 [@@deriving bin_io, eq, hash, ord, sexp, show]
 
 let mk_var (i:Id.t) : t =
@@ -24,7 +50,7 @@ let fold (type a)
          ~(fix_f:Id.t -> Type.t -> a -> a)
          ~(tuple_f:a list -> a)
          ~(proj_f:int -> a -> a)
-         ~(tagged_f:Type.t -> a -> a)
+         ~(obligation_f:Contract.t -> ContractArity.t -> a -> a)
          (e:t)
          : a =
   let rec fold_internal (e:t) : a =
@@ -42,8 +68,8 @@ let fold (type a)
         -> tuple_f (List.map ~f:fold_internal es)
       | Proj (i,e)
         -> proj_f i (fold_internal e)
-      | Tagged (t,e)
-        -> tagged_f t (fold_internal e)
+      | Obligation (c,a,e)
+        -> obligation_f c a (fold_internal e)
   in fold_internal e
 
 let mk_app (e1:t) (e2:t) : t =
@@ -167,30 +193,31 @@ let destruct_proj_exn
   : int * t =
   Option.value_exn (destruct_proj e)
 
-let mk_tagged
-    (t:Type.t)
+let mk_obligation
+    (t:Contract.t)
+    (a:ContractArity.t)
     (e:t)
   : t =
-  Tagged (t,e)
+  Obligation (t,a,e)
 
-let apply_tagged
+let apply_obligation
     (type a)
-    ~(f:Type.t -> t -> a)
+    ~(f:Contract.t -> ContractArity.t -> t -> a)
     (e:t)
   : a option =
   begin match e with
-    | Tagged (t,e2) -> Some (f t e2)
+    | Obligation (t,a,e2) -> Some (f t a e2)
     | _ -> None
   end
 
-let destruct_tagged
-  : t -> (Type.t * t) option =
-  apply_tagged ~f:(fun t e2 -> (t,e2))
+let destruct_obligation
+  : t -> (Contract.t * ContractArity.t * t) option =
+  apply_obligation ~f:(fun t a e2 -> (t,a,e2))
 
-let destruct_tagged_exn
+let destruct_contract_exn
     (e:t)
-  : Type.t * t =
-  Option.value_exn (destruct_tagged e)
+  : Contract.t * ContractArity.t * t =
+  Option.value_exn (destruct_obligation e)
 
 let mk_match
     (e:t)
@@ -285,8 +312,8 @@ let rec replace
         (List.map ~f:replace_simple es)
     | Proj (i,e) ->
       Proj (i,replace_simple e)
-    | Tagged (t,e) ->
-      Tagged (t,replace_simple e)
+    | Obligation (t,a,e) ->
+      Obligation (t,a,replace_simple e)
   end
 
 let replace_holes
@@ -360,7 +387,7 @@ let rec contains_var
         contains_var_simple e
     | Tuple es -> List.exists ~f:contains_var_simple es
     | Proj (_,e) -> contains_var_simple e
-    | Tagged (_,e) -> contains_var_simple e
+    | Obligation (_,_,e) -> contains_var_simple e
   end
 
 let rec simplify
@@ -387,7 +414,7 @@ let rec simplify
       mk_ctor i (simplify e)
     | Tuple es -> mk_tuple (List.map ~f:simplify es)
     | Proj (i,e) -> mk_proj i (simplify e)
-    | Tagged (t,e) -> mk_tagged t (simplify e)
+    | Obligation (t,a,e) -> mk_obligation t a (simplify e)
   end
 
 let and_exps
@@ -436,4 +463,4 @@ let size : t -> int =
         ~fix_f:(fun _ t s -> 1 + (Type.size t) + s)
         ~tuple_f:(List.fold_left~f:(+) ~init:1)
         ~proj_f:(fun _ i -> i+2)
-        ~tagged_f:(fun t i -> Type.size t + i + 1)
+        ~obligation_f:(fun _ _ i -> i + 1)

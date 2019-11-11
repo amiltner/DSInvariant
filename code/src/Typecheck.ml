@@ -175,12 +175,8 @@ let rec typecheck_exp
       let t = concretify tc (typecheck_simple e) in
       let ts = Type.destruct_tuple_exn t in
       List.nth_exn ts i
-    | Tagged (t,e) ->
-      let t' = concretify tc (typecheck_simple e) in
-      if not (type_equiv tc t t') then
-        failwith "ah"
-      else
-        t
+    | Obligation (_,_,e) ->
+      typecheck_simple e
   end
 
 let typecheck_formula

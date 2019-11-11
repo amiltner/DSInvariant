@@ -108,7 +108,7 @@ let rec to_myth_exp
         MythLang.ETuple (List.map ~f:to_myth_exp es)
     | Proj (i,e) ->
       MythLang.EProj (i+1, to_myth_exp e)
-    | Tagged _ -> failwith "shouldnt happen"
+    | Obligation _ -> failwith "shouldnt happen"
     end)
 
 let convert_decl_list_to_myth
@@ -173,7 +173,8 @@ let convert_problem_examples_type_to_myth
     (examples:(Expr.t * Expr.t) list)
   : MythLang.decl list
              * (MythLang.exp * MythLang.exp) list
-             * MythLang.typ =
+             * MythLang.typ
+             * type_to_type =
   let (decls,modi,_,_,_) = p.unprocessed in
   let modi =
     if !Consts.prelude_context then
@@ -194,4 +195,4 @@ let convert_problem_examples_type_to_myth
       examples
   in
   let t = to_myth_type_basic tt (Type.mk_named "t") in
-  (ds,examples,t)
+  (ds,examples,t,tt)

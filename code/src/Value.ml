@@ -4,6 +4,7 @@ type t =
   | Func of Param.t * Expr.t
   | Ctor of Id.t * t
   | Tuple of t list
+  | CoArr of Param.t * Expr.t * Expr.Contract.t * Expr.Contract.t * Expr.ContractArity.t
 [@@deriving bin_io, eq, hash, ord, sexp, show]
 
 let mk_func (a:Param.t) (e:Expr.t) : t =
@@ -57,18 +58,23 @@ let mk_false : t = mk_ctor "False" (mk_tuple [])
 let rec fold ~(func_f:Param.t -> Expr.t -> 'a)
              ~(ctor_f:Id.t -> 'a -> 'a)
              ~(tuple_f:'a list -> 'a)
+             ~(coarr_f:Param.t -> Expr.t -> Expr.Contract.t -> Expr.Contract.t -> Expr.ContractArity.t -> 'a)
             (v:t)
             : 'a =
-  let fold_simple = fold ~func_f ~ctor_f ~tuple_f
+  let fold_simple = fold ~func_f ~ctor_f ~tuple_f ~coarr_f
    in match v with
         | Func (a,e) -> func_f a e
         | Ctor (i,v) -> ctor_f i (fold_simple v)
         | Tuple vs -> tuple_f (List.map ~f:fold_simple vs)
+        | CoArr (p,e,c1,c2,a) -> coarr_f p e c1 c2 a
 
 let to_exp : t -> Expr.t =
   fold ~func_f:Expr.mk_func
        ~ctor_f:Expr.mk_ctor
        ~tuple_f:Expr.mk_tuple
+       ~coarr_f:(fun p e c1 c2 coa ->
+           let f = Expr.mk_func p e in
+           Expr.mk_obligation (CoArr(c1,c2)) coa f)
 
 let rec from_exp (e:Expr.t) : t option =
   match e with
@@ -83,7 +89,7 @@ let rec from_exp (e:Expr.t) : t option =
     | Proj _
     | Match _
     | Fix _
-    | Tagged _
+    | Obligation _
       -> None
 
 let from_exp_exn (e:Expr.t) : t =
@@ -94,6 +100,7 @@ let rec subvalues (v:t) : t list =
          | Func _ -> []
          | Ctor (_,v) -> subvalues v
          | Tuple vs -> List.concat_map ~f:subvalues vs
+         | CoArr _ -> failwith "shouldnt happen"
        end
 
 let strict_subvalues (e:t) : t list =
@@ -104,3 +111,4 @@ let size : t -> int =
     ~func_f:(fun (_,t) e -> 1 + (Type.size t) + (Expr.size e))
     ~ctor_f:(fun _ i -> i+1)
     ~tuple_f:(fun is -> List.fold ~f:(+) ~init:1 is)
+    ~coarr_f:(fun _ _ -> failwith "shouldnt happen")

@@ -17,7 +17,7 @@ module T : Synthesizer.t = struct
     if (List.length examples = 0) then
       (None,[Expr.mk_constant_true_func (Type.mk_named "t")])
     else
-      let (decls,examples,t) = DSToMythBasic.convert_problem_examples_type_to_myth problem examples in
+      let (decls,examples,t,_) = DSToMythBasic.convert_problem_examples_type_to_myth problem examples in
       let (sigma,gamma) =
         Myth.Typecheck.Typecheck.check_decls
           Myth.Sigma.Sigma.empty

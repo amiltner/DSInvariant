@@ -5,6 +5,31 @@ module T : LR.t = struct
   let _MAX_SIZE_T_ = 35
   let _MAX_SIZE_MULTIPLE_T = 25
 
+  let rec contract_of_type
+      ~(tc:Context.Types.t)
+      (t:Type.t)
+    : Expr.Contract.t =
+    let contract_of_type t = contract_of_type ~tc t in
+    if t = Type._t then
+      Expr.Contract.CoCheck
+    else
+      begin match t with
+        | Named i ->
+          contract_of_type (Context.find_exn tc i)
+        | Arrow (t1,t2) ->
+          let c1 = contract_of_type t1 in
+          let c2 = contract_of_type t2 in
+          Expr.Contract.CoArr (c1,c2)
+        | Tuple ts ->
+          let cs = List.map ~f:contract_of_type ts in
+          Expr.Contract.CoTuple cs
+        | Mu _ ->
+          Expr.Contract.CoAccept
+        | Variant branches ->
+          let bcs = List.map ~f:(fun (i,t) -> (i,contract_of_type t)) branches in
+          Expr.Contract.CoMatch bcs
+      end
+
   type 'a internal_condition =
     | InternalSet of ((int -> 'a list) * 'a list)
     | InternalPredicate of ('a -> bool)
@@ -140,6 +165,10 @@ module T : LR.t = struct
 
   let rec generator
       (tc:Context.Types.t)
+      (i_e:(Id.t * Expr.t) list)
+      (sigma:Myth.Sigma.Sigma.t)
+      (gamma:Myth.Gamma.Gamma.t)
+      (tt:DSToMythBasic.type_to_type)
       (t:Type.t)
       (pos:Value.t internal_condition)
       (neg:Value.t internal_condition)
@@ -148,7 +177,7 @@ module T : LR.t = struct
     if size <= 0 then
       []
     else
-      let generator_simple t size = generator tc t pos neg size in
+      let generator_simple t size = generator tc i_e sigma gamma tt t pos neg size in
       if Type.equal t Type._t then
         begin match pos with
           | InternalSet (is,_) -> is size
@@ -166,7 +195,17 @@ module T : LR.t = struct
             generator_simple
               (Context.find_exn tc i)
               size
-          | Arrow (_,_) -> failwith "ah"
+          | Arrow _ ->
+            let myth_fs =
+              Myth.Gen.gen_iexp
+                Myth.Timeout.unlimited
+                sigma
+                gamma
+                (DSToMythBasic.to_myth_type_basic tt t)
+                { size = 10; lambdas = 10 }
+            in
+            let fs = List.map ~f:MythToDSBasic.convert_expr (Myth.Rope.to_list myth_fs) in
+            List.map ~f:(Eval.evaluate_with_holes_basic ~tc ~eval_context:i_e) fs
           | Tuple ts ->
             let parts = List.partitions (size-1) (List.length ts) in
             let components =
@@ -184,7 +223,7 @@ module T : LR.t = struct
             List.map ~f:Value.mk_tuple components
           | Mu (v,t) ->
             let tc = Context.set tc ~key:v ~data:t in
-            generator tc t pos neg size
+            generator tc i_e sigma gamma tt t pos neg size
           | Variant options ->
             List.concat_map
               ~f:(fun (i,t) ->
@@ -196,6 +235,10 @@ module T : LR.t = struct
 
   and verifier
       (tc:Context.Types.t)
+      (i_e:(Id.t * Expr.t) list)
+      (sigma:Myth.Sigma.Sigma.t)
+      (gamma:Myth.Gamma.Gamma.t)
+      (tt:DSToMythBasic.type_to_type)
       (t:Type.t)
       (pos:Value.t internal_condition)
       (neg:Value.t internal_condition)
@@ -203,7 +246,7 @@ module T : LR.t = struct
       (pres:Value.t list)
       (v:Value.t)
     : (Value.t list * Value.t) option =
-    let verifier_simple t v = verifier tc t pos neg max_size v in
+    let verifier_simple t v = verifier tc i_e sigma gamma tt t pos neg max_size v in
     if Type.equal t Type._t then
       if not (check_condition pos v) then
         Some (pres,v)
@@ -217,12 +260,13 @@ module T : LR.t = struct
         | Arrow (t1,t2) ->
           let t1_generateds =
             Sequence.concat_map
-              ~f:(fun s -> Sequence.of_list (generator tc t1 neg pos s))
+              ~f:(fun s -> Sequence.of_list (generator tc i_e sigma gamma tt t1 neg pos s))
               (Sequence.of_list (List.range 0 max_size))
           in
+          let t1_contract = contract_of_type ~tc t1 in
           let t1_generateds_tagged =
             Sequence.map
-              ~f:(fun v -> Expr.mk_tagged t1 (Value.to_exp v))
+              ~f:(fun v -> Expr.mk_obligation t1_contract P (Value.to_exp v))
               t1_generateds
           in
           List.fold_until_completion
@@ -230,11 +274,22 @@ module T : LR.t = struct
                 begin match Sequence.next t1s with
                   | None -> Second None
                   | Some (t1,t1s) ->
-                    let (v,newpres) = Eval.evaluate ~tc (Expr.mk_app (Value.to_exp v) t1) in
-                    begin match verifier_simple t2 (pres@newpres) v with
-                      | None -> First t1s
-                      | Some _ as vo -> Second vo
-                    end
+                    let p_check v = check_condition neg v in
+                    let q_check v = check_condition pos v in
+                    try
+                      let (v,newpres) =
+                        Eval.evaluate ~tc ~p_check ~q_check ~log:P (Expr.mk_app (Value.to_exp v) t1)
+                      in
+                      begin match verifier_simple t2 (pres@newpres) v with
+                        | None -> First t1s
+                        | Some _ as vo -> Second vo
+                      end
+                    with
+                    | Eval.ContractViolation (v,vs,ca) ->
+                      if ca = P then
+                        First t1s
+                      else
+                        Second (Some (pres@vs,v))
                 end)
             t1_generateds_tagged
           (*let new_vs =
@@ -265,7 +320,7 @@ module T : LR.t = struct
             tsvs
         | Mu (i,t) ->
           let tc = Context.set tc ~key:i ~data:t in
-          verifier tc t pos neg max_size pres v
+          verifier tc i_e sigma gamma tt t pos neg max_size pres v
         | Variant branches ->
           let (i,v) = Value.destruct_ctor_exn v in
           let t = List.Assoc.find_exn ~equal:Id.equal branches i in
@@ -348,9 +403,20 @@ module T : LR.t = struct
       else
         _MAX_SIZE_T_
     in
+    let (decls,_,_,tt) = DSToMythBasic.convert_problem_examples_type_to_myth problem [] in
+    let (sigma,gamma) =
+      Myth.Typecheck.Typecheck.check_decls
+        Myth.Sigma.Sigma.empty
+        Myth.Gamma.Gamma.empty
+        decls
+    in
     let ans =
       verifier
         problem.tc
+        problem.eval_context
+        sigma
+        gamma
+        tt
         t
         (to_internal_condition pos)
         (to_internal_condition neg)

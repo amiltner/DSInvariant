@@ -1,10 +1,3 @@
 Test,Myth
-/useful/list-@-max-heap,30.290809154510498
-/useful/cache-minimal,1.545300006866455
-/useful/tree-@-heap,811.4102699756622
-/useful/range,4.493271112442017
-/useful/rbt-@-set,[-1]
-/useful/nat-nat-option-@-range,4.476391077041626
-/useful/binary-search-tree-@-set,[-1]
-/useful/unique-list-@-set,77.26318502426147
-/useful/stutter-list,39.21732711791992
+/useful/list-@-max-heap,32.52412486076355
+/useful/cache-minimal,1.6040101051330566
