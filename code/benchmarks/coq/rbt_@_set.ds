@@ -1,10 +1,10 @@
-type redblack =
+type color =
   | Red
   | Black
 
 type bst = mu bst .
   | Leaf
-  | Node of (redblack * bst * nat * bst)
+  | Node of (color * bst * nat * bst)
 
 struct
   type t = bst

@@ -11,12 +11,12 @@ struct
 
   let empty = Nil ;;
 
-  let length =
-    fix (length : t -> nat) =
+  let size =
+    fix (size : t -> nat) =
       fun (l : t) ->
         match l binding l with
         | Nil -> O
-        | Cons -> S (length l.1)
+        | Cons -> S (size l.1)
   ;;
 
   let maximum =
@@ -24,6 +24,18 @@ struct
       match l binding l with
       | Nil -> None
       | Cons -> Some (l.0)
+  ;;
+
+  let contains =
+    fix (contains : t -> nat -> bool) =
+      fun (l : t) ->
+        fun (n : nat) ->
+          match l binding lv with
+          | Nil -> False
+          | Cons ->
+            (match nat_eq (lv.0) n binding c with
+             | True -> True
+             | False -> contains (lv.1) n)
   ;;
 
   let insert =
@@ -36,7 +48,7 @@ struct
                    | False -> Cons (x, l))
   ;;
 
-  let pop =
+  let delete_max =
     fun (l : t) ->
       match l binding lp with
       | Nil -> l
@@ -60,18 +72,6 @@ struct
                     (update lp.1)))
                     lp.1))
   ;;
-
-  let contains =
-    fix (contains : t -> nat -> bool) =
-      fun (l : t) ->
-        fun (n : nat) ->
-          match l binding lv with
-          | Nil -> False
-          | Cons ->
-            (match nat_eq (lv.0) n binding c with
-             | True -> True
-             | False -> contains (lv.1) n)
-  ;;
 end
 :
 sig
@@ -79,21 +79,42 @@ sig
 
   val empty : t
 
-  val length : t -> nat
+  val size : t -> nat
+
   val maximum : t -> nat_option
+  val contains : t -> nat -> bool
 
   val insert : t -> nat -> t
-  val pop : t -> t
-
-  val contains : t -> nat -> bool
+  val delete_max : t -> t
 end
 
 maintains
 
 forall (h : t) .
-  forall (j : nat) .
-    (match maximum h binding m with
-     | None -> True
-     | Some -> (match nat_lt m j binding g with
-                | True -> not (contains h j)
-                | False -> True))
+  forall (i : nat) .
+    (and
+       (and
+          (and
+             (nat_eq (O) (size empty))
+             (and
+                (nat_eq (size (insert h i))
+                        (S (size h)))
+                (implies
+                   (nat_lt (O) (size h))
+                   (nat_eq (size h)
+                           (S (size (delete_max h)))))))
+          (and
+             (contains (insert h i) i)
+             (match maximum h binding m with
+              | None -> True
+              | Some -> (match nat_lt m i binding g with
+                         | True -> not (contains
+                                          (delete_max
+                                             (insert h i))
+                                          i)
+                         | False -> True))))
+       (match maximum h binding m with
+        | None -> True
+        | Some -> (match nat_lt m i binding g with
+                   | True -> not (contains h i)
+                   | False -> True)))

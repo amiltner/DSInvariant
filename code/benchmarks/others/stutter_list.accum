@@ -1,7 +1,0 @@
-type natoption =
-  | None
-  | Some of nat
-
-#
-
-accumulating natoption
