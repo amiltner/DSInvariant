@@ -2,21 +2,21 @@ type color =
   | Red
   | Black
 
-type bst = mu bst .
+type rbtree = mu rbtree .
   | Leaf
-  | Node of (color * bst * nat * bst)
+  | Node of (color * rbtree * nat * rbtree)
 
 struct
-  type t = bst
+  type t = rbtree
 
   let empty = Leaf ;;
 
-  let length =
-    fix (length : t -> nat) =
+  let size =
+    fix (size : t -> nat) =
       fun (b : t) ->
         match b binding b with
         | Leaf -> O
-        | Node -> add (S O) (add (length b.1) (length b.3))
+        | Node -> add (S O) (add (size b.1) (size b.3))
   ;;
 
   let lookup =
@@ -102,7 +102,7 @@ sig
 
   val empty : t
 
-  val length : t -> nat
+  val size : t -> nat
   val lookup : t -> nat -> bool
 
   val insert : t -> nat -> t
@@ -114,10 +114,35 @@ end
 
 maintains
 
-forall (s : t) .
-  forall (i : nat) .
-    forall (j : nat) .
-      (and
-        (not (lookup (delete s i) i))
-        (implies (lookup (delete s i) j)
-                 (lookup s j)))
+forall (s1 : t) .
+  forall (s2 : t) .
+    forall (i : nat) .
+      forall (j : nat) .
+        (and
+           (and
+              (and
+                 (nat_eq (O) (size empty))
+                 (implies
+                    (not (lookup s1 i))
+                    (nat_lt (size s1)
+                            (size (insert s1 i)))))
+              (and
+                 (not (lookup empty i))
+                 (lookup (insert s1 i) i)))
+           (and
+              (and
+                 (not (lookup (delete s1 i) i))
+                 (implies
+                    (and
+                       (not (nat_eq i j))
+                       (lookup s1 j))
+                    (lookup (delete s1 i) j)))
+              (and
+                 (implies
+                    (or (lookup s1 i)
+                        (lookup s2 i))
+                    (lookup (union s1 s2) i))
+                 (implies
+                    (and (lookup s1 i)
+                         (lookup s2 i))
+                    (lookup (inter s1 s2) i)))))

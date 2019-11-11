@@ -92,9 +92,9 @@ forall (s1 : t) .
               (and
                  (nat_eq (O) (size empty))
                  (implies
-                    (not (lookup s i))
-                    (nat_lt (size s)
-                            (size (insert s i)))))
+                    (not (lookup s1 i))
+                    (nat_lt (size s1)
+                            (size (insert s1 i)))))
               (and
                  (not (lookup empty i))
                  (lookup (insert s1 i) i)))
