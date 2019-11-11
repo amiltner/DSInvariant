@@ -360,7 +360,7 @@ module T : Verifier.t = struct
           else if Value.equal v Value.mk_false then
             Some e
           else
-            failwith "bad uf")
+            failwith (Value.show v))
       evaled
 
   let true_on_examples_full

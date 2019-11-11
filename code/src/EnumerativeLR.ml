@@ -289,7 +289,7 @@ module T : LR.t = struct
                       if ca = P then
                         First t1s
                       else
-                        Second (Some (pres@vs,v))
+                        (Second (Some (pres@vs,v)))
                 end)
             t1_generateds_tagged
           (*let new_vs =

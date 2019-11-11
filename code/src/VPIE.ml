@@ -122,10 +122,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
   let synth_new_inv
       ~(problem:Problem.t)
       ~(testbed:TestBed.t)
-      ~(invariant:Expr.t)
-      ~(post:UniversalFormula.t)
     : Expr.t =
-    let (ps,post_e) = post in
     begin match List.filter ~f:(satisfies_testbed ~problem testbed) !possibilities with
       | [] ->
         let subvalues =
@@ -142,40 +139,20 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                   (Typecheck.typecheck_exp problem.ec problem.tc problem.vc (Value.to_exp e)))
             subvalues
         in
-        let ps_t =
+        (*let ps_t =
           List.filter
             ~f:(fun (_,t) -> Type.equal t Type._t)
             ps
         in
         assert (List.length ps_t = 1);
-        let (t_p_i,_) = List.hd_exn ps_t in
-        let new_post =
-          (ps
-          ,Expr.mk_app
-              (Expr.mk_app
-                 (Expr.mk_and_func)
-                 post_e)
-              (Expr.mk_app
-                 invariant
-                 (Expr.mk_var t_p_i)))
-        in
+          let (t_p_i,_) = List.hd_exn ps_t in*)
         let testbed =
           List.fold_left
             ~f:(fun tb e ->
-                if not
-                    (List.is_empty
-                          (V.true_on_examples
-                             ~problem
-                             ~examples:[e]
-                             ~eval:(Expr.mk_identity_func Type._t)
-                             ~eval_t:(Type.mk_arrow (Type._t) (Type._t))
-                             ~post:new_post)) then
-                  TestBed.add_neg_test ~testbed:tb e
+                if TestBed.contains_test ~testbed:tb e then
+                  tb
                 else
-                  (if TestBed.contains_test ~testbed:tb e then
-                     tb
-                   else
-                     TestBed.add_pos_test ~testbed:tb e))
+                  TestBed.add_neg_test ~testbed:tb e)
             ~init:testbed
             all_inside_examples
         in
@@ -297,10 +274,19 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
               let model =
                 begin match model with
                   | [] ->
-                    verify_proves_post
-                      ~problem
-                      ~invariant
-                      ~post
+                    let model =
+                      verify_proves_post
+                        ~problem
+                        ~invariant
+                        ~post
+                    in
+                    let model =List.filter
+                      ~f:(fun n -> not (TestBed.contains_test ~testbed n))
+                      model
+                    in
+                    Log.info (lazy ("postcondition unproven, counterexample: "
+                                    ^ (List.to_string ~f:Value.show model)));
+                    model
                   | _ ->
                     Log.info (lazy ("Prior counterexample: " ^ (List.to_string ~f:Value.show model)));
                     model
@@ -331,8 +317,6 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                     synth_new_inv
                       ~problem
                       ~testbed
-                      ~post
-                      ~invariant
                   in
                   let answer_lists = (new_inv,testbed,[])::(old_invariant,old_testbed,model)::answer_lists in
                   learnVPreCondTrueAllInternal
