@@ -7,12 +7,12 @@ struct
 
   let empty = Nil ;;
 
-  let length =
-    fix (length : t -> nat) =
+  let size =
+    fix (size : t -> nat) =
       fun (l : t) ->
-        match l binding lp with
+        match l binding l with
         | Nil -> O
-        | Cons -> S (length lp.1)
+        | Cons -> S (size l.1)
   ;;
 
   let lookup =
@@ -44,28 +44,6 @@ struct
              | True -> lp.1
              | False -> Cons(lp.0, delete lp.1 x))
   ;;
-
-(*
-  let union =
-    fix (union : t -> t -> t) =
-      fun (la : t) ->
-        fun (lb : t) ->
-          match la binding la with
-          | Nil -> lb
-          | Cons -> (union la.1 (insert lb la.0))
-  ;;
-
-  let inter =
-    fix (inter : t -> t -> t) =
-      fun (la : t) ->
-        fun (lb : t) ->
-          match la binding la with
-          | Nil -> Nil
-          | Cons -> (match lookup lb la.0 binding r with
-                     | True -> Cons (la.0, (inter la.1 lb))
-                     | False -> inter la.1 lb)
-  ;;
-*)
 end
 :
 sig
@@ -73,16 +51,11 @@ sig
 
   val empty : t
 
-  val length : t -> nat
+  val size : t -> nat
   val lookup : t -> nat -> bool
 
   val insert : t -> nat -> t
   val delete : t -> nat -> t
-
-(*
-  val union : t -> t -> t
-  val inter : t -> t -> t
-*)
 end
 
 maintains
@@ -91,9 +64,20 @@ forall (s : t) .
   forall (i : nat) .
     forall (j : nat) .
       (and
-        (implies
-          (and
-            (not (nat_eq i j))
-            (lookup s j))
-          (lookup (delete s i) j))
-        (not (lookup (delete s i) i)))
+         (and
+            (and
+               (nat_eq (O) (size empty))
+               (implies
+                  (not (lookup s i))
+                  (nat_lt (size s)
+                          (size (insert s i)))))
+            (and
+               (not (lookup empty i))
+               (lookup (insert s i) i)))
+         (and
+            (not (lookup (delete s i) i))
+            (implies
+               (and
+                  (not (nat_eq i j))
+                  (lookup s j))
+               (lookup (delete s i) j))))

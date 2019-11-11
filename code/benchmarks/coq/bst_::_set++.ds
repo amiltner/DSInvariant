@@ -83,7 +83,6 @@ struct
                            | False -> Node (bp.0, bp.1, (delete bp.2 x))))
   ;;
 
-(*
   let union =
     fix (union : t -> t -> t) =
       fun (bx : t) ->
@@ -103,7 +102,6 @@ struct
                      | True -> insert (union (inter bx.0 by) (inter bx.2 by)) bx.1
                      | False -> union (inter bx.0 by) (inter bx.2 by))
   ;;
-*)
 end
 :
 sig
@@ -111,24 +109,47 @@ sig
 
   val empty : t
 
-  val length : t -> nat
+  val size : t -> nat
   val lookup : t -> nat -> bool
 
   val insert : t -> nat -> t
   val delete : t -> nat -> t
 
-(*
   val union : t -> t -> t
   val inter : t -> t -> t
-*)
 end
 
 maintains
 
-forall (s : t) .
-  forall (i : nat) .
-    forall (j : nat) .
-      (and
-        (not (lookup (delete s i) i))
-        (implies (lookup (delete s i) j)
-                 (lookup s j)))
+forall (s1 : t) .
+  forall (s2 : t) .
+    forall (i : nat) .
+      forall (j : nat) .
+        (and
+           (and
+              (and
+                 (nat_eq (O) (size empty))
+                 (implies
+                    (not (lookup s i))
+                    (nat_lt (size s)
+                            (size (insert s i)))))
+              (and
+                 (not (lookup empty i))
+                 (lookup (insert s1 i) i)))
+           (and
+              (and
+                 (not (lookup (delete s1 i) i))
+                 (implies
+                    (and
+                       (not (nat_eq i j))
+                       (lookup s1 j))
+                    (lookup (delete s1 i) j)))
+              (and
+                 (implies
+                    (or (lookup s1 i)
+                        (lookup s2 i))
+                    (lookup (union s1 s2) i))
+                 (implies
+                    (and (lookup s1 i)
+                         (lookup s2 i))
+                    (lookup (inter s1 s2) i)))))

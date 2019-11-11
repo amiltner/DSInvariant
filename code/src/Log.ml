@@ -1,11 +1,10 @@
-let indented_sep (indent : int) = "\n" ^ (String.make (42 + indent) ' ')
+let indented_sep (indent : int) = "\n" ^ (String.make (43 + indent) ' ')
 
 [%%import "config.h"]
 
 [%%if LOGGING = 0]
-  let fatal _ = ()
+  (* If logging has been entirely disabled during compilation *)
   let error _ = ()
-  let warn  _ = ()
   let info  _ = ()
   let debug _ = ()
 
@@ -13,27 +12,50 @@ let indented_sep (indent : int) = "\n" ^ (String.make (42 + indent) ' ')
 
   let [@warning "-27"] enable ?msg ?level _ = ()
 [%%else]
-  open Core_extended.Logger
+  (* If logging has not been disabled, a user may still choose not to log
+   * during a particular execution. Logging functions therefore accept `lazy`
+   * strings that are forced only when they are actually logged. *)
 
-  let logger = ref (create_default "")
-  let do_log level lstr = try log (!logger) (level , (Lazy.force lstr)) with _ -> ()
+  open Core
 
-  let enabled = ref 0
+  type level = Debug | Error | Info
+  let level_str = function Debug -> "(debug)"
+                         | Error -> "[ERROR]"
+                         | Info  -> "( info)"
 
-  let fatal lstr = if !enabled > 0 then do_log `Fatal lstr
-  let error lstr = if !enabled > 1 then do_log `Error lstr
-  let warn  lstr = if !enabled > 2 then do_log `Warn lstr
-  let info  lstr = if !enabled > 3 then do_log `Info lstr
-  let debug lstr = if !enabled > 4 then do_log `Debug lstr
+  let log_chan = ref stderr
+  let log_level = ref Debug
 
-  let disable () = enabled := 0
+  let is_enabled = ref false
+  let should_log level =
+    if not !is_enabled then false
+    else match level, !log_level with
+         | Error , _ | Info , Info | _ , Debug -> true
+         | _ -> false
 
-  let enable ?(msg = "") ?(level = 5) (file : string option) =
-    match file with
+  let do_log level lstr =
+    if should_log level
+    then begin
+      Out_channel.fprintf
+        !log_chan
+        "%s  %s  %s\n"
+        Time.(to_string (now ()))
+        (level_str level)
+        (Lazy.force lstr)
+    end
+
+  let info lstr = do_log Info lstr
+  let debug lstr = do_log Debug lstr
+  let error lstr = do_log Error lstr
+
+  let disable () = is_enabled := false
+
+  let enable ?(msg = "") ?(level = Debug) = function
     | None -> ()
-    | Some file -> logger := create_default file
-                 ; clear_filter (!logger)
-                 ; enabled := level
-                 ; info (lazy "")
-                 ; info (lazy (msg ^ String.(make (79 - (length msg)) '=')))
+    | Some filename
+      -> log_chan := Out_channel.create ~append:true filename
+       ; log_level := level
+       ; is_enabled := true
+       ; info (lazy "")
+       ; info (lazy (msg ^ String.(make (79 - (length msg)) '=')))
 [%%endif]

@@ -124,7 +124,7 @@ module Make
         (positive : Value.t list)
       : Expr.t =
       begin
-        Log.warn (lazy ("Restarting inference engine. Attempt was "
+        Log.info (lazy ("Restarting inference engine. Attempt was "
                         ^ (string_of_int attempt)
                         ^ ".")) ;
         learnInvariant_internal
