@@ -113,9 +113,13 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
               (TestBed.add_pos_tests_safe ~testbed:tb new_positives))
         answer_lists
     in
-    List.filter
-      ~f:(fun (e,tb,_) -> satisfies_testbed ~problem tb e)
-      answer_lists
+    let answer_lists_rev = List.rev answer_lists in
+    let answer_lists_rev =
+      List.take_while
+        ~f:(fun (e,tb,_) -> satisfies_testbed ~problem tb e)
+        answer_lists_rev
+    in
+    List.rev answer_lists_rev
 
   let synth_new_inv
       ~(problem:Problem.t)
