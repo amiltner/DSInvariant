@@ -106,6 +106,61 @@ module Make
     in
     helper invariant
 
+  let learnInvariant_internal_smallest50
+      ~(unprocessed_problem : Problem.t_unprocessed)
+    : string =
+    let problem = Problem.process unprocessed_problem in
+    (* find I => Q *)
+    let (ps,_) = problem.post in
+    let ps_t =
+      List.filter
+        ~f:(fun (_,t) -> Type.equal t Type._t)
+        ps
+    in
+    assert (List.length ps_t = 1);
+    let int_seq =
+      Sequence.unfold
+        ~init:0
+        ~f:(fun i -> Some (i,i+1))
+    in
+    let elt_seq =
+      Sequence.concat_map
+        ~f:(fun i -> Sequence.of_list (Generator.generator problem.tc Type._t i))
+        int_seq
+    in
+    let relevant_elts =
+      Sequence.to_list
+        (Sequence.take
+           elt_seq
+           50)
+    in
+    let testbed =
+      List.fold_left
+        ~f:(fun testbed e ->
+            let valid =
+              List.is_empty
+                (V.true_on_examples
+                   ~problem
+                   ~examples:[e]
+                   ~eval:(Expr.mk_identity_func Type._t)
+                   ~eval_t:(Type.mk_arrow Type._t Type._t)
+                   ~post:problem.post)
+            in
+            if valid then
+              TestBed.add_pos_test ~testbed e
+            else
+              TestBed.add_neg_test ~testbed e)
+        ~init:(TestBed.create_positive [])
+        relevant_elts
+    in
+    let (_,es) =
+      S.synth
+        ~problem
+        ~testbed
+    in
+    DSToMyth.full_to_pretty_myth_string (List.hd_exn es)
+      ~problem
+
 
   let rec learnInvariant_internal
       ~(problem : Problem.t)

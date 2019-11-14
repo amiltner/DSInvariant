@@ -1,3 +1,9 @@
 Test,Myth
-/useful/list-@-max-heap,32.52412486076355
-/useful/cache-minimal,1.6040101051330566
+/micro/cache,1.4967918395996094
+/micro/nat-nat-option-::-range,4.567217111587524
+/vfa/tree-::-priqueue,742.7444100379944
+/vfa/list-::-table,767.4935998916626
+/vfa/bst-::-table++,['timeout']
+/vfa/bst-::-table,['timeout']
+/vfa/tree-::-priqueue++,['timeout']
+/vfa/list-::-table++,['error']

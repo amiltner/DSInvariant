@@ -54,7 +54,7 @@ struct
           | Nil -> Nil
           | Cons -> (match nat_eq l.0 x binding c with
                      | True -> del l.2 x
-                     | False -> Cons (x, l.1, (del l.2 x)))
+                     | False -> Cons (l.0, l.1, (del l.2 x)))
   ;;
 end
 :

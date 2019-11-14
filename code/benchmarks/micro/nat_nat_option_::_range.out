@@ -1,0 +1,511 @@
+2019-11-14 15:10:40.530707-05:00
+
+2019-11-14 15:10:40.531208-05:00
+DSInfer========================================================================
+2019-11-14 15:10:40.531589-05:00
+Answer list length: 2
+2019-11-14 15:10:40.531617-05:00
+Candidate invariant: fun (x:natnatoption) -> False
+2019-11-14 15:10:40.531923-05:00
+Checking boundary for:None
+2019-11-14 15:10:40.532348-05:00
+Boundary Not Satisfied, counterexample:
+                                               ("(Value.Ctor (\"None\", (Value.Tuple [])))")
+                                               Comes from
+                                               ()
+2019-11-14 15:10:40.532388-05:00
+Answer list length: 1
+2019-11-14 15:10:40.532403-05:00
+Candidate invariant: fun (x:natnatoption) -> True
+2019-11-14 15:10:40.533206-05:00
+Checking boundary for:None
+2019-11-14 15:10:40.533391-05:00
+Safe
+2019-11-14 15:10:40.533408-05:00
+Checking boundary for:fun (r:natnatoption) -> match r with
+                          | None r -> True
+                          | Some r -> False
+2019-11-14 15:10:40.533615-05:00
+Safe
+2019-11-14 15:10:40.533631-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None r -> False
+      | Some r -> (match nat_eq (#1 r) n with
+                     | True c -> True
+                     | False c -> (match nat_lt (#1 r) n with
+                                     | True c -> (match nat_lt (#2 r) n with
+                                                    | True c -> False
+                                                    | False c -> True)
+                                     | False c -> False))
+2019-11-14 15:10:40.533858-05:00
+Safe
+2019-11-14 15:10:40.533874-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None rp -> Some (n, n)
+      | Some rp -> (match nat_lt (#1 rp) n with
+                      | True c -> (match nat_lt (#2 rp) n with
+                                     | True c -> Some (#1 rp, n)
+                                     | False c -> r)
+                      | False c -> (match nat_eq (#1 rp) n with
+                                      | True c -> r
+                                      | False c -> Some (n, #2 rp)))
+2019-11-14 15:10:40.534485-05:00
+Safe
+2019-11-14 15:10:40.534507-05:00
+verifying proves postcondition
+2019-11-14 15:10:40.539037-05:00
+postcondition unproven, counterexample: ("(Value.Ctor (\"Some\",\n   (Value.Tuple\n      [(Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))));\n        (Value.Ctor (\"O\", (Value.Tuple [])))])\n   ))")
+2019-11-14 15:10:40.539119-05:00
+testbed
+2019-11-14 15:10:40.539133-05:00
+{ TestBed.neg_tests =
+  [(Value.Ctor ("Some",
+      (Value.Tuple
+         [(Value.Ctor ("S", (Value.Ctor ("O", (Value.Tuple [])))));
+           (Value.Ctor ("O", (Value.Tuple [])))])
+      ))
+    ];
+  pos_tests = [(Value.Ctor ("None", (Value.Tuple [])))] }
+2019-11-14 15:10:40.539981-05:00
+Answer list length: 2
+2019-11-14 15:10:40.540003-05:00
+Candidate invariant: fun (n1:natnatoption) -> is_empty n1
+2019-11-14 15:10:40.540141-05:00
+Checking boundary for:None
+2019-11-14 15:10:40.540306-05:00
+Safe
+2019-11-14 15:10:40.540321-05:00
+Checking boundary for:fun (r:natnatoption) -> match r with
+                          | None r -> True
+                          | Some r -> False
+2019-11-14 15:10:40.540656-05:00
+Safe
+2019-11-14 15:10:40.540672-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None r -> False
+      | Some r -> (match nat_eq (#1 r) n with
+                     | True c -> True
+                     | False c -> (match nat_lt (#1 r) n with
+                                     | True c -> (match nat_lt (#2 r) n with
+                                                    | True c -> False
+                                                    | False c -> True)
+                                     | False c -> False))
+2019-11-14 15:10:40.541522-05:00
+Safe
+2019-11-14 15:10:40.541544-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None rp -> Some (n, n)
+      | Some rp -> (match nat_lt (#1 rp) n with
+                      | True c -> (match nat_lt (#2 rp) n with
+                                     | True c -> Some (#1 rp, n)
+                                     | False c -> r)
+                      | False c -> (match nat_eq (#1 rp) n with
+                                      | True c -> r
+                                      | False c -> Some (n, #2 rp)))
+2019-11-14 15:10:40.541809-05:00
+Boundary Not Satisfied, counterexample:
+                                               ("(Value.Ctor (\"Some\",\n   (Value.Tuple\n      [(Value.Ctor (\"O\", (Value.Tuple [])));\n        (Value.Ctor (\"O\", (Value.Tuple [])))])\n   ))")
+                                               Comes from
+                                               ("(Value.Ctor (\"None\", (Value.Tuple [])))")
+2019-11-14 15:10:40.541844-05:00
+Answer list length: 1
+2019-11-14 15:10:40.541852-05:00
+Candidate invariant: fun (x:natnatoption) -> True
+2019-11-14 15:10:40.541959-05:00
+Checking boundary for:None
+2019-11-14 15:10:40.542190-05:00
+Safe
+2019-11-14 15:10:40.542201-05:00
+Checking boundary for:fun (r:natnatoption) -> match r with
+                          | None r -> True
+                          | Some r -> False
+2019-11-14 15:10:40.542384-05:00
+Safe
+2019-11-14 15:10:40.542395-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None r -> False
+      | Some r -> (match nat_eq (#1 r) n with
+                     | True c -> True
+                     | False c -> (match nat_lt (#1 r) n with
+                                     | True c -> (match nat_lt (#2 r) n with
+                                                    | True c -> False
+                                                    | False c -> True)
+                                     | False c -> False))
+2019-11-14 15:10:40.542638-05:00
+Safe
+2019-11-14 15:10:40.542649-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None rp -> Some (n, n)
+      | Some rp -> (match nat_lt (#1 rp) n with
+                      | True c -> (match nat_lt (#2 rp) n with
+                                     | True c -> Some (#1 rp, n)
+                                     | False c -> r)
+                      | False c -> (match nat_eq (#1 rp) n with
+                                      | True c -> r
+                                      | False c -> Some (n, #2 rp)))
+2019-11-14 15:10:40.543815-05:00
+Safe
+2019-11-14 15:10:40.543837-05:00
+Prior counterexample: ("(Value.Ctor (\"Some\",\n   (Value.Tuple\n      [(Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))));\n        (Value.Ctor (\"O\", (Value.Tuple [])))])\n   ))")
+2019-11-14 15:10:40.543885-05:00
+testbed
+2019-11-14 15:10:40.543894-05:00
+{ TestBed.neg_tests =
+  [(Value.Ctor ("Some",
+      (Value.Tuple
+         [(Value.Ctor ("S", (Value.Ctor ("O", (Value.Tuple [])))));
+           (Value.Ctor ("O", (Value.Tuple [])))])
+      ))
+    ];
+  pos_tests =
+  [(Value.Ctor ("Some",
+      (Value.Tuple
+         [(Value.Ctor ("O", (Value.Tuple [])));
+           (Value.Ctor ("O", (Value.Tuple [])))])
+      ));
+    (Value.Ctor ("None", (Value.Tuple [])))]
+  }
+2019-11-14 15:10:40.586161-05:00
+Answer list length: 2
+2019-11-14 15:10:40.586205-05:00
+Candidate invariant: fun (n1:natnatoption) -> not (contains n1 S 0)
+2019-11-14 15:10:40.586352-05:00
+Checking boundary for:None
+2019-11-14 15:10:40.586563-05:00
+Safe
+2019-11-14 15:10:40.586574-05:00
+Checking boundary for:fun (r:natnatoption) -> match r with
+                          | None r -> True
+                          | Some r -> False
+2019-11-14 15:10:40.586746-05:00
+Safe
+2019-11-14 15:10:40.586756-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None r -> False
+      | Some r -> (match nat_eq (#1 r) n with
+                     | True c -> True
+                     | False c -> (match nat_lt (#1 r) n with
+                                     | True c -> (match nat_lt (#2 r) n with
+                                                    | True c -> False
+                                                    | False c -> True)
+                                     | False c -> False))
+2019-11-14 15:10:40.586976-05:00
+Safe
+2019-11-14 15:10:40.586986-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None rp -> Some (n, n)
+      | Some rp -> (match nat_lt (#1 rp) n with
+                      | True c -> (match nat_lt (#2 rp) n with
+                                     | True c -> Some (#1 rp, n)
+                                     | False c -> r)
+                      | False c -> (match nat_eq (#1 rp) n with
+                                      | True c -> r
+                                      | False c -> Some (n, #2 rp)))
+2019-11-14 15:10:40.587261-05:00
+Boundary Not Satisfied, counterexample:
+                                               ("(Value.Ctor (\"Some\",\n   (Value.Tuple\n      [(Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))));\n        (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))])\n   ))")
+                                               Comes from
+                                               ("(Value.Ctor (\"None\", (Value.Tuple [])))")
+2019-11-14 15:10:40.587300-05:00
+Answer list length: 1
+2019-11-14 15:10:40.587309-05:00
+Candidate invariant: fun (x:natnatoption) -> True
+2019-11-14 15:10:40.587416-05:00
+Checking boundary for:None
+2019-11-14 15:10:40.587566-05:00
+Safe
+2019-11-14 15:10:40.587576-05:00
+Checking boundary for:fun (r:natnatoption) -> match r with
+                          | None r -> True
+                          | Some r -> False
+2019-11-14 15:10:40.587739-05:00
+Safe
+2019-11-14 15:10:40.587749-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None r -> False
+      | Some r -> (match nat_eq (#1 r) n with
+                     | True c -> True
+                     | False c -> (match nat_lt (#1 r) n with
+                                     | True c -> (match nat_lt (#2 r) n with
+                                                    | True c -> False
+                                                    | False c -> True)
+                                     | False c -> False))
+2019-11-14 15:10:40.587966-05:00
+Safe
+2019-11-14 15:10:40.587976-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None rp -> Some (n, n)
+      | Some rp -> (match nat_lt (#1 rp) n with
+                      | True c -> (match nat_lt (#2 rp) n with
+                                     | True c -> Some (#1 rp, n)
+                                     | False c -> r)
+                      | False c -> (match nat_eq (#1 rp) n with
+                                      | True c -> r
+                                      | False c -> Some (n, #2 rp)))
+2019-11-14 15:10:40.589400-05:00
+Safe
+2019-11-14 15:10:40.589414-05:00
+Prior counterexample: ("(Value.Ctor (\"Some\",\n   (Value.Tuple\n      [(Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))));\n        (Value.Ctor (\"O\", (Value.Tuple [])))])\n   ))")
+2019-11-14 15:10:40.589489-05:00
+testbed
+2019-11-14 15:10:40.589498-05:00
+{ TestBed.neg_tests =
+  [(Value.Ctor ("Some",
+      (Value.Tuple
+         [(Value.Ctor ("S", (Value.Ctor ("O", (Value.Tuple [])))));
+           (Value.Ctor ("O", (Value.Tuple [])))])
+      ))
+    ];
+  pos_tests =
+  [(Value.Ctor ("Some",
+      (Value.Tuple
+         [(Value.Ctor ("S", (Value.Ctor ("O", (Value.Tuple [])))));
+           (Value.Ctor ("S", (Value.Ctor ("O", (Value.Tuple [])))))])
+      ));
+    (Value.Ctor ("Some",
+       (Value.Tuple
+          [(Value.Ctor ("O", (Value.Tuple [])));
+            (Value.Ctor ("O", (Value.Tuple [])))])
+       ));
+    (Value.Ctor ("None", (Value.Tuple [])))]
+  }
+2019-11-14 15:10:40.631865-05:00
+Answer list length: 2
+2019-11-14 15:10:40.631907-05:00
+Candidate invariant: fun (n1:natnatoption) ->
+  match n1 with
+    | None N_fresh_var_0 -> True
+    | Some N_fresh_var_0 -> (fun (n2:unit) ->
+                               (fun (n3:unit) -> nat_eq n3 n2)
+                                 (#2 N_fresh_var_0))
+                              (#1 N_fresh_var_0)
+2019-11-14 15:10:40.632085-05:00
+Checking boundary for:None
+2019-11-14 15:10:40.632278-05:00
+Safe
+2019-11-14 15:10:40.632288-05:00
+Checking boundary for:fun (r:natnatoption) -> match r with
+                          | None r -> True
+                          | Some r -> False
+2019-11-14 15:10:40.632443-05:00
+Safe
+2019-11-14 15:10:40.632452-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None r -> False
+      | Some r -> (match nat_eq (#1 r) n with
+                     | True c -> True
+                     | False c -> (match nat_lt (#1 r) n with
+                                     | True c -> (match nat_lt (#2 r) n with
+                                                    | True c -> False
+                                                    | False c -> True)
+                                     | False c -> False))
+2019-11-14 15:10:40.632696-05:00
+Safe
+2019-11-14 15:10:40.632706-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None rp -> Some (n, n)
+      | Some rp -> (match nat_lt (#1 rp) n with
+                      | True c -> (match nat_lt (#2 rp) n with
+                                     | True c -> Some (#1 rp, n)
+                                     | False c -> r)
+                      | False c -> (match nat_eq (#1 rp) n with
+                                      | True c -> r
+                                      | False c -> Some (n, #2 rp)))
+2019-11-14 15:10:40.634328-05:00
+Boundary Not Satisfied, counterexample:
+                                               ("(Value.Ctor (\"Some\",\n   (Value.Tuple\n      [(Value.Ctor (\"O\", (Value.Tuple [])));\n        (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))])\n   ))")
+                                               Comes from
+                                               ("(Value.Ctor (\"Some\",\n   (Value.Tuple\n      [(Value.Ctor (\"O\", (Value.Tuple [])));\n        (Value.Ctor (\"O\", (Value.Tuple [])))])\n   ))")
+2019-11-14 15:10:40.634377-05:00
+Answer list length: 1
+2019-11-14 15:10:40.634386-05:00
+Candidate invariant: fun (x:natnatoption) -> True
+2019-11-14 15:10:40.634510-05:00
+Checking boundary for:None
+2019-11-14 15:10:40.634657-05:00
+Safe
+2019-11-14 15:10:40.634666-05:00
+Checking boundary for:fun (r:natnatoption) -> match r with
+                          | None r -> True
+                          | Some r -> False
+2019-11-14 15:10:40.634818-05:00
+Safe
+2019-11-14 15:10:40.634828-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None r -> False
+      | Some r -> (match nat_eq (#1 r) n with
+                     | True c -> True
+                     | False c -> (match nat_lt (#1 r) n with
+                                     | True c -> (match nat_lt (#2 r) n with
+                                                    | True c -> False
+                                                    | False c -> True)
+                                     | False c -> False))
+2019-11-14 15:10:40.635037-05:00
+Safe
+2019-11-14 15:10:40.635047-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None rp -> Some (n, n)
+      | Some rp -> (match nat_lt (#1 rp) n with
+                      | True c -> (match nat_lt (#2 rp) n with
+                                     | True c -> Some (#1 rp, n)
+                                     | False c -> r)
+                      | False c -> (match nat_eq (#1 rp) n with
+                                      | True c -> r
+                                      | False c -> Some (n, #2 rp)))
+2019-11-14 15:10:40.637062-05:00
+Safe
+2019-11-14 15:10:40.637075-05:00
+Prior counterexample: ("(Value.Ctor (\"Some\",\n   (Value.Tuple\n      [(Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))));\n        (Value.Ctor (\"O\", (Value.Tuple [])))])\n   ))")
+2019-11-14 15:10:40.637276-05:00
+testbed
+2019-11-14 15:10:40.637286-05:00
+{ TestBed.neg_tests =
+  [(Value.Ctor ("Some",
+      (Value.Tuple
+         [(Value.Ctor ("S", (Value.Ctor ("O", (Value.Tuple [])))));
+           (Value.Ctor ("O", (Value.Tuple [])))])
+      ))
+    ];
+  pos_tests =
+  [(Value.Ctor ("Some",
+      (Value.Tuple
+         [(Value.Ctor ("O", (Value.Tuple [])));
+           (Value.Ctor ("S", (Value.Ctor ("O", (Value.Tuple [])))))])
+      ));
+    (Value.Ctor ("Some",
+       (Value.Tuple
+          [(Value.Ctor ("S", (Value.Ctor ("O", (Value.Tuple [])))));
+            (Value.Ctor ("S", (Value.Ctor ("O", (Value.Tuple [])))))])
+       ));
+    (Value.Ctor ("Some",
+       (Value.Tuple
+          [(Value.Ctor ("O", (Value.Tuple [])));
+            (Value.Ctor ("O", (Value.Tuple [])))])
+       ));
+    (Value.Ctor ("None", (Value.Tuple [])))]
+  }
+2019-11-14 15:10:40.643074-05:00
+Answer list length: 2
+2019-11-14 15:10:40.643098-05:00
+Candidate invariant: fun (n1:natnatoption) ->
+  match n1 with
+    | None N_fresh_var_0 -> True
+    | Some N_fresh_var_0 -> (fun (n2:unit) ->
+                               (fun (n3:unit) -> contains n1 n3)
+                                 (#2 N_fresh_var_0))
+                              (#1 N_fresh_var_0)
+2019-11-14 15:10:40.643246-05:00
+Checking boundary for:None
+2019-11-14 15:10:40.643410-05:00
+Safe
+2019-11-14 15:10:40.643420-05:00
+Checking boundary for:fun (r:natnatoption) -> match r with
+                          | None r -> True
+                          | Some r -> False
+2019-11-14 15:10:40.643598-05:00
+Safe
+2019-11-14 15:10:40.643608-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None r -> False
+      | Some r -> (match nat_eq (#1 r) n with
+                     | True c -> True
+                     | False c -> (match nat_lt (#1 r) n with
+                                     | True c -> (match nat_lt (#2 r) n with
+                                                    | True c -> False
+                                                    | False c -> True)
+                                     | False c -> False))
+2019-11-14 15:10:40.643794-05:00
+Safe
+2019-11-14 15:10:40.643803-05:00
+Checking boundary for:fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None rp -> Some (n, n)
+      | Some rp -> (match nat_lt (#1 rp) n with
+                      | True c -> (match nat_lt (#2 rp) n with
+                                     | True c -> Some (#1 rp, n)
+                                     | False c -> r)
+                      | False c -> (match nat_eq (#1 rp) n with
+                                      | True c -> r
+                                      | False c -> Some (n, #2 rp)))
+2019-11-14 15:10:40.652784-05:00
+Safe
+2019-11-14 15:10:40.652811-05:00
+verifying proves postcondition
+2019-11-14 15:10:41.119035-05:00
+postcondition proven
+2019-11-14 15:10:41.119080-05:00
+verifying: None
+2019-11-14 15:10:41.119285-05:00
+Safe
+2019-11-14 15:10:41.119295-05:00
+verifying: fun (r:natnatoption) -> match r with
+                          | None r -> True
+                          | Some r -> False
+2019-11-14 15:10:41.119550-05:00
+Safe
+2019-11-14 15:10:41.119561-05:00
+verifying: fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None r -> False
+      | Some r -> (match nat_eq (#1 r) n with
+                     | True c -> True
+                     | False c -> (match nat_lt (#1 r) n with
+                                     | True c -> (match nat_lt (#2 r) n with
+                                                    | True c -> False
+                                                    | False c -> True)
+                                     | False c -> False))
+2019-11-14 15:10:41.119781-05:00
+Safe
+2019-11-14 15:10:41.119791-05:00
+verifying: fun (r:natnatoption) ->
+  fun (n:nat) ->
+    match r with
+      | None rp -> Some (n, n)
+      | Some rp -> (match nat_lt (#1 rp) n with
+                      | True c -> (match nat_lt (#2 rp) n with
+                                     | True c -> Some (#1 rp, n)
+                                     | False c -> r)
+                      | False c -> (match nat_eq (#1 rp) n with
+                                      | True c -> r
+                                      | False c -> Some (n, #2 rp)))
+2019-11-14 15:10:41.642199-05:00
+Safe
+fun (n1:natnatoption) ->
+  match n1 with
+    | None N_fresh_var_0 -> True
+    | Some N_fresh_var_0 -> (fun (n2:unit) ->
+                               (fun (n3:unit) -> contains n1 n3)
+                                 (#2 N_fresh_var_0))
+                              (#1 N_fresh_var_0)

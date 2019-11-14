@@ -2,8 +2,10 @@ open Core
 open Utils
 
 module T : LR.t = struct
-  let _MAX_SIZE_T_ = 35
-  let _MAX_SIZE_MULTIPLE_T = 25
+  let _MAX_SIZE_T_ = 30
+  let _MAX_COUNT_INPUT_ = 3000
+  let _MAX_TOTAL_SIZE_ = 30000
+  let _MAX_SIZE_MULTIPLE_T = 15
 
   let rec contract_of_type
       ~(tc:Context.Types.t)
@@ -245,112 +247,122 @@ module T : LR.t = struct
       (max_size:int)
       (pres:Value.t list)
       (v:Value.t)
+      (prior_size:int)
     : (Value.t list * Value.t) option =
-    let verifier_simple t v = verifier tc i_e sigma gamma tt t pos neg max_size v in
-    if Type.equal t Type._t then
-      if not (check_condition pos v) then
-        Some (pres,v)
-      else
-        None
-    else if not (any_postcondition tc t) then
+    if max_size > _MAX_TOTAL_SIZE_ then
       None
     else
-      begin match t with
-        | Named i -> verifier_simple (Context.find_exn tc i) pres v
-        | Arrow (t1,t2) ->
-          let t1_generateds =
-            Sequence.concat_map
-              ~f:(fun s -> Sequence.of_list (generator tc i_e sigma gamma tt t1 neg pos s))
-              (Sequence.of_list (List.range 0 max_size))
-          in
-          let t1_contract = contract_of_type ~tc t1 in
-          let t1_generateds_tagged =
-            Sequence.map
-              ~f:(fun v -> Expr.mk_obligation t1_contract P (Value.to_exp v))
-              t1_generateds
-          in
-          List.fold_until_completion
-            ~f:(fun t1s ->
-                begin match Sequence.next t1s with
-                  | None -> Second None
-                  | Some (t1,t1s) ->
-                    let p_check v = check_condition neg v in
-                    let q_check v = check_condition pos v in
-                    try
-                      let (v,newpres) =
-                        Eval.evaluate ~tc ~p_check ~q_check ~log:P (Expr.mk_app (Value.to_exp v) t1)
-                      in
-                      begin match verifier_simple t2 (pres@newpres) v with
-                        | None -> First t1s
-                        | Some _ as vo -> Second vo
-                      end
-                    with
-                    | Eval.ContractViolation (v,vs,ca) ->
-                      if ca = P then
-                        First t1s
-                      else
-                        (Second (Some (pres@vs,v)))
-                end)
-            t1_generateds_tagged
+      let verifier_simple t v ps = verifier tc i_e sigma gamma tt t pos neg max_size v ps in
+      if Type.equal t Type._t then
+        if not (check_condition pos v) then
+          Some (pres,v)
+        else
+          None
+      else if not (any_postcondition tc t) then
+        None
+      else
+        begin match t with
+          | Named i -> verifier_simple (Context.find_exn tc i) pres v prior_size
+          | Arrow (t1,t2) ->
+            let t1_generateds =
+              Sequence.take
+                (Sequence.concat_map
+                   ~f:(fun s ->
+                       Sequence.of_list
+                         (List.map
+                            ~f:(fun v -> (s,v))
+                            (generator tc i_e sigma gamma tt t1 neg pos s)))
+                   (Sequence.of_list (List.range 0 max_size)))
+                _MAX_COUNT_INPUT_
+            in
+            let t1_contract = contract_of_type ~tc t1 in
+            let t1_generateds_tagged =
+              Sequence.map
+                ~f:(fun (s,v) -> (s,Expr.mk_obligation t1_contract P (Value.to_exp v)))
+                t1_generateds
+            in
+            List.fold_until_completion
+              ~f:(fun t1s ->
+                  begin match Sequence.next t1s with
+                    | None -> Second None
+                    | Some ((s,t1),t1s) ->
+                      let p_check v = check_condition neg v in
+                      let q_check v = check_condition pos v in
+                      try
+                        let (v,newpres) =
+                          Eval.evaluate ~tc ~p_check ~q_check ~log:P (Expr.mk_app (Value.to_exp v) t1)
+                        in
+                        begin match verifier_simple t2 (pres@newpres) v (prior_size+s) with
+                          | None -> First t1s
+                          | Some _ as vo -> Second vo
+                        end
+                      with
+                      | Eval.ContractViolation (v,vs,ca) ->
+                        if ca = P then
+                          First t1s
+                        else
+                          (Second (Some (pres@vs,v)))
+                  end)
+              t1_generateds_tagged
           (*let new_vs =
             List.map
               ~f:(fun ((subs,f),x) ->
                   let (v,newsubs) = (Eval.evaluate ~tc (Expr.mk_app (Value.to_exp f) x)) in
                   (subs@newsubs,v))
               (List.cartesian_product vs t1_generateds_tagged)
-          in
-            verifier_simple t2 new_vs*)
-        | Tuple ts ->
-          let vs = Value.destruct_tuple_exn v in
-          let tsvs =
-            List.zip_exn
-              ts
-              vs
-          in
-          List.fold_until_completion
-            ~f:(fun tsvs ->
-                begin match tsvs with
-                  | [] -> Second None
-                  | (t,v)::tsvs ->
-                    begin match verifier_simple t pres v with
-                      | None -> First tsvs
-                      | Some _ as vo -> Second vo
-                    end
-                end)
-            tsvs
-        | Mu (i,t) ->
-          let tc = Context.set tc ~key:i ~data:t in
-          verifier tc i_e sigma gamma tt t pos neg max_size pres v
-        | Variant branches ->
-          let (i,v) = Value.destruct_ctor_exn v in
-          let t = List.Assoc.find_exn ~equal:Id.equal branches i in
-          verifier_simple t pres v
-          (*let c_vs =
-            List.map
-              ~f:(fun (pres,v) ->
-                  let (i,v) = Value.destruct_ctor_exn v in
-                  (i,pres,v))
-              vs in
-          let c_vs_sorted =
-            List.sort
-              ~compare:(fun (c1,_,_) (c2,_,_) -> Id.compare c1 c2)
-              c_vs
-          in
-          let c_vs_grouped =
-            List.group
-              ~break:(fun (c1,_,_) (c2,_,_) -> not (String.equal c1 c2))
-              c_vs_sorted
             in
-          List.fold
-            ~f:(fun (acc_ins,acc_outs) cvs ->
-                let c = fst3 (List.hd_exn cvs) in
-                let vs = List.map ~f:(fun (_,pres,v) -> (pres,v)) cvs in
-                let t = List.Assoc.find_exn ~equal:String.equal branches c in
-                let (ins,outs) = verifier_simple t vs in
-                (ins@acc_ins,outs@acc_outs))
-            ~init:([],[])
-            c_vs_grouped*)
-      end
+            verifier_simple t2 new_vs*)
+          | Tuple ts ->
+            let vs = Value.destruct_tuple_exn v in
+            let tsvs =
+              List.zip_exn
+                ts
+                vs
+            in
+            List.fold_until_completion
+              ~f:(fun tsvs ->
+                  begin match tsvs with
+                    | [] -> Second None
+                    | (t,v)::tsvs ->
+                      begin match verifier_simple t pres v prior_size with
+                        | None -> First tsvs
+                        | Some _ as vo -> Second vo
+                      end
+                  end)
+              tsvs
+          | Mu (i,t) ->
+            let tc = Context.set tc ~key:i ~data:t in
+            verifier tc i_e sigma gamma tt t pos neg max_size pres v prior_size
+          | Variant branches ->
+            let (i,v) = Value.destruct_ctor_exn v in
+            let t = List.Assoc.find_exn ~equal:Id.equal branches i in
+            verifier_simple t pres v prior_size
+            (*let c_vs =
+              List.map
+                ~f:(fun (pres,v) ->
+                    let (i,v) = Value.destruct_ctor_exn v in
+                    (i,pres,v))
+                vs in
+              let c_vs_sorted =
+              List.sort
+                ~compare:(fun (c1,_,_) (c2,_,_) -> Id.compare c1 c2)
+                c_vs
+              in
+              let c_vs_grouped =
+              List.group
+                ~break:(fun (c1,_,_) (c2,_,_) -> not (String.equal c1 c2))
+                c_vs_sorted
+              in
+              List.fold
+              ~f:(fun (acc_ins,acc_outs) cvs ->
+                  let c = fst3 (List.hd_exn cvs) in
+                  let vs = List.map ~f:(fun (_,pres,v) -> (pres,v)) cvs in
+                  let t = List.Assoc.find_exn ~equal:String.equal branches c in
+                  let (ins,outs) = verifier_simple t vs in
+                  (ins@acc_ins,outs@acc_outs))
+              ~init:([],[])
+              c_vs_grouped*)
+        end
 
   module IntToExpr = struct
     include Map.Make(Int)
@@ -423,6 +435,7 @@ module T : LR.t = struct
         max_size
         []
         v
+        0
     in
     begin match ans with
       | None -> ([],[])

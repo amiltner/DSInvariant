@@ -18,6 +18,7 @@ def stddev(lst):
 
 
 TEST_EXT = '.ds'
+REF_EXT = '.out'
 BASELINE_EXT = '.out'
 BASE_FLAGS = []
 TIMEOUT_TIME = 1800
@@ -33,6 +34,10 @@ def ensure_dir(f):
 
 def transpose(matrix):
     return zip(*matrix)
+
+def check_equal(path,base,data):
+    with open(join(path,base + REF_EXT), "r") as exfile:
+        return exfile.read() == data
 
 def find_tests(root):
     tests = []
@@ -68,19 +73,26 @@ def gather_data(rootlength, prog, path, base):
                 break
             run_data.append([time] + datum.split(","))
         if error:
-            current_data[col_name]=[-1]
+            print("error")
+            current_data[col_name]=["error"]
         elif timeout:
-            print("oh no2")
-	    current_data[col_name]=[-1]
+            print("timeout")
+	    current_data[col_name]=["timeout"]
+        elif not check_equal(path,base,datum):
+            print("incorrect")
+	    current_data[col_name]=["incorrect"]
         else:
             run_data_transpose = transpose(run_data)
             current_data[col_name]=run_combiner(run_data_transpose)
 
     def ctime_combiner(run_data_transpose):
         print(run_data_transpose[0])
-        computation_time_col = [float(x) for x in run_data_transpose[0]]
-        ans = sum(computation_time_col)/len(computation_time_col)
-        return ans
+        if len(run_data_transpose[0]) == 1:
+            return run_data_transpose[0][0]
+        else:
+            computation_time_col = [float(x) for x in run_data_transpose[0]]
+            ans = sum(computation_time_col)/len(computation_time_col)
+            return ans
 
     def exs_reqd_combiner(run_data_transpose):
 	    example_number_col = [float(x) for x in run_data_transpose[0]]
@@ -99,7 +111,7 @@ def gather_data(rootlength, prog, path, base):
     #gather_col([],ctime_combiner,"SS",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([],ctime_combiner,"Full",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-prelude-context"],ctime_combiner,"FullP",TIMEOUT_TIME,REPETITION_COUNT)
-    gather_col([lambda p, b: "-use-myth"],ctime_combiner,"Myth",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col([],ctime_combiner,"Myth",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([lambda p, b: "-use-myth", lambda p, b: "-prelude-context"],ctime_combiner,"MythP",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-gat"],ctime_combiner,"GAT",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-no-dedup"],ctime_combiner,"NDD",TIMEOUT_TIME,REPETITION_COUNT)

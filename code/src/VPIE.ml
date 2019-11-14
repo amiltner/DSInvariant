@@ -162,7 +162,8 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
             ~f:(fun e -> assert (satisfies_testbed ~problem testbed e); Expr.simplify e)
             results
         in
-        possibilities := !possibilities@results;
+        if !Consts.synth_result_persistance then
+          possibilities := !possibilities@results;
         List.hd_exn results
       | h::_ ->
         h
@@ -282,11 +283,13 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                       ~f:(fun n -> not (TestBed.contains_test ~testbed n))
                       model
                     in
-                    Log.info (lazy ("postcondition unproven, counterexample: "
-                                    ^ (List.to_string ~f:Value.show model)));
                     model
                   | _ ->
                     Log.info (lazy ("Prior counterexample: " ^ (List.to_string ~f:Value.show model)));
+                    let model =List.filter
+                        ~f:(fun n -> not (TestBed.contains_test ~testbed n))
+                        model
+                    in
                     model
                 end
               in
@@ -322,10 +325,13 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
               end
             | new_positives ->
               let answer_lists =
-                valid_answer_lists
-                  ~problem
-                  ~answer_lists
-                  ~new_positives
+                if !Consts.counterexample_list_persistance then
+                  valid_answer_lists
+                    ~problem
+                    ~answer_lists
+                    ~new_positives
+                else
+                  [(Expr.mk_constant_true_func Type._t,testbed,[])]
               in
               learnVPreCondTrueAllInternal
                 ~answer_lists

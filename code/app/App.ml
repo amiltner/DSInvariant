@@ -25,6 +25,7 @@ open DSInvGen
 module EMIG = MIG.Make (EnumerativeVerifier.T) (ParSynthesizer.T) (EnumerativeLR.T)
 module QCMIG = MIG.Make (QuickCheckVerifier.T) (ParSynthesizer.T) (EnumerativeLR.T)
 module MythMIG = MIG.Make (EnumerativeVerifier.T) (MythSynthesizer.T) (EnumerativeLR.T)
+module AltMIG = MIG_Alternative.Make (EnumerativeVerifier.T) (MythSynthesizer.T) (EnumerativeLR.T)
 
 let read_accum = function
   | None -> "", ""
@@ -35,8 +36,10 @@ let read_accum = function
            | [ accum_types ; accum_annot ] -> (accum_types , accum_annot)
            | _ -> raise (DSInvGen.Exceptions.Parse_Exn "bad accumulating annotation")
 
-let main (* nworkers *) accum_file use_myth prelude_context gat ndd filename () =
-  Consts.use_myth := use_myth;
+let main (* nworkers *) accum_file use_fold srp clp smallest50 prelude_context gat ndd filename () =
+  Consts.use_myth := not use_fold;
+  Consts.synth_result_persistance := not srp;
+  Consts.counterexample_list_persistance := not clp;
   Consts.prelude_context := prelude_context;
   Myth_folds.Consts.generate_and_test := gat;
   Myth_folds.Consts.no_dedup := ndd;
@@ -52,10 +55,12 @@ let main (* nworkers *) accum_file use_myth prelude_context gat ndd filename () 
                                   (Lexing.from_string problem_string)
       in
       let inv =
-        if use_myth then
-          (MythMIG.learnInvariant ~unprocessed_problem)
-        else
+        if smallest50 then
+          (AltMIG.learnInvariant_internal_smallest50 ~unprocessed_problem)
+        else if use_fold then
           (EMIG.learnInvariant ~unprocessed_problem)
+        else
+          (MythMIG.learnInvariant ~unprocessed_problem)
       in
       print_endline inv
 
@@ -65,8 +70,14 @@ let spec =
     (* +> flag "nworkers" (optional_with_default 4 int) ~doc:" Number of workers" *)
     +> flag "-a" (optional string)
             ~doc:"FILENAME accumulating annotation file"
-    +> flag "-use-myth" no_arg
-      ~doc:"Use MYTH as the underlying synthesizer"
+    +> flag "-use-fold" no_arg
+      ~doc:"Use fold as the underlying synthesizer"
+    +> flag "-srp" no_arg
+      ~doc:"Do not use synth result persistance"
+    +> flag "-clp" no_arg
+      ~doc:"Do not use counterexample list persistance"
+    +> flag "-smallestthirty" no_arg
+      ~doc:"run post on smallest 30 elements"
     +> flag "-prelude-context" no_arg
       ~doc:"Use only Prelude as the underlying context"
     +> flag "-gat" no_arg

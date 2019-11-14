@@ -1,10 +1,12 @@
 open Core
-
 open Utils
 
 module T : Verifier.t = struct
   let _MAX_SIZE_T_ = 30
   let _MAX_SIZE_NON_T = 10
+  let _MAX_COUNT_INPUT_ = 300
+  let _MAX_COUNT_INPUT_TOTAL_ = 1000
+  let _MAX_TOTAL_SIZE_ = 45
 
   (*module TypeToGeneratorDict =
   struct
@@ -226,18 +228,31 @@ module T : Verifier.t = struct
         sizes_combinations
     in
     let all_args =
-      Sequence.concat_map
-        ~f:(fun tss ->
-            let tss_a =
-              List.map
-                ~f:(fun (t,s) ->
-                    List.map
-                      ~f:(fun (d,e) -> (d,e,t))
-                      (generator t s))
-                tss
-            in
-            Sequence.of_list (List.combinations tss_a))
-        sizes_combinations_sequences
+      Sequence.take
+        (Sequence.concat_map
+           ~f:(fun tss ->
+               let total_size =
+                 List.fold_left
+                   ~f:(fun acc (_,x) -> acc + x)
+                   ~init:0
+                   tss
+               in
+               if total_size > _MAX_TOTAL_SIZE_ then
+                 Sequence.empty
+               else
+                 let tss_a =
+                   List.map
+                     ~f:(fun (t,s) ->
+                         List.map
+                           ~f:(fun (d,e) -> (d,e,t))
+                           (List.take
+                              (generator t s)
+                              _MAX_COUNT_INPUT_))
+                     tss
+                 in
+                 Sequence.of_list (List.combinations tss_a))
+           sizes_combinations_sequences)
+        _MAX_COUNT_INPUT_TOTAL_
     in
     (*let args_possibilities =
       List.map

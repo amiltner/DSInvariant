@@ -33,7 +33,9 @@ let indented_sep (indent : int) = "\n" ^ (String.make (43 + indent) ' ')
          | Error , _ | Info , Info | _ , Debug -> true
          | _ -> false
 
-  let do_log level lstr =
+let do_log level lstr =
+  print_endline (Time.(to_string (now ())));
+  print_endline (Lazy.force lstr);
     if should_log level
     then begin
       Out_channel.fprintf

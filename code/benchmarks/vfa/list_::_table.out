@@ -1,0 +1,46 @@
+2019-11-14 15:13:11.729786-05:00
+
+2019-11-14 15:13:11.730303-05:00
+DSInfer========================================================================
+2019-11-14 15:13:11.730682-05:00
+Answer list length: 2
+2019-11-14 15:13:11.730710-05:00
+Candidate invariant: fun (x:list) -> False
+2019-11-14 15:13:11.730993-05:00
+Checking boundary for:[]
+2019-11-14 15:13:11.731395-05:00
+Boundary Not Satisfied, counterexample:
+                                               ("(Value.Ctor (\"Nil\", (Value.Tuple [])))")
+                                               Comes from
+                                               ()
+2019-11-14 15:13:11.732004-05:00
+Answer list length: 1
+2019-11-14 15:13:11.732023-05:00
+Candidate invariant: fun (x:list) -> True
+2019-11-14 15:13:11.732161-05:00
+Checking boundary for:[]
+2019-11-14 15:13:11.732346-05:00
+Safe
+2019-11-14 15:13:11.732361-05:00
+Checking boundary for:UnitVal
+2019-11-14 15:13:11.732553-05:00
+Safe
+2019-11-14 15:13:11.732568-05:00
+Checking boundary for:fix get (l:list) : nat -> value =
+  fun (x:nat) ->
+    match l with
+      | Nil l -> default
+      | Cons l -> (match nat_eq (#1 l) x with
+                     | True c -> #2 l
+                     | False c -> get (#3 l) x)
+2019-11-14 15:13:11.732786-05:00
+Safe
+2019-11-14 15:13:11.732801-05:00
+Checking boundary for:fun (l:list) -> fun (x:nat) -> fun (v:value) -> Cons (x, v, l)
+2019-11-14 15:13:11.743110-05:00
+Safe
+2019-11-14 15:13:11.743136-05:00
+verifying proves postcondition
+2019-11-14 15:13:13.198172-05:00
+postcondition proven
+fun (x:list) -> True

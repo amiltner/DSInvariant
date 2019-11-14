@@ -68,17 +68,17 @@ struct
       fun (tr : t) ->
         fun (p : pos) ->
           fun (v : value) ->
-            match tr binding tr with
+            match tr binding trp with
             | Leaf ->
-              (match p binding p with
+              (match p binding pp with
                | Halt -> Node (Leaf, v, Leaf)
-               | GoLeft -> Node ((insert (Leaf) p v), default, Leaf)
-               | GoRight -> Node (Leaf, default, (insert (Leaf) p v)))
+               | GoLeft -> Node ((insert (Leaf) pp v), default, Leaf)
+               | GoRight -> Node (Leaf, default, (insert (Leaf) pp v)))
             | Node ->
-              (match p binding p with
-               | Halt -> Node (tr.0, v, tr.2)
-               | GoLeft -> Node ((insert tr.0 p v), tr.1, tr.2)
-               | GoRight -> Node (tr.0, tr.1, (insert tr.2 p v)))
+              (match p binding pp with
+               | Halt -> Node (trp.0, v, trp.2)
+               | GoLeft -> Node ((insert trp.0 pp v), trp.1, trp.2)
+               | GoRight -> Node (trp.0, trp.1, (insert trp.2 pp v)))
   ;;
 end
 :

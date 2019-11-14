@@ -1,6 +1,7 @@
 TARGETS=App.exe
 
 GENERATE_DATA := python generate-data.py
+CREATE_DEFAULT_ANSWERS := python create-default-answers.py
 
 .PHONY: all build clean %.exe
 
@@ -32,3 +33,6 @@ documentation:
 
 generate-data: all
 	$(GENERATE_DATA) ./App.exe benchmarks
+
+generate-outs: all
+	$(CREATE_DEFAULT_ANSWERS) ./App.exe benchmarks

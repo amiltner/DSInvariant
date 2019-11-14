@@ -1,0 +1,8 @@
+fix f1 (l1:list) : bool =
+  match l1 with
+    | Nil N_fresh_var_0 -> True
+    | Cons N_fresh_var_0 -> (fun (n1:unit) ->
+                               (fun (l2:unit) ->
+                                  and (not (lookup l2 n1)) (f1 l2))
+                                 (#2 N_fresh_var_0))
+                              (#1 N_fresh_var_0)

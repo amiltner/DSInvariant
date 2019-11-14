@@ -1,0 +1,90 @@
+2019-11-14 15:13:13.274864-05:00
+
+2019-11-14 15:13:13.275366-05:00
+DSInfer========================================================================
+2019-11-14 15:13:13.276030-05:00
+Answer list length: 2
+2019-11-14 15:13:13.276056-05:00
+Candidate invariant: fun (x:bst) -> False
+2019-11-14 15:13:13.276458-05:00
+Checking boundary for:Leaf
+2019-11-14 15:13:13.277471-05:00
+Boundary Not Satisfied, counterexample:
+                                               ("(Value.Ctor (\"Leaf\", (Value.Tuple [])))")
+                                               Comes from
+                                               ()
+2019-11-14 15:13:13.277503-05:00
+Answer list length: 1
+2019-11-14 15:13:13.277517-05:00
+Candidate invariant: fun (x:bst) -> True
+2019-11-14 15:13:13.277714-05:00
+Checking boundary for:Leaf
+2019-11-14 15:13:13.278003-05:00
+Safe
+2019-11-14 15:13:13.278019-05:00
+Checking boundary for:UnitVal
+2019-11-14 15:13:13.278329-05:00
+Safe
+2019-11-14 15:13:13.278345-05:00
+Checking boundary for:fix get (b:bst) : nat -> value =
+  fun (x:nat) ->
+    match b with
+      | Leaf b -> default
+      | Node b -> (match nat_eq x (#2 b) with
+                     | True c -> #3 b
+                     | False c -> (match nat_lt x (#2 b) with
+                                     | True c -> get (#1 b) x
+                                     | False c -> get (#4 b) x))
+2019-11-14 15:13:13.278684-05:00
+Safe
+2019-11-14 15:13:13.278700-05:00
+Checking boundary for:fix set (b:bst) : nat -> value -> bst =
+  fun (k:nat) ->
+    fun (v:value) ->
+      match b with
+        | Leaf bp -> Node (Leaf, k, v, Leaf)
+        | Node bp -> (match nat_lt k (#2 bp) with
+                        | True c -> Node (set (#1 bp) k v, #2 bp, #3 bp,
+                                           #4 bp)
+                        | False c -> (match nat_eq k (#2 bp) with
+                                        | True c -> Node (#1 bp, k, v, #4 bp)
+                                        | False c -> Node (#1 bp, #2 bp,
+                                                            #3 bp,
+                                                            set (#4 bp) k v)))
+2019-11-14 15:13:13.292550-05:00
+Safe
+2019-11-14 15:13:13.292598-05:00
+Checking boundary for:fix del (b:bst) : nat -> bst =
+  fun (x:nat) ->
+    match b with
+      | Leaf bp -> Leaf
+      | Node bp -> (match nat_eq x (#2 bp) with
+                      | True c -> (match #1 bp with
+                                     | Leaf bl -> #4 bp
+                                     | Node bl -> (match #4 bp with
+                                                     | Leaf br -> #1 bp
+                                                     | Node br -> (fun (m:nat * value) ->
+                                                                    Node 
+                                                                    (#1 bp,
+                                                                    #1 m,
+                                                                    #2 m,
+                                                                    del
+                                                                    (#4 bp)
+                                                                    (#1 m)))
+                                                                    (
+                                                                    min_val
+                                                                    (#4 bp))))
+                      | False c -> (match nat_lt x (#2 bp) with
+                                      | True c -> Node (del (#1 bp) x, 
+                                                         #2 bp, #3 bp, 
+                                                         #4 bp)
+                                      | False c -> Node (#1 bp, #2 bp, 
+                                                          #3 bp,
+                                                          del (#4 bp) x)))
+2019-11-14 15:13:13.293441-05:00
+Safe
+2019-11-14 15:13:13.293465-05:00
+verifying proves postcondition
+2019-11-14 15:13:24.852915-05:00
+postcondition proven
+fun (x:bst) -> True
