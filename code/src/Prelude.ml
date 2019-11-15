@@ -84,6 +84,15 @@ let nat_eq =
                 | S -> nat_eq x1 x2)
 ;;
 
+let nat_between =
+  fun (x1 : nat) ->
+    fun (x2 : nat) ->
+      fun (x3 : nat) ->
+        (and
+          (nat_lt x1 x2)
+          (nat_lt x2 x3))
+;;
+
 (* END_PRELUDE *)
 
 "

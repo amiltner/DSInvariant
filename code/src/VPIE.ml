@@ -121,7 +121,14 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
       ~(problem:Problem.t)
       ~(testbed:TestBed.t)
     : Expr.t =
-    begin match List.filter ~f:(satisfies_testbed ~problem testbed) !possibilities with
+    print_endline (string_of_int (List.length !possibilities));
+    possibilities :=
+      List.dedup_and_sort
+        ~compare:Expr.compare
+        (List.filter
+           ~f:(satisfies_testbed ~problem (TestBed.remove_all_negatives ~testbed))
+           !possibilities);
+    begin match List.filter ~f:(satisfies_testbed ~problem (TestBed.remove_all_positives ~testbed)) !possibilities with
       | [] ->
         let subvalues =
           List.concat_map

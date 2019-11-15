@@ -2,6 +2,10 @@ type bst = mu bst .
   | Leaf
   | Node of (bst * nat * bst)
 
+type nat_option =
+  | Some of nat
+  | None
+
 struct
   type t = bst
 
@@ -51,15 +55,39 @@ struct
                    | Node -> min_val b.0)
   ;;
 
-  (* added *)
-  let max_val =
-    fix (max_val : t -> nat) =
-      fun (b : t) ->
-        match b binding b with
-        | Leaf -> O
-        | Node -> (match b.2 binding br with
-                   | Leaf -> b.1
-                   | Node -> max_val b.2)
+  type possible_defs =
+    | JustLeft of nat
+    | JustRight of nat
+    | Both of nat * nat
+    | Neither
+  let min_max_vals =
+    fun (t1 : t) ->
+      fun (t2 : t) ->
+        ((fun (max_val_real : t -> nat_option) ->
+          (fun (min_val_real : t -> nat_option) ->
+            match max_val_real t1 binding n1 with
+              | None ->
+                (match min_val_real t2 binding n2 with
+                | None -> Neither
+                | Some -> JustRight n2)
+              | Some ->
+                (match min_val_real t2 binding n2 with
+                | None -> JustLeft n1
+                | Some -> Both (n1,n2)))
+          (fix (min_val_real : t -> nat_option) =
+            fun (b : t) ->
+              match b binding b with
+              | Leaf -> (None)
+              | Node -> (match b.0 binding bl with
+                         | Leaf -> (Some (b.1))
+                         | Node -> (min_val_real b.0))))
+        (fix (max_val_real : t -> nat_option) =
+          fun (b : t) ->
+            match b binding b with
+            | Leaf -> (None)
+            | Node -> (match b.2 binding bl with
+                       | Leaf -> (Some (b.1))
+                       | Node -> (max_val_real b.2))))
   ;;
 
   let delete =

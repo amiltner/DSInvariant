@@ -62,6 +62,12 @@ maintains
 forall (r : t) .
   forall (i : nat) .
     forall (j : nat) .
-      (implies
-        (contains r i)
-        (contains (expand r j) i))
+      (and
+        (and
+          (contains (expand r i) i)
+          (and
+            (not (contains empty i))
+            (implies
+              (contains r i)
+              (contains (expand r j) i))))
+        (is_empty empty))

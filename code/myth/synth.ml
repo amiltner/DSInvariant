@@ -17,7 +17,7 @@ let standard_synth_plan : synth_plan =
   ; SynthGrowMatches
   ; SynthGrowMatches
   ; SynthSaturate 0.25
-  ; SynthSaturate 0.24
+  ; SynthSaturate 0.25
   ; SynthGrowScrutinees 5
   ; SynthSaturate 0.25
   ; SynthGrowMatches

@@ -1,36 +1,36 @@
-2019-11-14 15:10:39.537215-05:00
+2019-11-15 09:21:43.186921-05:00
 
-2019-11-14 15:10:39.537660-05:00
+2019-11-15 09:21:43.187414-05:00
 DSInfer========================================================================
-2019-11-14 15:10:39.538000-05:00
+2019-11-15 09:21:43.188785-05:00
 Answer list length: 2
-2019-11-14 15:10:39.538024-05:00
+2019-11-15 09:21:43.188849-05:00
 Candidate invariant: fun (x:natoption * natoption) -> False
-2019-11-14 15:10:39.538283-05:00
+2019-11-15 09:21:43.189478-05:00
 Checking boundary for:(None, None)
-2019-11-14 15:10:39.539210-05:00
+2019-11-15 09:21:43.191462-05:00
 Boundary Not Satisfied, counterexample:
                                                ("(Value.Tuple\n   [(Value.Ctor (\"None\", (Value.Tuple [])));\n     (Value.Ctor (\"None\", (Value.Tuple [])))])")
                                                Comes from
                                                ()
-2019-11-14 15:10:39.539251-05:00
+2019-11-15 09:21:43.191545-05:00
 Answer list length: 1
-2019-11-14 15:10:39.539265-05:00
+2019-11-15 09:21:43.191574-05:00
 Candidate invariant: fun (x:natoption * natoption) -> True
-2019-11-14 15:10:39.539405-05:00
+2019-11-15 09:21:43.191879-05:00
 Checking boundary for:(None, None)
-2019-11-14 15:10:39.539611-05:00
+2019-11-15 09:21:43.192277-05:00
 Safe
-2019-11-14 15:10:39.539633-05:00
+2019-11-15 09:21:43.192299-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:39.539862-05:00
+2019-11-15 09:21:43.192636-05:00
 Safe
-2019-11-14 15:10:39.539878-05:00
+2019-11-15 09:21:43.192658-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -40,9 +40,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:39.540116-05:00
+2019-11-15 09:21:43.193052-05:00
 Safe
-2019-11-14 15:10:39.540132-05:00
+2019-11-15 09:21:43.193074-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -50,9 +50,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:39.540670-05:00
+2019-11-15 09:21:43.193863-05:00
 Safe
-2019-11-14 15:10:39.540688-05:00
+2019-11-15 09:21:43.193890-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -73,15 +73,16 @@ Checking boundary for:fun (r:natoption * natoption) ->
                                                                     None)
                                                                    | False c -> r))
                                      | False c -> r))
-2019-11-14 15:10:39.541186-05:00
+2019-11-15 09:21:43.194694-05:00
 Safe
-2019-11-14 15:10:39.541206-05:00
+2019-11-15 09:21:43.194725-05:00
 verifying proves postcondition
-2019-11-14 15:10:39.542683-05:00
+2019-11-15 09:21:43.196748-05:00
 postcondition unproven, counterexample: ("(Value.Tuple\n   [(Value.Ctor (\"Some\",\n       (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))));\n     (Value.Ctor (\"Some\", (Value.Ctor (\"O\", (Value.Tuple [])))))])")
-2019-11-14 15:10:39.542739-05:00
+1
+2019-11-15 09:21:43.196830-05:00
 testbed
-2019-11-14 15:10:39.542755-05:00
+2019-11-15 09:21:43.196848-05:00
 { TestBed.neg_tests =
   [(Value.Tuple
       [(Value.Ctor ("Some",
@@ -94,24 +95,24 @@ testbed
         (Value.Ctor ("None", (Value.Tuple [])))])
     ]
   }
-2019-11-14 15:10:39.549173-05:00
+2019-11-15 09:21:43.204242-05:00
 Answer list length: 2
-2019-11-14 15:10:39.549224-05:00
+2019-11-15 09:21:43.204268-05:00
 Candidate invariant: fun (t1:natoption * natoption) -> is_empty (#2 empty, #2 t1)
-2019-11-14 15:10:39.549499-05:00
+2019-11-15 09:21:43.204434-05:00
 Checking boundary for:(None, None)
-2019-11-14 15:10:39.549888-05:00
+2019-11-15 09:21:43.205295-05:00
 Safe
-2019-11-14 15:10:39.549900-05:00
+2019-11-15 09:21:43.205306-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:39.550618-05:00
+2019-11-15 09:21:43.205580-05:00
 Safe
-2019-11-14 15:10:39.550632-05:00
+2019-11-15 09:21:43.205591-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -121,9 +122,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:39.550888-05:00
+2019-11-15 09:21:43.205825-05:00
 Safe
-2019-11-14 15:10:39.550899-05:00
+2019-11-15 09:21:43.205835-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -131,9 +132,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:39.551618-05:00
+2019-11-15 09:21:43.206536-05:00
 Safe
-2019-11-14 15:10:39.551645-05:00
+2019-11-15 09:21:43.206548-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -154,26 +155,26 @@ Checking boundary for:fun (r:natoption * natoption) ->
                                                                     None)
                                                                    | False c -> r))
                                      | False c -> r))
-2019-11-14 15:10:39.552397-05:00
+2019-11-15 09:21:43.207224-05:00
 Safe
-2019-11-14 15:10:39.552413-05:00
+2019-11-15 09:21:43.207236-05:00
 verifying proves postcondition
-2019-11-14 15:10:39.603292-05:00
+2019-11-15 09:21:43.255492-05:00
 postcondition proven
-2019-11-14 15:10:39.603336-05:00
+2019-11-15 09:21:43.255539-05:00
 verifying: (None, None)
-2019-11-14 15:10:39.603649-05:00
+2019-11-15 09:21:43.255863-05:00
 Safe
-2019-11-14 15:10:39.603659-05:00
+2019-11-15 09:21:43.255874-05:00
 verifying: fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:39.603875-05:00
+2019-11-15 09:21:43.256117-05:00
 Safe
-2019-11-14 15:10:39.603885-05:00
+2019-11-15 09:21:43.256127-05:00
 verifying: fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -183,9 +184,9 @@ verifying: fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:39.604112-05:00
+2019-11-15 09:21:43.256396-05:00
 Safe
-2019-11-14 15:10:39.604122-05:00
+2019-11-15 09:21:43.256406-05:00
 verifying: fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -193,14 +194,15 @@ verifying: fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:39.605139-05:00
+2019-11-15 09:21:43.257517-05:00
 Not a LR, counterexample:
                                                ("(Value.Tuple\n   [(Value.Ctor (\"Some\", (Value.Ctor (\"O\", (Value.Tuple [])))));\n     (Value.Ctor (\"Some\",\n        (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))))\n     ])")
                                                Comes from
                                                ("(Value.Tuple\n   [(Value.Ctor (\"Some\",\n       (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))));\n     (Value.Ctor (\"None\", (Value.Tuple [])))])")
-2019-11-14 15:10:39.605242-05:00
+3
+2019-11-15 09:21:43.257619-05:00
 testbed
-2019-11-14 15:10:39.605252-05:00
+2019-11-15 09:21:43.257628-05:00
 { TestBed.neg_tests =
   [(Value.Tuple
       [(Value.Ctor ("Some",
@@ -217,24 +219,24 @@ testbed
         (Value.Ctor ("None", (Value.Tuple [])))])
     ]
   }
-2019-11-14 15:10:39.605479-05:00
+2019-11-15 09:21:43.257898-05:00
 Answer list length: 3
-2019-11-14 15:10:39.605491-05:00
+2019-11-15 09:21:43.257911-05:00
 Candidate invariant: fun (t1:natoption * natoption) -> is_empty (#2 empty, #1 t1)
-2019-11-14 15:10:39.605643-05:00
+2019-11-15 09:21:43.258044-05:00
 Checking boundary for:(None, None)
-2019-11-14 15:10:39.605836-05:00
+2019-11-15 09:21:43.258270-05:00
 Safe
-2019-11-14 15:10:39.605846-05:00
+2019-11-15 09:21:43.258280-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:39.606047-05:00
+2019-11-15 09:21:43.258488-05:00
 Safe
-2019-11-14 15:10:39.606057-05:00
+2019-11-15 09:21:43.258498-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -244,9 +246,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:39.606303-05:00
+2019-11-15 09:21:43.258743-05:00
 Safe
-2019-11-14 15:10:39.606313-05:00
+2019-11-15 09:21:43.258752-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -254,29 +256,29 @@ Checking boundary for:fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:39.606541-05:00
+2019-11-15 09:21:43.259023-05:00
 Boundary Not Satisfied, counterexample:
                                                ("(Value.Tuple\n   [(Value.Ctor (\"Some\", (Value.Ctor (\"O\", (Value.Tuple [])))));\n     (Value.Ctor (\"None\", (Value.Tuple [])))])")
                                                Comes from
                                                ("(Value.Tuple\n   [(Value.Ctor (\"None\", (Value.Tuple [])));\n     (Value.Ctor (\"None\", (Value.Tuple [])))])")
-2019-11-14 15:10:39.606594-05:00
+2019-11-15 09:21:43.259076-05:00
 Answer list length: 2
-2019-11-14 15:10:39.606604-05:00
+2019-11-15 09:21:43.259085-05:00
 Candidate invariant: fun (t1:natoption * natoption) -> is_empty (#2 empty, #2 t1)
-2019-11-14 15:10:39.606727-05:00
+2019-11-15 09:21:43.259209-05:00
 Checking boundary for:(None, None)
-2019-11-14 15:10:39.606919-05:00
+2019-11-15 09:21:43.259434-05:00
 Safe
-2019-11-14 15:10:39.606929-05:00
+2019-11-15 09:21:43.259444-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:39.607197-05:00
+2019-11-15 09:21:43.259671-05:00
 Safe
-2019-11-14 15:10:39.607207-05:00
+2019-11-15 09:21:43.259680-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -286,9 +288,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:39.607452-05:00
+2019-11-15 09:21:43.259900-05:00
 Safe
-2019-11-14 15:10:39.607464-05:00
+2019-11-15 09:21:43.259912-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -296,9 +298,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:39.608643-05:00
+2019-11-15 09:21:43.260971-05:00
 Safe
-2019-11-14 15:10:39.608657-05:00
+2019-11-15 09:21:43.260984-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -319,13 +321,14 @@ Checking boundary for:fun (r:natoption * natoption) ->
                                                                     None)
                                                                    | False c -> r))
                                      | False c -> r))
-2019-11-14 15:10:39.609800-05:00
+2019-11-15 09:21:43.262006-05:00
 Safe
-2019-11-14 15:10:39.609813-05:00
+2019-11-15 09:21:43.262018-05:00
 Prior counterexample: ("(Value.Tuple\n   [(Value.Ctor (\"Some\",\n       (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))));\n     (Value.Ctor (\"None\", (Value.Tuple [])))])")
-2019-11-14 15:10:39.609904-05:00
+4
+2019-11-15 09:21:43.262091-05:00
 testbed
-2019-11-14 15:10:39.609913-05:00
+2019-11-15 09:21:43.262101-05:00
 { TestBed.neg_tests =
   [(Value.Tuple
       [(Value.Ctor ("Some",
@@ -345,24 +348,32 @@ testbed
          (Value.Ctor ("None", (Value.Tuple [])))])
     ]
   }
-2019-11-14 15:10:39.675425-05:00
+2019-11-15 09:21:43.377824-05:00
 Answer list length: 3
-2019-11-14 15:10:39.675470-05:00
-Candidate invariant: fun (t1:natoption * natoption) -> is_empty (delete (#2 empty, #1 t1) 0)
-2019-11-14 15:10:39.675663-05:00
+2019-11-15 09:21:43.377868-05:00
+Candidate invariant: fun (t1:natoption * natoption) ->
+  match #1 t1 with
+    | None N_fresh_var_0 -> True
+    | Some N_fresh_var_0 -> (fun (n1:unit) ->
+                               match n1 with
+                                 | O N_fresh_var_1 -> True
+                                 | S N_fresh_var_1 -> (fun (n2:unit) -> False)
+                                                        N_fresh_var_1)
+                              N_fresh_var_0
+2019-11-15 09:21:43.378055-05:00
 Checking boundary for:(None, None)
-2019-11-14 15:10:39.675887-05:00
+2019-11-15 09:21:43.378540-05:00
 Safe
-2019-11-14 15:10:39.675897-05:00
+2019-11-15 09:21:43.378553-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:39.676102-05:00
+2019-11-15 09:21:43.378866-05:00
 Safe
-2019-11-14 15:10:39.676112-05:00
+2019-11-15 09:21:43.378878-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -372,9 +383,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:39.676363-05:00
+2019-11-15 09:21:43.379265-05:00
 Safe
-2019-11-14 15:10:39.676373-05:00
+2019-11-15 09:21:43.379278-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -382,29 +393,29 @@ Checking boundary for:fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:39.676668-05:00
+2019-11-15 09:21:43.379611-05:00
 Boundary Not Satisfied, counterexample:
                                                ("(Value.Tuple\n   [(Value.Ctor (\"Some\",\n       (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))));\n     (Value.Ctor (\"None\", (Value.Tuple [])))])")
                                                Comes from
                                                ("(Value.Tuple\n   [(Value.Ctor (\"None\", (Value.Tuple [])));\n     (Value.Ctor (\"None\", (Value.Tuple [])))])")
-2019-11-14 15:10:39.676736-05:00
+2019-11-15 09:21:43.379709-05:00
 Answer list length: 2
-2019-11-14 15:10:39.676746-05:00
+2019-11-15 09:21:43.379720-05:00
 Candidate invariant: fun (t1:natoption * natoption) -> is_empty (#2 empty, #2 t1)
-2019-11-14 15:10:39.676971-05:00
+2019-11-15 09:21:43.379898-05:00
 Checking boundary for:(None, None)
-2019-11-14 15:10:39.677261-05:00
+2019-11-15 09:21:43.380150-05:00
 Safe
-2019-11-14 15:10:39.677273-05:00
+2019-11-15 09:21:43.380161-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:39.677502-05:00
+2019-11-15 09:21:43.380399-05:00
 Safe
-2019-11-14 15:10:39.677570-05:00
+2019-11-15 09:21:43.380409-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -414,9 +425,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:39.677812-05:00
+2019-11-15 09:21:43.380711-05:00
 Safe
-2019-11-14 15:10:39.677823-05:00
+2019-11-15 09:21:43.380723-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -424,29 +435,29 @@ Checking boundary for:fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:39.678921-05:00
+2019-11-15 09:21:43.382086-05:00
 Boundary Not Satisfied, counterexample:
                                                ("(Value.Tuple\n   [(Value.Ctor (\"Some\", (Value.Ctor (\"O\", (Value.Tuple [])))));\n     (Value.Ctor (\"Some\",\n        (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))))\n     ])")
                                                Comes from
                                                ("(Value.Tuple\n   [(Value.Ctor (\"Some\",\n       (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))));\n     (Value.Ctor (\"None\", (Value.Tuple [])))])")
-2019-11-14 15:10:39.678977-05:00
+2019-11-15 09:21:43.382153-05:00
 Answer list length: 1
-2019-11-14 15:10:39.678987-05:00
+2019-11-15 09:21:43.382164-05:00
 Candidate invariant: fun (x:natoption * natoption) -> True
-2019-11-14 15:10:39.679134-05:00
+2019-11-15 09:21:43.382317-05:00
 Checking boundary for:(None, None)
-2019-11-14 15:10:39.679344-05:00
+2019-11-15 09:21:43.382542-05:00
 Safe
-2019-11-14 15:10:39.679355-05:00
+2019-11-15 09:21:43.382554-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:39.679589-05:00
+2019-11-15 09:21:43.382813-05:00
 Safe
-2019-11-14 15:10:39.679600-05:00
+2019-11-15 09:21:43.382824-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -456,9 +467,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:39.679874-05:00
+2019-11-15 09:21:43.383086-05:00
 Safe
-2019-11-14 15:10:39.679885-05:00
+2019-11-15 09:21:43.383097-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -466,9 +477,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:39.681298-05:00
+2019-11-15 09:21:43.384881-05:00
 Safe
-2019-11-14 15:10:39.681310-05:00
+2019-11-15 09:21:43.384912-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -489,13 +500,14 @@ Checking boundary for:fun (r:natoption * natoption) ->
                                                                     None)
                                                                    | False c -> r))
                                      | False c -> r))
-2019-11-14 15:10:39.682966-05:00
+2019-11-15 09:21:43.387241-05:00
 Safe
-2019-11-14 15:10:39.682980-05:00
+2019-11-15 09:21:43.387296-05:00
 Prior counterexample: ("(Value.Tuple\n   [(Value.Ctor (\"Some\",\n       (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))));\n     (Value.Ctor (\"Some\", (Value.Ctor (\"O\", (Value.Tuple [])))))])")
-2019-11-14 15:10:39.683175-05:00
+5
+2019-11-15 09:21:43.387451-05:00
 testbed
-2019-11-14 15:10:39.683200-05:00
+2019-11-15 09:21:43.387462-05:00
 { TestBed.neg_tests =
   [(Value.Tuple
       [(Value.Ctor ("Some",
@@ -520,24 +532,32 @@ testbed
          (Value.Ctor ("None", (Value.Tuple [])))])
     ]
   }
-2019-11-14 15:10:39.684602-05:00
+2019-11-15 09:21:43.391004-05:00
 Answer list length: 2
-2019-11-14 15:10:39.684619-05:00
-Candidate invariant: fun (t1:natoption * natoption) -> not (contains (#2 t1, #2 empty) 0)
-2019-11-14 15:10:39.684753-05:00
+2019-11-15 09:21:43.391026-05:00
+Candidate invariant: fun (t1:natoption * natoption) ->
+  match #2 t1 with
+    | None N_fresh_var_0 -> True
+    | Some N_fresh_var_0 -> (fun (n1:unit) ->
+                               match n1 with
+                                 | O N_fresh_var_1 -> False
+                                 | S N_fresh_var_1 -> (fun (n2:unit) -> True)
+                                                        N_fresh_var_1)
+                              N_fresh_var_0
+2019-11-15 09:21:43.391217-05:00
 Checking boundary for:(None, None)
-2019-11-14 15:10:39.685008-05:00
+2019-11-15 09:21:43.391486-05:00
 Safe
-2019-11-14 15:10:39.685018-05:00
+2019-11-15 09:21:43.391497-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:39.685250-05:00
+2019-11-15 09:21:43.391719-05:00
 Safe
-2019-11-14 15:10:39.685261-05:00
+2019-11-15 09:21:43.391729-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -547,9 +567,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:39.685479-05:00
+2019-11-15 09:21:43.392088-05:00
 Safe
-2019-11-14 15:10:39.685489-05:00
+2019-11-15 09:21:43.392098-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -557,9 +577,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:39.688064-05:00
+2019-11-15 09:21:43.394205-05:00
 Safe
-2019-11-14 15:10:39.688078-05:00
+2019-11-15 09:21:43.394219-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -580,15 +600,16 @@ Checking boundary for:fun (r:natoption * natoption) ->
                                                                     None)
                                                                    | False c -> r))
                                      | False c -> r))
-2019-11-14 15:10:39.690872-05:00
+2019-11-15 09:21:43.396814-05:00
 Safe
-2019-11-14 15:10:39.690886-05:00
+2019-11-15 09:21:43.396838-05:00
 verifying proves postcondition
-2019-11-14 15:10:39.695339-05:00
+2019-11-15 09:21:43.401505-05:00
 postcondition unproven, counterexample: ("(Value.Tuple\n   [(Value.Ctor (\"Some\",\n       (Value.Ctor (\"S\",\n          (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))))\n       ));\n     (Value.Ctor (\"Some\",\n        (Value.Ctor (\"S\", (Value.Ctor (\"O\", (Value.Tuple [])))))))\n     ])")
-2019-11-14 15:10:39.695675-05:00
+4
+2019-11-15 09:21:43.401722-05:00
 testbed
-2019-11-14 15:10:39.695686-05:00
+2019-11-15 09:21:43.401733-05:00
 { TestBed.neg_tests =
   [(Value.Tuple
       [(Value.Ctor ("Some",
@@ -621,9 +642,9 @@ testbed
          (Value.Ctor ("None", (Value.Tuple [])))])
     ]
   }
-2019-11-14 15:10:39.787443-05:00
+2019-11-15 09:21:43.439523-05:00
 Answer list length: 3
-2019-11-14 15:10:39.787487-05:00
+2019-11-15 09:21:43.439569-05:00
 Candidate invariant: fun (t1:natoption * natoption) ->
   match #1 t1 with
     | None N_fresh_var_0 -> True
@@ -634,20 +655,20 @@ Candidate invariant: fun (t1:natoption * natoption) ->
                                                             nat_lte n1 n2)
                                                            N_fresh_var_1)
                               N_fresh_var_0
-2019-11-14 15:10:39.787666-05:00
+2019-11-15 09:21:43.439760-05:00
 Checking boundary for:(None, None)
-2019-11-14 15:10:39.787894-05:00
+2019-11-15 09:21:43.439993-05:00
 Safe
-2019-11-14 15:10:39.787904-05:00
+2019-11-15 09:21:43.440004-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:39.788112-05:00
+2019-11-15 09:21:43.440272-05:00
 Safe
-2019-11-14 15:10:39.788122-05:00
+2019-11-15 09:21:43.440292-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -657,9 +678,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:39.788359-05:00
+2019-11-15 09:21:43.440525-05:00
 Safe
-2019-11-14 15:10:39.788369-05:00
+2019-11-15 09:21:43.440534-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -667,9 +688,9 @@ Checking boundary for:fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:39.790617-05:00
+2019-11-15 09:21:43.443052-05:00
 Safe
-2019-11-14 15:10:39.790635-05:00
+2019-11-15 09:21:43.443065-05:00
 Checking boundary for:fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -690,26 +711,26 @@ Checking boundary for:fun (r:natoption * natoption) ->
                                                                     None)
                                                                    | False c -> r))
                                      | False c -> r))
-2019-11-14 15:10:39.793047-05:00
+2019-11-15 09:21:43.445900-05:00
 Safe
-2019-11-14 15:10:39.793061-05:00
+2019-11-15 09:21:43.445914-05:00
 verifying proves postcondition
-2019-11-14 15:10:40.018773-05:00
+2019-11-15 09:21:43.656856-05:00
 postcondition proven
-2019-11-14 15:10:40.018820-05:00
+2019-11-15 09:21:43.656900-05:00
 verifying: (None, None)
-2019-11-14 15:10:40.019132-05:00
+2019-11-15 09:21:43.657155-05:00
 Safe
-2019-11-14 15:10:40.019144-05:00
+2019-11-15 09:21:43.657165-05:00
 verifying: fun (r:natoption * natoption) ->
   match #1 r with
     | None b -> (match #2 r with
                    | None b -> True
                    | Some b -> False)
     | Some b -> False
-2019-11-14 15:10:40.019361-05:00
+2019-11-15 09:21:43.657470-05:00
 Safe
-2019-11-14 15:10:40.019371-05:00
+2019-11-15 09:21:43.657480-05:00
 verifying: fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -719,9 +740,9 @@ verifying: fun (r:natoption * natoption) ->
                      | False c -> (match #2 r with
                                      | None z -> False
                                      | Some z -> nat_eq z n))
-2019-11-14 15:10:40.019623-05:00
+2019-11-15 09:21:43.657732-05:00
 Safe
-2019-11-14 15:10:40.019633-05:00
+2019-11-15 09:21:43.657742-05:00
 verifying: fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -729,9 +750,9 @@ verifying: fun (r:natoption * natoption) ->
       | Some z -> (match nat_lt n z with
                      | True c -> (Some n, Some z)
                      | False c -> (Some n, None))
-2019-11-14 15:10:40.170124-05:00
+2019-11-15 09:21:43.803660-05:00
 Safe
-2019-11-14 15:10:40.170175-05:00
+2019-11-15 09:21:43.803712-05:00
 verifying: fun (r:natoption * natoption) ->
   fun (n:nat) ->
     match #1 r with
@@ -752,7 +773,7 @@ verifying: fun (r:natoption * natoption) ->
                                                                     None)
                                                                    | False c -> r))
                                      | False c -> r))
-2019-11-14 15:10:40.457588-05:00
+2019-11-15 09:21:44.123032-05:00
 Safe
 fun (t1:natoption * natoption) ->
   match #1 t1 with

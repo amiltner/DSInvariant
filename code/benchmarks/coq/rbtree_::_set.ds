@@ -6,6 +6,10 @@ type rbtree = mu rbtree .
   | Leaf
   | Node of (color * rbtree * nat * rbtree)
 
+type nat_option =
+  | Some of nat
+  | None
+
 struct
   type t = rbtree
 
@@ -53,6 +57,41 @@ struct
         | Node -> (match b.1 binding bl with
                    | Leaf -> b.2
                    | Node -> min_val b.1)
+  ;;
+
+  type possible_defs =
+    | JustLeft of nat
+    | JustRight of nat
+    | Both of nat * nat
+    | Neither
+  let min_max_vals =
+    fun (t1 : t) ->
+      fun (t2 : t) ->
+        ((fun (max_val_real : t -> nat_option) ->
+          (fun (min_val_real : t -> nat_option) ->
+            match max_val_real t1 binding n1 with
+              | None ->
+                (match min_val_real t2 binding n2 with
+                | None -> Neither
+                | Some -> JustRight n2)
+              | Some ->
+                (match min_val_real t2 binding n2 with
+                | None -> JustLeft n1
+                | Some -> Both (n1,n2)))
+          (fix (min_val_real : t -> nat_option) =
+            fun (b : t) ->
+              match b binding b with
+              | Leaf -> (None)
+              | Node -> (match b.1 binding bl with
+                         | Leaf -> (Some (b.2))
+                         | Node -> (min_val_real b.1))))
+        (fix (max_val_real : t -> nat_option) =
+          fun (b : t) ->
+            match b binding b with
+            | Leaf -> (None)
+            | Node -> (match b.3 binding bl with
+                       | Leaf -> (Some (b.2))
+                       | Node -> (max_val_real b.3))))
   ;;
 
   let delete =

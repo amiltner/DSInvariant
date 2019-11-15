@@ -73,3 +73,15 @@ let merge (tb1 : t) (tb2 : t) : t =
   }
 
 let positives ~(testbed : t) : Value.t list = testbed.pos_tests
+
+let remove_all_negatives ~(testbed : t) : t =
+  {
+    pos_tests = testbed.pos_tests ;
+    neg_tests = []                ;
+  }
+
+let remove_all_positives ~(testbed : t) : t =
+  {
+    pos_tests = []                ;
+    neg_tests = testbed.neg_tests ;
+  }
