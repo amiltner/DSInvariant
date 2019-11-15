@@ -16,19 +16,30 @@ struct
           add (S (size t.0)) (size t.2)
   ;;
 
-  let height =
-    fix (height : t -> nat) =
+  let contains_full =
+    fix (contains_full : t -> nat -> bool) =
       fun (t : t) ->
-        match t binding t with
-        | Leaf -> O
-        | Node ->
-          (((fun (leftheight : nat) ->
-            (fun (rightheight : nat) ->
-              match nat_lt leftheight rightheight binding c with
-              | True -> S rightheight
-              | False -> S rightheight))
-            (height t.0))
-          (height t.2))
+        fun (x : nat) ->
+          match t binding t with
+          | Leaf -> False
+          | Node ->
+            (or
+              (nat_eq t.1 x)
+              (or
+                (contains_full t.0 x)
+                (contains_full t.2 x)))
+  ;;
+
+  let contains_fast =
+    fix (contains_fast : t -> nat -> bool) =
+      fun (t : t) ->
+        fun (x : nat) ->
+          match t binding t with
+          | Leaf -> False
+          | Node ->
+            (or
+              (nat_eq t.1 x)
+              (contains_fast t.2 x))
   ;;
 
   let insert =
@@ -47,12 +58,16 @@ sig
   val empty : t
 
   val size : t -> nat
-  val height : t -> nat
 
   val insert : t -> nat -> t
+  val contains_full : t -> nat -> bool
+  val contains_fast : t -> nat -> bool
 end
 
 maintains
 
 forall (s : t) .
-  (nat_eq (height s) (size s))
+  forall (i : nat) .
+    (implies
+      (contains_full s i)
+      (contains_fast s i))
