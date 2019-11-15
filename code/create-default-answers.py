@@ -62,9 +62,9 @@ def sort_data(data):
 def print_data(data):
     ensure_dir("generated_data/")
     with open("generated_data/generated_data.csv", "wb") as csvfile:
-	datawriter = csv.DictWriter(csvfile,fieldnames=data[0].keys())
-	datawriter.writeheader()
-	datawriter.writerows(data)
+        datawriter = csv.DictWriter(csvfile,fieldnames=data[0].keys())
+        datawriter.writeheader()
+        datawriter.writerows(data)
 
 def print_usage(args):
     print("Usage: {0} <prog> <test|testdir>".format(args[0]))
@@ -73,10 +73,10 @@ def transform_data(path, base, run_data):
     current_data = {"Test":join(path, base + TEST_EXT).replace("_","-")[6:]}
     run_data_transpose = transpose(run_data)
     for index in range(len(run_data_transpose)/2):
-	col_name = run_data_transpose[index][0]
-	col_data = run_data_transpose[index+1]
+        col_name = run_data_transpose[index][0]
+        col_data = run_data_transpose[index+1]
         if "" in col_data:
-	    current_data[col_name]=-1
+            current_data[col_name]=-1
         else:
             col = [float(x) for x in col_data]
             current_data[col_name] = str(sum(col)/len(col))
@@ -103,7 +103,7 @@ def main(args):
             else:
                 data = gather_data(prog, path, base)
                 sort_data(data)
-		print_data([data])
+        print_data([data])
     else:
         print_usage(args)
 
