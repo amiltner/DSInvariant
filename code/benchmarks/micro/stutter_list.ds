@@ -51,7 +51,7 @@ struct
                 | False -> Cons(lp.0, Cons(lp.0, delete lp.1 x))))
   ;;
 
-let union =
+  let union =
     fix (union : t -> t -> t) =
       fun (la : t) ->
         fun (lb : t) ->
@@ -89,11 +89,22 @@ end
 
 maintains
 
-forall (s : t) .
-  forall (i : nat) .
-    forall (j : nat) .
-      (implies
+forall (s1 : t) .
+  forall (s2 : t) .
+    forall (i : nat) .
+      forall (j : nat) .
         (and
-          (not (nat_eq i j))
-          (lookup s j))
-        (lookup (delete s i) j))
+          (implies
+            (and
+              (not (nat_eq i j))
+              (lookup s1 j))
+            (lookup (delete s1 i) j))
+          (and
+            (implies
+               (or (lookup s1 i)
+                   (lookup s2 i))
+               (lookup (union s1 s2) i))
+            (implies
+               (and (lookup s1 i)
+                    (lookup s2 i))
+               (lookup (inter s1 s2) i))))

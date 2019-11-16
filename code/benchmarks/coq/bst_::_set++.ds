@@ -2,6 +2,10 @@ type bst = mu bst .
   | Leaf
   | Node of (bst * nat * bst)
 
+type nat_option =
+  | Some of nat
+  | None
+
 struct
   type t = bst
 
@@ -26,6 +30,14 @@ struct
                     | False -> (match nat_lt x b.1 binding c with
                                 | True -> lookup b.0 x
                                 | False -> lookup b.2 x))
+  ;;
+
+  let size =
+    fix (size : t -> nat) =
+      fun (b : t) ->
+        match b binding b with
+        | Leaf -> O
+        | Node -> add (S O) (add (size b.0) (size b.2))
   ;;
 
   let insert =

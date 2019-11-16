@@ -88,5 +88,9 @@ maintains
 forall (r : t) .
   forall (i : nat) .
     (and
-      (contains (insert r i) i)
-      (not (contains (delete r i) i)))
+      (and
+        (and
+          (contains (insert r i) i)
+          (not (contains (delete r i) i)))
+        (not (contains empty i)))
+        (is_empty empty))

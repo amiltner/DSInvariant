@@ -68,6 +68,8 @@ maintains
 
 forall (s : t) .
   forall (i : nat) .
-    (implies
-      (contains_full s i)
-      (contains_fast s i))
+    (and
+      (implies
+        (contains_full s i)
+        (contains_fast s i))
+      (contains_fast (insert s i) i))

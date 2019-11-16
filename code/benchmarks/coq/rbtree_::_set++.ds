@@ -6,6 +6,10 @@ type rbtree = mu rbtree .
   | Leaf
   | Node of (color * rbtree * nat * rbtree)
 
+type nat_option =
+  | Some of nat
+  | None
+
 struct
   type t = rbtree
 
