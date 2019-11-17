@@ -123,19 +123,19 @@ end
 maintains
 
 forall (d : t) .
-  forall (k1 : nat) .
-    forall (k2 : nat) .
+  forall (k1 : pos) .
+    forall (k2 : pos) .
       forall (v : value) .
         (and
            (and
               (and
-                 (value_eq default (get empty k1))
-                 (value_eq v (get (set d k1 v) k1)))
+                 (value_eq default (lookup empty k1))
+                 (value_eq v (lookup (insert d k1 v) k1)))
               (implies
-                 (not (nat_eq k1 k2))
+                 (not (pos_eq k1 k2))
                  (and
-                    (value_eq (get (del d k1) k2)
-                              (get d k2))
-                    (value_eq (get (set d k1 v) k2)
-                              (get d k2)))))
-           (value_eq default (get (del d k1) k1)))
+                    (value_eq (lookup (delete d k1) k2)
+                              (lookup d k2))
+                    (value_eq (lookup (insert d k1 v) k2)
+                              (lookup d k2)))))
+           (value_eq default (lookup (delete d k1) k1)))
