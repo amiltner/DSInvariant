@@ -296,7 +296,10 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                         ~f:(fun n -> not (TestBed.contains_test ~testbed n))
                         model
                     in
-                    model
+                    if List.is_empty model then
+                      failwith "no valid invariant"
+                    else
+                      model
                 end
               in
               let model =
