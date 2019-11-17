@@ -80,4 +80,6 @@ forall (s : t) .
                (and
                   (not (nat_eq i j))
                   (lookup s j))
-               (lookup (delete s i) j))))
+               (and
+                 (lookup (insert s i) j)
+                 (lookup (delete s i) j)))))

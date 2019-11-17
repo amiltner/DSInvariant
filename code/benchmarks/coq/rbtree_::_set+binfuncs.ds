@@ -175,7 +175,9 @@ forall (s1 : t) .
                     (and
                        (not (nat_eq i j))
                        (lookup s1 j))
-                    (lookup (delete s1 i) j)))
+                    (and
+                      (lookup (insert s1 i) j)
+                      (lookup (delete s1 i) j))))
               (and
                  (implies
                     (or (lookup s1 i)

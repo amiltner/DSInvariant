@@ -1,7 +1,7 @@
 TARGETS=App.exe
 
-GENERATE_DATA := python generate-data.py
-CREATE_DEFAULT_ANSWERS := python create-default-answers.py
+GENERATE_DATA := python2 generate-data.py
+CREATE_DEFAULT_ANSWERS := python2 create-default-answers.py
 
 .PHONY: all build clean %.exe
 

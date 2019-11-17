@@ -150,25 +150,26 @@ end
 
 maintains
 
-forall (s1 : t) .
-  forall (s2 : t) .
-    forall (i : nat) .
-      forall (j : nat) .
-        (and
-           (and
-              (and
-                 (nat_eq (O) (size empty))
-                 (implies
-                    (not (lookup s1 i))
-                    (nat_lt (size s1)
-                            (size (insert s1 i)))))
-              (and
-                 (not (lookup empty i))
-                 (lookup (insert s1 i) i)))
-           (and
-              (not (lookup (delete s1 i) i))
-              (implies
-                 (and
-                    (not (nat_eq i j))
-                    (lookup s1 j))
-                 (lookup (delete s1 i) j))))
+forall (s : t) .
+  forall (i : nat) .
+    forall (j : nat) .
+      (and
+          (and
+            (and
+                (nat_eq (O) (size empty))
+                (implies
+                  (not (lookup s i))
+                  (nat_lt (size s1)
+                          (size (insert s i)))))
+            (and
+                (not (lookup empty i))
+                (lookup (insert s i) i)))
+          (and
+            (not (lookup (delete s i) i))
+            (implies
+                (and
+                  (not (nat_eq i j))
+                  (lookup s j))
+                (and
+                  (lookup (insert s i) j)
+                  (lookup (delete s i) j)))))
