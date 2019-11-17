@@ -48,7 +48,8 @@ def find_tests(root):
 
 def gather_datum(prog, path, base, additional_flags, timeout):
     start = time.time()
-    flags = map(lambda t: t(path,base),additional_flags)
+    flags = additional_flags
+    #flags = map(lambda t: t(path,base),additional_flags)
     process_output = EasyProcess([prog] + BASE_FLAGS + flags + [join(path, base + TEST_EXT)]).call(timeout=timeout)
     end = time.time()
     return ((end - start), process_output.stdout,process_output.stderr)
@@ -57,7 +58,7 @@ def gather_datum(prog, path, base, additional_flags, timeout):
 def gather_data(rootlength, prog, path, base):
     current_data = {"Test":join(path, base).replace("_","-")[rootlength:]}
 
-    def gather_col(flags, run_combiner, col_name, timeout_time, repetition_count):
+    def gather_col(flags, run_combiner, col_name, timeout_time, repetition_count, compare):
         print(col_name)
         run_data = []
         timeout = False
@@ -68,31 +69,27 @@ def gather_data(rootlength, prog, path, base):
                 print(err)
                 error = True
                 break
-            if time > TIMEOUT_TIME:
+            if time >= TIMEOUT_TIME:
                 timeout = True
                 break
             run_data.append([time] + datum.split(","))
         if error:
             print("error")
-            current_data[col_name]=["error"]
+            current_data[col_name]="error"
         elif timeout:
             print("timeout")
-	    current_data[col_name]=["timeout"]
-        elif not check_equal(path,base,datum):
+	    current_data[col_name]="timeout"
+        elif not check_equal(path,base,datum) and compare:
             print("incorrect")
-	    current_data[col_name]=["incorrect"]
+	    current_data[col_name]="incorrect"
         else:
             run_data_transpose = transpose(run_data)
             current_data[col_name]=run_combiner(run_data_transpose)
 
     def ctime_combiner(run_data_transpose):
-        print(run_data_transpose[0])
-        if len(run_data_transpose[0]) == 1:
-            return run_data_transpose[0][0]
-        else:
-            computation_time_col = [float(x) for x in run_data_transpose[0]]
-            ans = sum(computation_time_col)/len(computation_time_col)
-            return ans
+        computation_time_col = [float(x) for x in run_data_transpose[0]]
+        ans = sum(computation_time_col)/len(computation_time_col)
+        return ans
 
     def exs_reqd_combiner(run_data_transpose):
 	    example_number_col = [float(x) for x in run_data_transpose[0]]
@@ -111,7 +108,11 @@ def gather_data(rootlength, prog, path, base):
     #gather_col([],ctime_combiner,"SS",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([],ctime_combiner,"Full",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-prelude-context"],ctime_combiner,"FullP",TIMEOUT_TIME,REPETITION_COUNT)
-    gather_col([],ctime_combiner,"Myth",TIMEOUT_TIME,REPETITION_COUNT)
+    gather_col([],ctime_combiner,"Myth",TIMEOUT_TIME,REPETITION_COUNT,True)
+    gather_col(["-use-fold"],ctime_combiner,"Fold",TIMEOUT_TIME,REPETITION_COUNT,False)
+    gather_col(["-smallestthirty"],ctime_combiner,"SmallestThirty",TIMEOUT_TIME,REPETITION_COUNT,True)
+    gather_col(["-srp"],ctime_combiner,"SRP",TIMEOUT_TIME,REPETITION_COUNT,True)
+    gather_col(["-clp"],ctime_combiner,"CLP",TIMEOUT_TIME,REPETITION_COUNT,True)
     #gather_col([lambda p, b: "-use-myth", lambda p, b: "-prelude-context"],ctime_combiner,"MythP",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-gat"],ctime_combiner,"GAT",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-no-dedup"],ctime_combiner,"NDD",TIMEOUT_TIME,REPETITION_COUNT)
@@ -179,6 +180,7 @@ def sort_data(data):
     return sorted(data,cmp=specsize_compare)
 
 def print_data(data):
+    print(data)
     ensure_dir("generated_data/")
     with open("generated_data/generated_data.csv", "wb") as csvfile:
 	datawriter = csv.DictWriter(csvfile,fieldnames=data[0].keys())

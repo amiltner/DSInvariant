@@ -1,0 +1,39 @@
+fix f1 (b1:bst) : bool =
+  match b1 with
+    | Leaf N_fresh_var_0 -> True
+    | Node N_fresh_var_0 -> (fun (b2:unit) ->
+                               (fun (n1:unit) ->
+                                  (fun (b3:unit) ->
+                                     match min_max_vals b3 b2 with
+                                       | JustLeft N_fresh_var_1 -> (fun (n2:unit) ->
+                                                                    and
+                                                                    (nat_lt
+                                                                    n1 n2)
+                                                                    (f1 b3))
+                                                                    N_fresh_var_1
+                                       | JustRight N_fresh_var_1 -> (fun (n2:unit) ->
+                                                                    and
+                                                                    (nat_lt
+                                                                    n2 n1)
+                                                                    (f1 b2))
+                                                                    N_fresh_var_1
+                                       | Both N_fresh_var_1 -> (fun (n2:unit) ->
+                                                                  (fun (n3:unit) ->
+                                                                    match 
+                                                                    f1 b2 with
+                                                                    | False N_fresh_var_2 -> 
+                                                                    False
+                                                                    | True N_fresh_var_2 -> 
+                                                                    and
+                                                                    (nat_between
+                                                                    n3 n1 n2)
+                                                                    (f1 b3))
+                                                                    (
+                                                                    #2
+                                                                    N_fresh_var_1))
+                                                                 (#1
+                                                                    N_fresh_var_1)
+                                       | Neither N_fresh_var_1 -> True)
+                                    (#3 N_fresh_var_0))
+                                 (#2 N_fresh_var_0))
+                              (#1 N_fresh_var_0)

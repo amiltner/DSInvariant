@@ -337,6 +337,15 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                     ~answer_lists
                     ~new_positives
                 else
+                  let testbed =
+                    TestBed.remove_all_negatives
+                      ~testbed
+                  in
+                  let testbed =
+                    TestBed.add_pos_tests
+                      ~testbed
+                      new_positives
+                  in
                   [(Expr.mk_constant_true_func Type._t,testbed,[])]
               in
               learnVPreCondTrueAllInternal

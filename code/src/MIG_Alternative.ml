@@ -134,6 +134,7 @@ module Make
            elt_seq
            50)
     in
+    Log.info (lazy "elements found, building testbed");
     let testbed =
       List.fold_left
         ~f:(fun testbed e ->
@@ -153,6 +154,7 @@ module Make
         ~init:(TestBed.create_positive [])
         relevant_elts
     in
+    Log.info (lazy ("testbed done, starting synthesis"));
     let (_,es) =
       S.synth
         ~problem

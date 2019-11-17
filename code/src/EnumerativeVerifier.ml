@@ -5,7 +5,7 @@ module T : Verifier.t = struct
   let _MAX_SIZE_T_ = 30
   let _MAX_SIZE_NON_T = 10
   let _MAX_COUNT_INPUT_ = 300
-  let _MAX_COUNT_INPUT_TOTAL_ = 1000
+  let _MAX_COUNT_INPUT_TOTAL_ = 2000
   let _MAX_TOTAL_SIZE_ = 45
 
   (*module TypeToGeneratorDict =

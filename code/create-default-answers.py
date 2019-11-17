@@ -21,7 +21,7 @@ TEST_EXT = '.ds'
 REF_EXT = '.out'
 BASELINE_EXT = '.out'
 BASE_FLAGS = []
-TIMEOUT_TIME = 18000
+TIMEOUT_TIME = 1800
 STILL_WORK_TIMEOUT_TIME = 120
 GENERATE_EXAMPLES_TIMEOUT_TIME = 600000
 
@@ -103,7 +103,6 @@ def main(args):
             else:
                 data = gather_data(prog, path, base)
                 sort_data(data)
-        print_data([data])
     else:
         print_usage(args)
 
