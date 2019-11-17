@@ -2,6 +2,8 @@ config.h
 *.tgz
 starexec*
 
+*.out
+
 # - - -
 # OCaml
 # - - -

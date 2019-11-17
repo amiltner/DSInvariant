@@ -1,3 +1,9 @@
+(* Sources:
+ * --------
+ * Specification: https://softwarefoundations.cis.upenn.edu/vfa-current/ADT.html
+ * Implementation: https://softwarefoundations.cis.upenn.edu/lf-current/Lists.html#lab96
+ *)
+
 type value = mu value .
   | UnitVal
   | SingleVal of value
@@ -43,19 +49,6 @@ struct
         fun (v : value) ->
           Cons (x, v, l)
   ;;
-
-  (* additional functions beyond VFA *)
-
-  let del =
-    fix (del : t -> nat -> t) =
-      fun (l : t) ->
-        fun (x : nat) ->
-          match l binding l with
-          | Nil -> Nil
-          | Cons -> (match nat_eq l.0 x binding c with
-                     | True -> del l.2 x
-                     | False -> Cons (l.0, l.1, (del l.2 x)))
-  ;;
 end
 :
 sig
@@ -66,10 +59,6 @@ sig
 
   val get : t -> nat -> value
   val set : t -> nat -> value -> t
-
-  (* additional functions beyond VFA *)
-
-  val del : t -> nat -> t
 end
 
 maintains
@@ -79,12 +68,10 @@ forall (d : t) .
     forall (k2 : nat) .
       forall (v : value) .
         (and
-           (and
-              (and
-                 (value_eq default (get empty k1))
-                 (value_eq v (get (set d k1 v) k1)))
-              (implies
-                 (not (nat_eq k1 k2))
-                 (value_eq (get (set d k1 v) k2)
-                           (get d k2))))
-           (value_eq default (get (del d k1) k1)))
+          (and
+             (value_eq default (get empty k1))
+             (value_eq v (get (set d k1 v) k1)))
+          (implies
+             (not (nat_eq k1 k2))
+             (value_eq (get (set d k1 v) k2)
+                       (get d k2))))

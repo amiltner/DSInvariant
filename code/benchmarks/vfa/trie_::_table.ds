@@ -1,3 +1,9 @@
+(* Sources:
+ * --------
+ * Specification: https://softwarefoundations.cis.upenn.edu/vfa-current/Trie.html
+ * Implementation: https://softwarefoundations.cis.upenn.edu/vfa-current/Trie.html
+ *)
+
 type value = mu value .
   | UnitVal
   | SingleVal of value

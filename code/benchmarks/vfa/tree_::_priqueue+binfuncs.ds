@@ -1,3 +1,9 @@
+(* Sources:
+ * --------
+ * Specification: https://softwarefoundations.cis.upenn.edu/vfa-current/Priqueue.html
+ * Implementation: https://softwarefoundations.cis.upenn.edu/vfa-current/Priqueue.html
+ *)
+
 type tree = mu tree .
   | Leaf
   | Node of (tree * nat * tree)

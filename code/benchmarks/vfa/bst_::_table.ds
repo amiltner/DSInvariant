@@ -1,3 +1,9 @@
+(* Sources:
+ * --------
+ * Specification: https://softwarefoundations.cis.upenn.edu/vfa-current/ADT.html
+ * Implementation: https://softwarefoundations.cis.upenn.edu/vfa-current/SearchTree.html
+ *)
+
 type value = mu value .
   | UnitVal
   | SingleVal of value
@@ -32,11 +38,11 @@ struct
         fun (x : nat) ->
           match b binding b with
           | Leaf -> default
-          | Node -> (match nat_eq x b.1 binding c with
-                     | True -> b.2
-                     | False -> (match nat_lt x b.1 binding c with
-                                 | True -> get b.0 x
-                                 | False -> get b.3 x))
+          | Node -> (match nat_lt x b.1 binding c with
+                     | True -> get b.0 x
+                     | False -> (match nat_lt b.1 x binding c with
+                                 | True -> get b.3 x
+                                 | False -> b.2))
   ;;
 
   let set =
@@ -48,9 +54,9 @@ struct
             | Leaf -> Node (Leaf, k, v, Leaf)
             | Node -> (match nat_lt k bp.1 binding c with
                        | True -> Node ((set bp.0 k v), bp.1, bp.2, bp.3)
-                       | False -> (match nat_eq k bp.1 binding c with
-                                   | True -> Node (bp.0, k, v, bp.3)
-                                   | False -> Node (bp.0, bp.1, bp.2, (set bp.3 k v))))
+                       | False -> (match nat_eq bp.1 k binding c with
+                                   | True -> Node (bp.0, bp.1, bp.2, (set bp.3 k v))
+                                   | False -> Node (bp.0, k, v, bp.3)))
   ;;
 end
 :

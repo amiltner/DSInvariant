@@ -1,3 +1,12 @@
+(* Sources:
+ * --------
+ * Specification: https://softwarefoundations.cis.upenn.edu/vfa-current/Trie.html
+ * Implementation: https://softwarefoundations.cis.upenn.edu/vfa-current/Trie.html
+ *
+ * `delete` (= `remove`) and specification for them used from Coq stdlib:
+ *   https://coq.github.io/doc/master/stdlib/Coq.FSets.FMapFacts.html
+ *)
+
 type value = mu value .
   | UnitVal
   | SingleVal of value
@@ -114,16 +123,19 @@ end
 maintains
 
 forall (d : t) .
-  forall (p1 : pos) .
-    forall (p2 : pos) .
+  forall (k1 : nat) .
+    forall (k2 : nat) .
       forall (v : value) .
         (and
            (and
               (and
-                 (value_eq default (lookup empty p1))
-                 (value_eq v (lookup (insert d p1 v) p1)))
+                 (value_eq default (get empty k1))
+                 (value_eq v (get (set d k1 v) k1)))
               (implies
-                 (not (pos_eq p1 p2))
-                 (value_eq (lookup (insert d p1 v) p2)
-                           (lookup d p2))))
-           (value_eq default (lookup (delete d p1) p1)))
+                 (not (nat_eq k1 k2))
+                 (and
+                    (value_eq (get (del d k1) k2)
+                              (get d k2))
+                    (value_eq (get (set d k1 v) k2)
+                              (get d k2)))))
+           (value_eq default (get (del d k1) k1)))
