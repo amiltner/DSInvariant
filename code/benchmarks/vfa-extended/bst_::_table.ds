@@ -57,7 +57,7 @@ struct
             | Leaf -> Node (Leaf, k, v, Leaf)
             | Node -> (match nat_lt k bp.1 binding c with
                        | True -> Node ((set bp.0 k v), bp.1, bp.2, bp.3)
-                       | False -> (match nat_eq bp.1 k binding c with
+                       | False -> (match nat_lt bp.1 k binding c with
                                    | True -> Node (bp.0, bp.1, bp.2, (set bp.3 k v))
                                    | False -> Node (bp.0, k, v, bp.3)))
   ;;

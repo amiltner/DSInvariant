@@ -48,10 +48,11 @@ def gather_datum(prog, path, base, timeout):
 
 
 def gather_data(rootlength, prog, path, base):
-    current_data = {"Test":join(path, base).replace("_","-")[rootlength:]}
-    res = gather_datum(prog, path, base,TIMEOUT_TIME)
-    with open(join(path,base+REF_EXT), "wb") as outfile:
-        outfile.write(res)
+    if not os.path.exists(path,base+REF_EXT):
+        current_data = {"Test":join(path, base).replace("_","-")[rootlength:]}
+        res = gather_datum(prog, path, base,TIMEOUT_TIME)
+        with open(join(path,base+REF_EXT), "wb") as outfile:
+            outfile.write(res)
 
 def specsize_compare(x,y):
     return int(x["SpecSize"])-int(y["SpecSize"])
