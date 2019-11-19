@@ -1,9 +1,0 @@
-(* Generated Tue Mar  3 15:20:26 2015 *)
-let extract : c -> nat =
-  let rec f1 (c1:c) : nat =
-    match c1 with
-      | B {x = n1;} -> n1
-      | R c2 -> f1 c2
-  in
-    f1
-;;

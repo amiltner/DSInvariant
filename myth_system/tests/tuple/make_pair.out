@@ -1,4 +1,0 @@
-(* Generated Wed Dec 31 11:21:25 2014 *)
-let make_pair : nat -> nat -> nat * nat =
-  fun (n1:nat) -> fun (n2:nat) -> (n1, n2)
-;;

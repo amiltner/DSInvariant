@@ -1,4 +1,0 @@
-(* Generated Thu Nov 13 04:28:00 2014 *)
-let list_sum : list -> nat =
-  fun (l1:list) -> fold l1 plus O
-;;

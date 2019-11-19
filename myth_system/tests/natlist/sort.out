@@ -1,9 +1,0 @@
-(* Generated Wed Dec 31 11:16:14 2014 *)
-let sort : list -> list =
-  let rec f1 (l1:list) : list =
-    match l1 with
-      | Nil -> Nil
-      | Cons (n1, l2) -> insert (f1 l2) n1
-  in
-    f1
-;;

@@ -1,4 +1,0 @@
-(* Generated Sun Mar  1 19:57:34 2015 *)
-let snd : nat * nat -> nat =
-  fun (t1:nat * nat) -> #2 t1
-;;

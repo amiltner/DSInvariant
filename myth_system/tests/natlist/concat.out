@@ -1,9 +1,0 @@
-(* Generated Wed Dec 31 11:16:14 2014 *)
-let concat : llist -> list =
-  let rec f1 (l1:llist) : list =
-    match l1 with
-      | LNil -> Nil
-      | LCons (l2, l3) -> append (f1 l3) l2
-  in
-    f1
-;;

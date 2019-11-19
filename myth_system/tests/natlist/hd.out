@@ -1,6 +1,0 @@
-(* Generated Wed Dec 31 11:16:29 2014 *)
-let hd : list -> nat =
-  fun (l1:list) -> match l1 with
-                     | Nil -> O
-                     | Cons (n1, l2) -> n1
-;;
