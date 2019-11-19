@@ -171,9 +171,7 @@ forall (s1 : t) .
                             (size (insert s1 i)))))
               (and
                  (not (lookup empty i))
-                 (and
-                   (lookup (insert s1 i) j)
-                   (lookup (insert s1 i) i))))
+                 (lookup (insert s1 i) i))))
            (and
               (and
                  (not (lookup (delete s1 i) i))
