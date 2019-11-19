@@ -187,7 +187,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                        ^ (Int.to_string attempt)
                        ^ "."));
        let pres =
-         begin match List.filter ~f:(RealVPIE.satisfies_testbed ~problem testbed) pres with
+         begin match List.filter ~f:(fun e -> RealVPIE.satisfies_testbed ~problem testbed (ref []) e) pres with
            | [] ->
              let subvalues =
                List.concat_map
@@ -221,7 +221,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                Consts.synthesis_calls
                (fun () ->
                   List.map
-                    ~f:(fun e -> assert (RealVPIE.satisfies_testbed ~problem testbed e); Expr.simplify e)
+                    ~f:(fun e -> assert (RealVPIE.satisfies_testbed ~problem testbed (ref []) e); Expr.simplify e)
                     (snd (S.synth ~problem ~testbed:testbed)))
            | pres ->
              pres
@@ -310,7 +310,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
         (testbed:TestBed.t)
       : Expr.t =
        let pres =
-         begin match List.filter ~f:(RealVPIE.satisfies_testbed ~problem testbed) !RealVPIE.possibilities with
+         begin match List.filter ~f:(fun (e,r) -> RealVPIE.satisfies_testbed ~problem testbed r e) !RealVPIE.possibilities with
            | [] ->
              (Log.info (lazy ("Learning new precondition set.")));
              let subvalues =
@@ -346,7 +346,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                  Consts.synthesis_times
                  Consts.max_synthesis_time
                  Consts.synthesis_calls
-                 (fun () -> List.map ~f:Expr.simplify (snd (S.synth ~problem ~testbed:testbed))
+                 (fun () -> (List.map ~f:(fun e -> (Expr.simplify e,ref [])) (snd (S.synth ~problem ~testbed:testbed)))
                  )
              in RealVPIE.possibilities := pres
                ; pres
@@ -357,7 +357,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
       (Log.info (lazy ("VPIE Attempt "
                        ^ (Int.to_string attempt)
                        ^ "."));
-       let synthed_pre = List.hd_exn pres in
+       let synthed_pre = fst (List.hd_exn pres) in
        Log.info (lazy ("Candidate Precondition: " ^ (DSToMyth.full_to_pretty_myth_string ~problem synthed_pre)));
        let full_pre = Expr.and_predicates pre synthed_pre in
        let model_o =

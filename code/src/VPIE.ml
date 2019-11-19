@@ -1,21 +1,39 @@
 open Core
 
 module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
-  let possibilities : Expr.t list ref = ref [Expr.mk_constant_true_func (Type._t)]
+  let possibilities : (Expr.t * ((Value.t * Value.t) list) ref) list ref = ref [Expr.mk_constant_true_func (Type._t),ref []]
 
   let satisfies_testbed
       ~(problem:Problem.t)
       (tb:TestBed.t)
+      (anses:((Value.t * Value.t) list) ref)
       (e : Expr.t)
     : bool =
-    List.for_all
-      ~f:(fun p ->
+    let run_val
+        (p:Value.t)
+      : Value.t =
+      let ans_o =
+        List.Assoc.find
+          ~equal:Value.equal
+          !anses
+          p
+      in
+      begin match ans_o with
+        | Some ans -> ans
+        | None ->
           let ans =
             Eval.evaluate_with_holes_basic
               ~tc:problem.tc
               ~eval_context:problem.eval_context
               (Expr.mk_app e (Value.to_exp p))
           in
+          anses := (p,ans)::(!anses);
+          ans
+      end
+    in
+    List.for_all
+      ~f:(fun p ->
+          let ans = run_val p in
           Value.equal
             ans
             Value.mk_true)
@@ -23,12 +41,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
       &&
       List.for_all
         ~f:(fun p ->
-            let ans =
-              Eval.evaluate_with_holes_basic
-                     ~tc:problem.tc
-                ~eval_context:problem.eval_context
-                (Expr.mk_app e (Value.to_exp p))
-            in
+            let ans = run_val p in
             Value.equal
               ans
               Value.mk_false)
@@ -107,32 +120,32 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
 
   let valid_answer_lists
       ~(problem:Problem.t)
-      ~(answer_lists : (Expr.t * TestBed.t * Value.t list) list)
+      ~(answer_lists : (Expr.t * TestBed.t * ((Value.t * Value.t) list) ref * Value.t list) list)
       ~(new_positives : Value.t list)
-    : (Expr.t * TestBed.t * Value.t list) list =
+    : (Expr.t * TestBed.t * ((Value.t * Value.t) list) ref * Value.t list) list =
     let answer_lists =
       List.filter_map
-        ~f:(fun (e,tb,ces) ->
+        ~f:(fun (e,tb,anses,ces) ->
             Option.map
-              ~f:(fun tb -> (e,tb,ces))
+              ~f:(fun tb -> (e,tb,anses,ces))
               (TestBed.add_pos_tests_safe ~testbed:tb new_positives))
         answer_lists
     in
     List.filter
-      ~f:(fun (e,tb,_) -> satisfies_testbed ~problem tb e)
+      ~f:(fun (e,tb,anses,_) -> satisfies_testbed ~problem tb anses e)
       answer_lists
 
   let synth_new_inv
       ~(problem:Problem.t)
       ~(testbed:TestBed.t)
-    : Expr.t =
+    : Expr.t * ((Value.t * Value.t) list) ref =
     possibilities :=
       List.dedup_and_sort
-        ~compare:Expr.compare
+        ~compare:(fun (e1,_) (e2,_) -> Expr.compare e1 e2)
         (List.filter
-           ~f:(satisfies_testbed ~problem (TestBed.remove_all_negatives ~testbed))
+           ~f:(fun (e1,vr) -> satisfies_testbed ~problem (TestBed.remove_all_negatives ~testbed) vr e1)
            !possibilities);
-    begin match List.filter ~f:(satisfies_testbed ~problem (TestBed.remove_all_positives ~testbed)) !possibilities with
+    begin match List.filter ~f:(fun (e1,vr) -> satisfies_testbed ~problem (TestBed.remove_all_positives ~testbed) vr e1) !possibilities with
       | [] ->
         let subvalues =
           List.concat_map
@@ -176,7 +189,9 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
         in
         let results =
           List.map
-            ~f:(fun e -> assert (satisfies_testbed ~problem testbed e); Expr.simplify e)
+            ~f:(fun e ->
+                let vr = ref [] in
+                assert (satisfies_testbed ~problem testbed vr e); (Expr.simplify e,vr))
             results
         in
         if !Consts.synth_result_persistance then
@@ -279,12 +294,12 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
       ~(post : UniversalFormula.t)
     : Expr.t =
     let rec learnVPreCondTrueAllInternal
-        ~(answer_lists : (Expr.t * TestBed.t * Value.t list) list)
+        ~(answer_lists : (Expr.t * TestBed.t * ((Value.t * Value.t) list) ref * Value.t list) list)
       : Expr.t =
       Log.info (lazy ("Answer list length: " ^ (string_of_int (List.length answer_lists))));
       begin match answer_lists with
         | [] -> failwith "something went drastically wrong"
-        | (invariant,testbed,ces)::answer_lists ->
+        | (invariant,testbed,anses,ces)::answer_lists ->
           let old_invariant = invariant in
           let old_testbed = testbed in
           Log.info (lazy ("Candidate invariant: " ^ (DSToMyth.full_to_pretty_myth_string ~problem invariant)));
@@ -344,12 +359,12 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                       ~testbed
                       model
                   in
-                  let new_inv =
+                  let (new_inv,new_anses) =
                     synth_new_inv
                       ~problem
                       ~testbed
                   in
-                  let answer_lists = (new_inv,testbed,[])::(old_invariant,old_testbed,model)::answer_lists in
+                  let answer_lists = (new_inv,testbed,new_anses,[])::(old_invariant,old_testbed,anses,model)::answer_lists in
                   learnVPreCondTrueAllInternal
                     ~answer_lists
               end
@@ -370,7 +385,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                       ~testbed
                       new_positives
                   in
-                  [(Expr.mk_constant_true_func Type._t,testbed,[])]
+                  [(Expr.mk_constant_true_func Type._t,testbed,ref [],[])]
               in
               learnVPreCondTrueAllInternal
                 ~answer_lists
@@ -380,7 +395,7 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
     let true_invariant = Expr.mk_constant_true_func Type._t in
     let false_invariant = Expr.mk_constant_false_func Type._t in
     let testbed = TestBed.create_positive [] in
-    let answer_lists = [(false_invariant,testbed,[]);(true_invariant,testbed,[])] in
+    let answer_lists = [(false_invariant,testbed,ref [],[]);(true_invariant,testbed,ref [],[])] in
     learnVPreCondTrueAllInternal
       ~answer_lists
 
