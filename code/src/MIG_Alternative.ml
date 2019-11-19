@@ -16,12 +16,16 @@ module Make
     : Value.t list * Value.t list =
     Log.info
       (lazy ("Checking boundary for:" ^ (DSToMyth.full_to_pretty_myth_string ~problem eval)));
-    (L.verifier
-       ~problem
-       eval_t
-       post
-       (LR.Set positives)
-       (Eval.evaluate_with_holes_basic ~tc:problem.tc ~eval_context:problem.eval_context eval))
+    Consts.full_time
+      Consts.verification_times
+      Consts.max_verification_time
+      Consts.verification_calls
+      (fun () -> (L.verifier
+                    ~problem
+                    eval_t
+                    post
+                    (LR.Set positives)
+                    (Eval.evaluate_with_holes_basic ~tc:problem.tc ~eval_context:problem.eval_context eval)))
 
   let satisfyTransAll
       ~problem:(problem : Problem.t)
@@ -160,6 +164,7 @@ module Make
         ~problem
         ~testbed
     in
+    Consts.invariant_size := Expr.size (List.hd_exn es);
     DSToMyth.full_to_pretty_myth_string (List.hd_exn es)
       ~problem
 
@@ -205,4 +210,30 @@ module Make
     | First inv -> inv
     | Second ce -> restart_with_new_positives ce
 
+  let learnInvariant ~(unprocessed_problem : Problem.t_unprocessed)
+    : string =
+    let problem = Problem.process unprocessed_problem in
+    let inv =
+      learnInvariant_internal
+        ~problem
+        ~positives:[]
+        ~attempt:0
+    in
+    Consts.invariant_size := Expr.size inv;
+    DSToMyth.full_to_pretty_myth_string inv
+      ~problem
+
+  let learnInvariantLinearArbitrary
+      ~(unprocessed_problem : Problem.t_unprocessed)
+    : string =
+    let problem = Problem.process unprocessed_problem in
+    let inv =
+      VPIE.learnInvariantLinearArbitrary
+        ~problem
+        ~testbed:(TestBed.create_positive [])
+        ~invariant:(Expr.mk_constant_true_func Type._t)
+    in
+    Consts.invariant_size := Expr.size inv;
+    DSToMyth.full_to_pretty_myth_string inv
+      ~problem
 end

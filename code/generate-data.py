@@ -16,16 +16,19 @@ def stddev(lst):
     mean = float(sum(lst)) / len(lst)
     return sqrt(float(reduce(lambda x, y: x + y, map(lambda x: (x - mean) ** 2, lst))) / len(lst))
 
+def average(lst):
+    return sum(lst)/len(lst)
+
 
 TEST_EXT = '.ds'
 REF_EXT = '.out'
 BASELINE_EXT = '.out'
-BASE_FLAGS = []
-TIMEOUT_TIME = 1800
+BASE_FLAGS = ["-print-data"]
+TIMEOUT_TIME = 1805
 STILL_WORK_TIMEOUT_TIME = 120
 GENERATE_EXAMPLES_TIMEOUT_TIME = 600000
 
-REPETITION_COUNT = 1
+REPETITION_COUNT = 10
 
 def ensure_dir(f):
     d = os.path.dirname(f)
@@ -58,61 +61,88 @@ def gather_datum(prog, path, base, additional_flags, timeout):
 def gather_data(rootlength, prog, path, base):
     current_data = {"Test":join(path, base).replace("_","-")[rootlength:]}
 
-    def gather_col(flags, run_combiner, col_name, timeout_time, repetition_count, compare):
-        print(col_name)
+    def gather_col(flags, run_combiner, col_names, timeout_time, repetition_count, compare):
+        print(col_names)
         run_data = []
         timeout = False
         error = False
+        incorrect = False
         for iteration in range(repetition_count):
-    	    (time,datum,err) = gather_datum(prog, path, base,flags,timeout_time)
+            (time,datum,err) = gather_datum(prog, path, base,flags,timeout_time)
             if err != "":
                 print(err)
                 error = True
                 break
-            if time >= TIMEOUT_TIME:
+            if time >= TIMEOUT_TIME - 5:
                 timeout = True
                 break
-            run_data.append([time] + datum.split(","))
+            this_run_data = [time] + map(lambda d: d.strip(),datum.split(";"))
+            if not check_equal(path,base,this_run_data[1]) and compare:
+                incorrect = True
+            run_data.append(this_run_data)
         if error:
             print("error")
-            current_data[col_name]="error"
+            for col_name in col_names:
+                current_data[col_name]="error"
         elif timeout:
             print("timeout")
-	    current_data[col_name]="timeout"
-        elif not check_equal(path,base,datum) and compare:
+            for col_name in col_names:
+                current_data[col_name]="timeout"
+        elif incorrect:
             print("incorrect")
-	    current_data[col_name]="incorrect"
+            for col_name in col_names:
+                current_data[col_name]="incorrect"
         else:
             run_data_transpose = transpose(run_data)
-            current_data[col_name]=run_combiner(run_data_transpose)
+            print(run_data_transpose)
+            combined_data = run_combiner(run_data_transpose)
+            for (col_name,data) in zip(col_names,combined_data):
+                current_data[col_name] = data
 
     def ctime_combiner(run_data_transpose):
         computation_time_col = [float(x) for x in run_data_transpose[0]]
-        ans = sum(computation_time_col)/len(computation_time_col)
-        return ans
+        synthesis_calls_col = [int(x) for x in run_data_transpose[2]]
+        verification_calls_col = [int(x) for x in run_data_transpose[3]]
+        max_synth_time_calls = [float(x) for x in run_data_transpose[4]]
+        max_verif_time_calls = [float(x) for x in run_data_transpose[5]]
+        total_synth_time = [float(x) for x in run_data_transpose[6]]
+        total_verif_time = [float(x) for x in run_data_transpose[7]]
+        invariant_size_col = [int(x) for x in run_data_transpose[8]]
+        average_computation = average(computation_time_col)
+        synth_calls = synthesis_calls_col[0]
+        verif_calls = verification_calls_col[0]
+        average_max_synth = average(max_synth_time_calls)
+        average_max_verif = average(max_verif_time_calls)
+        average_total_synth_time = average(total_synth_time)
+        average_total_verif_time = average(total_verif_time)
+        invariant_size = invariant_size_col[0]
+        return [average_computation,synth_calls,verif_calls,average_max_synth,average_max_verif,average_total_synth_time,average_total_verif_time,invariant_size]
 
     def exs_reqd_combiner(run_data_transpose):
-	    example_number_col = [float(x) for x in run_data_transpose[0]]
-	    return "{:.1f}".format(sum(example_number_col)/len(example_number_col))
+        example_number_col = [float(x) for x in run_data_transpose[0]]
+        return "{:.1f}".format(sum(example_number_col)/len(example_number_col))
 
     def max_exs_reqd_combiner(run_data_transpose):
-	    example_number_col = [float(x) for x in run_data_transpose[0]]
-	    return int(sum(example_number_col)/len(example_number_col))
+        example_number_col = [float(x) for x in run_data_transpose[0]]
+        return int(sum(example_number_col)/len(example_number_col))
 
     def specsize_combiner(run_data_transpose):
-            print(run_data_transpose[1])
-	    example_number_col = [float(x) for x in run_data_transpose[1]]
-	    return int(sum(example_number_col)/len(example_number_col))
+        print(run_data_transpose[1])
+        example_number_col = [float(x) for x in run_data_transpose[1]]
+        return int(sum(example_number_col)/len(example_number_col))
 
 
     #gather_col([],ctime_combiner,"SS",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([],ctime_combiner,"Full",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-prelude-context"],ctime_combiner,"FullP",TIMEOUT_TIME,REPETITION_COUNT)
-    gather_col([],ctime_combiner,"Myth",TIMEOUT_TIME,REPETITION_COUNT,True)
-    gather_col(["-use-fold"],ctime_combiner,"Fold",TIMEOUT_TIME,REPETITION_COUNT,False)
-    gather_col(["-smallestthirty"],ctime_combiner,"SmallestThirty",TIMEOUT_TIME,REPETITION_COUNT,True)
-    gather_col(["-srp"],ctime_combiner,"SRP",TIMEOUT_TIME,REPETITION_COUNT,True)
-    gather_col(["-clp"],ctime_combiner,"CLP",TIMEOUT_TIME,REPETITION_COUNT,True)
+        return [average_computation,synth_calls,verif_calls,average_max_synth,average_max_verif,average_total_synth_time,average_total_verif_time]
+    gather_col([],ctime_combiner,["MythTime","MythSynthCalls","MythVerifCalls","MythMaxSynthTime","MythMaxVerifTime","MythTotalSynthTime","MythTotalVerifTime","InvariantSize"],TIMEOUT_TIME,REPETITION_COUNT,True)
+    #gather_col(["-use-fold"],ctime_combiner,["FoldTime","FoldSynthCalls","FoldVerifCalls","FoldMaxSynthTime","FoldMaxVerifTime","FoldTotalSynthTime","FoldTotalVerifTime"],TIMEOUT_TIME,REPETITION_COUNT,False)
+    #gather_col(["-smallestthirty"],ctime_combiner,["ThirtyTime","ThirtySynthCalls","ThirtyVerifCalls","ThirtyMaxSynthTime","ThirtyMaxVerifTime","ThirtyTotalSynthTime","ThirtyTotalVerifTime"],TIMEOUT_TIME,REPETITION_COUNT,False)
+    #gather_col(["-srp"],ctime_combiner,["SRPTime","SRPSynthCalls","SRPVerifCalls","SRPMaxSynthTime","SRPMaxVerifTime","SRPTotalSynthTime","SRPTotalVerifTime"],TIMEOUT_TIME,REPETITION_COUNT,False)
+    #gather_col(["-clp"],ctime_combiner,["CLPTime","CLPSynthCalls","CLPVerifCalls","CLPMaxSynthTime","CLPMaxVerifTime","CLPTotalSynthTime","CLPTotalVerifTime"],TIMEOUT_TIME,REPETITION_COUNT,False)
+    gather_col(["-conj-str"],ctime_combiner,["ConjStrTime","ConjStrSynthCalls","ConjStrVerifCalls","ConjStrMaxSynthTime","ConjStrMaxVerifTime","ConjStrTotalSynthTime","ConjStrTotalVerifTime"],TIMEOUT_TIME,REPETITION_COUNT,False)
+    gather_col(["-linear-arbitrary"],ctime_combiner,["LAStrTime","LAStrSynthCalls","LAStrVerifCalls","LAStrMaxSynthTime","LAStrMaxVerifTime","LAStrTotalSynthTime","LAStrTotalVerifTime"],TIMEOUT_TIME,REPETITION_COUNT,False)
     #gather_col([lambda p, b: "-use-myth", lambda p, b: "-prelude-context"],ctime_combiner,"MythP",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-gat"],ctime_combiner,"GAT",TIMEOUT_TIME,REPETITION_COUNT)
     #gather_col([lambda p, b: "-a",lambda p, b: join(p, b + ".accum"), lambda p, b: "-no-dedup"],ctime_combiner,"NDD",TIMEOUT_TIME,REPETITION_COUNT)
@@ -173,19 +203,25 @@ def gather_data(rootlength, prog, path, base):
 
     return current_data
 
+def extract_test(x):
+    return x["Test"]
+
 def specsize_compare(x,y):
     return int(x["SpecSize"])-int(y["SpecSize"])
 
+def test_compare(x,y):
+    return int(x["Test"])-int(y["Test"])
+
 def sort_data(data):
-    return sorted(data,cmp=specsize_compare)
+    data.sort(key=extract_test)#sorted(data,cmp=test_compare)
 
 def print_data(data):
     print(data)
     ensure_dir("generated_data/")
     with open("generated_data/generated_data.csv", "wb") as csvfile:
-	datawriter = csv.DictWriter(csvfile,fieldnames=data[0].keys())
-	datawriter.writeheader()
-	datawriter.writerows(data)
+        datawriter = csv.DictWriter(csvfile,fieldnames=data[0].keys())
+        datawriter.writeheader()
+        datawriter.writerows(data)
 
 def print_usage(args):
     print("Usage: {0} <prog> <test|testdir>".format(args[0]))
@@ -194,10 +230,10 @@ def transform_data(path, base, run_data):
     current_data = {"Test":join(path, base + TEST_EXT).replace("_","-")[6:]}
     run_data_transpose = transpose(run_data)
     for index in range(len(run_data_transpose)/2):
-	col_name = run_data_transpose[index][0]
-	col_data = run_data_transpose[index+1]
+        col_name = run_data_transpose[index][0]
+        col_data = run_data_transpose[index+1]
         if "" in col_data:
-	    current_data[col_name]=-1
+            current_data[col_name]=-1
         else:
             col = [float(x) for x in col_data]
             current_data[col_name] = str(sum(col)/len(col))
@@ -217,20 +253,21 @@ def main(args):
         path = args[2]
         rootlength = len(path)
         data = load_data()
+        print(data)
         if not os.path.exists(prog):
             print_usage(args)
         elif os.path.exists(path) and os.path.isdir(path):
             for path, base in find_tests(path):
-                test_name = join(path, base + TEST_EXT).replace("_","-")[rootlength:]
+                test_name = join(path, base).replace("_","-")[rootlength:]
                 print(test_name)
                 if (not (any(row["Test"] == test_name for row in data))):
                     current_data = gather_data(rootlength,prog, path, base)
                     data.append(current_data)
-	            print_data(data)
+                    print_data(data)
                 else:
                     print("data already retrieved")
-            #data = sort_data(data)
-	    print_data(data)
+            sort_data(data)
+            print_data(data)
         else:
             path, filename = os.path.split(path)
             base, ext = splitext(filename)
@@ -239,7 +276,6 @@ def main(args):
             else:
                 data = gather_data(prog, path, base)
                 sort_data(data)
-		print_data([data])
     else:
         print_usage(args)
 

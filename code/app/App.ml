@@ -36,7 +36,7 @@ let read_accum = function
            | [ accum_types ; accum_annot ] -> (accum_types , accum_annot)
            | _ -> raise (DSInvGen.Exceptions.Parse_Exn "bad accumulating annotation")
 
-let main (* nworkers *) accum_file use_fold srp clp smallest50 prelude_context gat ndd filename () =
+let main (* nworkers *) accum_file use_fold srp clp smallest50 prelude_context gat ndd conjstr linarb print_data filename () =
   Consts.use_myth := not use_fold;
   Consts.synth_result_persistance := not srp;
   Consts.counterexample_list_persistance := not clp;
@@ -59,10 +59,30 @@ let main (* nworkers *) accum_file use_fold srp clp smallest50 prelude_context g
           (AltMIG.learnInvariant_internal_smallest50 ~unprocessed_problem)
         else if use_fold then
           (EMIG.learnInvariant ~unprocessed_problem)
+        else if conjstr then
+          (AltMIG.learnInvariant ~unprocessed_problem)
+        else if linarb then
+          (AltMIG.learnInvariantLinearArbitrary ~unprocessed_problem)
         else
           (MythMIG.learnInvariant ~unprocessed_problem)
       in
-      print_endline inv
+      print_endline inv;
+      if print_data then
+        (print_endline ";";
+         print_endline (string_of_int !Consts.synthesis_calls);
+         print_endline ";";
+         print_endline (string_of_int !Consts.verification_calls);
+         print_endline ";";
+         print_endline (Float.to_string !Consts.max_synthesis_time);
+         print_endline ";";
+         print_endline (Float.to_string !Consts.max_verification_time);
+         print_endline ";";
+         print_endline (Float.to_string !Consts.synthesis_times);
+         print_endline ";";
+         print_endline (Float.to_string !Consts.verification_times);
+         print_endline ";";
+         print_endline (string_of_int !Consts.invariant_size);
+        )
 
 let spec =
   Command.Spec.(
@@ -84,6 +104,12 @@ let spec =
       ~doc:"Generate and test the synthesized programs"
     +> flag "-no-dedup" no_arg
       ~doc:"Do not perform observational equivalence deduplication"
+    +> flag "-conj-str" no_arg
+      ~doc:"Synth via conjunctive strengthening"
+    +> flag "-linear-arbitrary" no_arg
+      ~doc:"Synth via linear arbitrary"
+    +> flag "-print-data" no_arg
+      ~doc:"print data"
     +> anon ("filename" %: file)
   )
 

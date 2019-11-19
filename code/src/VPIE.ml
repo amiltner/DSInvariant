@@ -78,27 +78,32 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
            Value.equal
              Value.mk_true
              (Eval.evaluate_with_holes_basic
-                     ~eval_context:problem.eval_context
-                     ~tc:problem.tc
-                     (Expr.mk_app
-                        invariant
-                        (Value.to_exp v))))
+                ~eval_context:problem.eval_context
+                ~tc:problem.tc
+                (Expr.mk_app
+                   invariant
+                   (Value.to_exp v))))
     in
-    snd
-      (List.fold_left
-         ~f:(fun acc (eval,eval_t) ->
-             begin match acc with
-               | ([],[]) ->
-                 check_boundary_singleton
-                   ~problem
-                   ~eval
-                   ~eval_t
-                   ~post
-                   ~positives
-               | _ -> acc
-             end)
-         ~init:([],[])
-         problem.mod_vals)
+    Consts.full_time
+      Consts.verification_times
+      Consts.max_verification_time
+      Consts.verification_calls
+      (fun () ->
+         snd
+           (List.fold_left
+              ~f:(fun acc (eval,eval_t) ->
+                  begin match acc with
+                    | ([],[]) ->
+                      check_boundary_singleton
+                        ~problem
+                        ~eval
+                        ~eval_t
+                        ~post
+                        ~positives
+                    | _ -> acc
+                  end)
+              ~init:([],[])
+              problem.mod_vals))
 
   let valid_answer_lists
       ~(problem:Problem.t)
@@ -162,7 +167,13 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
         in
         Log.info (lazy "testbed");
         Log.info (lazy (TestBed.show testbed));
-        let results = snd (S.synth ~problem ~testbed:testbed) in
+        let results =
+          Consts.full_time
+            Consts.synthesis_times
+            Consts.max_synthesis_time
+            Consts.synthesis_calls
+            (fun () -> snd (S.synth ~problem ~testbed:testbed))
+        in
         let results =
           List.map
             ~f:(fun e -> assert (satisfies_testbed ~problem testbed e); Expr.simplify e)
@@ -182,12 +193,17 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
     : Value.t list =
     Log.info (lazy ("verifying proves postcondition"));
     let vs =
-      V.implication_counter_example
-        ~problem
-        ~pre:invariant
-        ~eval:(Expr.mk_identity_func (Type._t))
-        ~eval_t:(Type.mk_arrow (Type._t) (Type._t))
-        ~post
+      Consts.full_time
+        Consts.verification_times
+        Consts.max_verification_time
+        Consts.verification_calls
+        (fun () ->
+           V.implication_counter_example
+             ~problem
+             ~pre:invariant
+             ~eval:(Expr.mk_identity_func (Type._t))
+             ~eval_t:(Type.mk_arrow (Type._t) (Type._t))
+             ~post)
     in
     begin match vs with
       | [] ->
@@ -215,42 +231,47 @@ module Make (V : Verifier.t) (S : Synthesizer.t) (L : LR.t) = struct
                         invariant
                         (Value.to_exp v))))
     in
-    List.fold_left
-      ~f:(fun acc (eval,eval_t) ->
-          begin match acc with
-            | [] ->
-              Log.info (lazy ("verifying: " ^ DSToMyth.full_to_pretty_myth_string ~problem eval));
-              let model =
-                (L.verifier
+    Consts.full_time
+      Consts.verification_times
+      Consts.max_verification_time
+      Consts.verification_calls
+      (fun () ->
+         List.fold_left
+           ~f:(fun acc (eval,eval_t) ->
+               begin match acc with
+                 | [] ->
+                   Log.info (lazy ("verifying: " ^ DSToMyth.full_to_pretty_myth_string ~problem eval));
+                   let model =
+                     (L.verifier
+                        ~problem
+                        eval_t
+                        invariant_pred
+                        invariant_pred
+                        (Eval.evaluate_with_holes_basic ~tc:problem.tc ~eval_context:problem.eval_context eval))
+                   in
+                   begin match model with
+                     | ([],[]) -> Log.info (lazy ("Safe")); fst model
+                     | _ ->
+                       Log.info
+                         (lazy ("Not a LR, counterexample:"
+                                ^ (Log.indented_sep 4)
+                                ^ (List.to_string ~f:Value.show (snd model))
+                                ^ (Log.indented_sep 4)
+                                ^ "Comes from"
+                                ^ (Log.indented_sep 4)
+                                ^ (List.to_string ~f:Value.show (fst model)))) ;
+                       fst model
+                   end
+                 (*V.implication_counter_example
                    ~problem
-                   eval_t
-                   invariant_pred
-                   invariant_pred
-                   (Eval.evaluate_with_holes_basic ~tc:problem.tc ~eval_context:problem.eval_context eval))
-              in
-              begin match model with
-                | ([],[]) -> Log.info (lazy ("Safe")); fst model
-                | _ ->
-                  Log.info
-                    (lazy ("Not a LR, counterexample:"
-                           ^ (Log.indented_sep 4)
-                           ^ (List.to_string ~f:Value.show (snd model))
-                           ^ (Log.indented_sep 4)
-                           ^ "Comes from"
-                           ^ (Log.indented_sep 4)
-                           ^ (List.to_string ~f:Value.show (fst model)))) ;
-                  fst model
-              end
-            (*V.implication_counter_example
-              ~problem
-              ~pre:full_pre
-              ~eval
-              ~eval_t
-              ~post*)
-            | _ -> acc
-          end)
-      ~init:[]
-      problem.mod_vals
+                   ~pre:full_pre
+                   ~eval
+                   ~eval_t
+                   ~post*)
+                 | _ -> acc
+               end)
+           ~init:[]
+           problem.mod_vals)
 
 
   let learnVPreCondTrueAll

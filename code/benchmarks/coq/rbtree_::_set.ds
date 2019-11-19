@@ -159,7 +159,7 @@ forall (s : t) .
                 (nat_eq (O) (size empty))
                 (implies
                   (not (lookup s i))
-                  (nat_lt (size s1)
+                  (nat_lt (size s)
                           (size (insert s i)))))
             (and
                 (not (lookup empty i))

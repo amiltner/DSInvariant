@@ -13,6 +13,7 @@ module Make
         ~problem
         ~post:(problem.post)
     in
+    Consts.invariant_size := Expr.size inv;
     DSToMyth.full_to_pretty_myth_string inv
       ~problem
 end

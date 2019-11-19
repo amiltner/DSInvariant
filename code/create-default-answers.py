@@ -48,7 +48,7 @@ def gather_datum(prog, path, base, timeout):
 
 
 def gather_data(rootlength, prog, path, base):
-    if not os.path.exists(path,base+REF_EXT):
+    if not os.path.exists(join(path,base+REF_EXT)):
         current_data = {"Test":join(path, base).replace("_","-")[rootlength:]}
         res = gather_datum(prog, path, base,TIMEOUT_TIME)
         with open(join(path,base+REF_EXT), "wb") as outfile:
