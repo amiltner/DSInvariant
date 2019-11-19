@@ -1,6 +1,0 @@
-(* Generated Wed Dec 31 11:16:17 2014 *)
-let tl : natlist -> natlist =
-  fun (n1:natlist) -> match n1 with
-                        | Nil -> Nil
-                        | Cons (n2, n3) -> n3
-;;

@@ -1,5 +1,0 @@
-(* Generated Wed Dec 31 11:21:25 2014 *)
-let make_quadruple : nat -> nat -> nat -> nat -> nat * nat * nat * nat =
-  fun (n1:nat) ->
-    fun (n2:nat) -> fun (n3:nat) -> fun (n4:nat) -> (n1, n2, n3, n4)
-;;

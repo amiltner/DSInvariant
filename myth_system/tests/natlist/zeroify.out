@@ -1,4 +1,0 @@
-(* Generated Wed Dec 31 11:16:12 2014 *)
-let zeroify : list -> list =
-  fun (l1:list) -> map l1 (fun (n1:nat) -> O)
-;;
